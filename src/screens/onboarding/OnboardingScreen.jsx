@@ -1,6 +1,8 @@
 import React, { useState, useRef } from 'react';
 import { View, Text, Image, FlatList, Dimensions, TouchableOpacity, StyleSheet } from 'react-native';
 import SafeAreaWrapper from '../../components/common/SafeAreaWrapper';
+import { useAuth } from '../../context/AuthContext';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width } = Dimensions.get('window');
 
@@ -31,25 +33,30 @@ const onboardingData = [
   },
 ];
 
-const OnboardingScreen = ({ navigation }) => {
+const OnboardingScreen = () => {
+  const { login } = useAuth();
   const [currentIndex, setCurrentIndex] = useState(0);
   const flatListRef = useRef(null);
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (currentIndex < onboardingData.length - 1) {
       flatListRef.current?.scrollToIndex({
         index: currentIndex + 1,
         animated: true,
       });
     } else {
-      // Navigate to Main screen (since we're setting isAuthenticated to true)
-      navigation.replace('Main');
+      // Complete onboarding and login the user
+      // Ensure the hasLaunched flag is set to true
+      await AsyncStorage.setItem('hasLaunched', 'true');
+      login();
     }
   };
 
-  const handleSkip = () => {
-    // Navigate to Main screen (since we're setting isAuthenticated to true)
-    navigation.replace('Main');
+  const handleSkip = async () => {
+    // Skip onboarding and login the user
+    // Ensure the hasLaunched flag is set to true
+    await AsyncStorage.setItem('hasLaunched', 'true');
+    login();
   };
 
   const renderItem = ({ item }) => {

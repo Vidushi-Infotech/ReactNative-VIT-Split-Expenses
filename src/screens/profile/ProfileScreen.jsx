@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Switch, StyleSheet, Image, Modal, FlatList } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useTheme } from '../../context/ThemeContext';
+import { useAuth } from '../../context/AuthContext';
 import { availableColorThemes, availableDisplayModes, getThemeColors } from '../../theme/theme';
 import SafeAreaWrapper from '../../components/common/SafeAreaWrapper';
 
@@ -14,8 +15,9 @@ const currentUser = {
   avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e',
 };
 
-const ProfileScreen = ({ navigation }) => {
+const ProfileScreen = () => {
   const { isDarkMode, displayMode, colorTheme, setDisplayMode, setColorTheme, colors: themeColors } = useTheme();
+  const { logout } = useAuth();
 
   // Modal states
   const [showThemeModal, setShowThemeModal] = useState(false);
@@ -23,10 +25,8 @@ const ProfileScreen = ({ navigation }) => {
 
   const handleLogout = () => {
     // In a real app, we would clear auth tokens here
-    navigation.reset({
-      index: 0,
-      routes: [{ name: 'Auth' }],
-    });
+    logout();
+    // No need to manually navigate - the AuthContext will handle this
   };
 
   const toggleDarkMode = () => {
