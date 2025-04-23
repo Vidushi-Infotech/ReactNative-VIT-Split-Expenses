@@ -31,5 +31,24 @@ target 'VitSplit' do
       :mac_catalyst_enabled => false,
       # :ccache_enabled => true
     )
+
+    # Fix for font duplication error
+    installer.pods_project.targets.each do |target|
+      target.build_phases.each do |build_phase|
+        if build_phase.respond_to?(:name) && build_phase.name.eql?('[CP] Copy Pods Resources')
+          build_phase.input_paths.delete_if { |path| path.include?("react-native-vector-icons") && path.include?(".ttf") }
+          build_phase.output_paths.delete_if { |path| path.include?("react-native-vector-icons") && path.include?(".ttf") }
+        end
+      end
+    end
+
+    # Additional fix for font duplication
+    installer.target_installation_results.pod_target_installation_results.each do |pod_name, target_installation_result|
+      target_installation_result.resource_bundle_targets.each do |resource_bundle_target|
+        resource_bundle_target.build_configurations.each do |config|
+          config.build_settings['CODE_SIGNING_ALLOWED'] = 'NO'
+        end
+      end
+    end
   end
 end
