@@ -82,7 +82,7 @@ export const mockGroups = [
     createdBy: mockUsers[3].id,
     createdAt: '2023-06-01T12:00:00Z',
   },
-  
+
 ];
 
 // Mock Expenses
@@ -175,7 +175,7 @@ export const mockNotifications = [
     id: 'notif2',
     type: 'payment_reminder',
     title: 'Payment reminder',
-    message: 'You need to pay Mike Brown $66.67 for Electricity bill',
+    message: 'You need to pay Mike Brown ₹66.67 for Electricity bill',
     date: '2023-03-18T09:30:00Z',
     read: true,
     data: { paymentId: 'payment3', groupId: 'group2' },
@@ -193,7 +193,7 @@ export const mockNotifications = [
     id: 'notif4',
     type: 'payment_received',
     title: 'Payment received',
-    message: 'John Doe paid you $40.17',
+    message: 'John Doe paid you ₹40.17',
     date: '2023-04-18T10:35:00Z',
     read: true,
     data: { paymentId: 'payment1', groupId: 'group1' },

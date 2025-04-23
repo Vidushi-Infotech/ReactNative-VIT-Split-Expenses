@@ -165,8 +165,7 @@ const AppNavigator = () => {
           name="AddExpense"
           component={AddExpenseScreen}
           options={{
-            headerShown: true,
-            headerTitle: 'Add Expense',
+            headerShown: false,
             headerTintColor: isDarkMode ? '#FFFFFF' : '#1A202C',
             headerStyle: {
               backgroundColor: isDarkMode ? '#1A202C' : '#F7FAFC',

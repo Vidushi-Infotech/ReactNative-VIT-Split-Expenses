@@ -118,7 +118,7 @@ const GroupDetailsScreen = () => {
                 <View style={styles.groupStatsContainer}>
                   <View style={styles.groupStat}>
                     <Text style={[styles.groupStatValue, { color: themeColors.primary.default }]}>
-                      ${totalExpenses.toFixed(2)}
+                      ₹{totalExpenses.toFixed(2)}
                     </Text>
                     <Text style={[styles.groupStatLabel, { color: themeColors.textSecondary }]}>
                       Total
@@ -309,7 +309,7 @@ const GroupDetailsScreen = () => {
                         />
                       </View>
                       <Text style={[styles.balanceText, { color: getBalanceTextColor() }]}>
-                        {isPositive ? '+' : isNegative ? '-' : ''}${Math.abs(balance).toFixed(2)}
+                        {isPositive ? '+' : isNegative ? '-' : ''}₹{Math.abs(balance).toFixed(2)}
                       </Text>
                     </View>
                   </Animated.View>

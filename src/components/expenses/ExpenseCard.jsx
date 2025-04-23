@@ -75,7 +75,7 @@ const ExpenseCard = ({ expense }) => {
             </View>
 
             <Text style={[styles.amount, { color: isDarkMode ? colors.white : colors.dark.default }]}>
-              ${expense.amount.toFixed(2)}
+              ₹{expense.amount.toFixed(2)}
             </Text>
           </View>
 
