@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { AppState } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -97,9 +98,11 @@ const AppNavigator = () => {
       try {
         const hasLaunched = await AsyncStorage.getItem('hasLaunched');
         if (hasLaunched === null) {
+          // This is the first launch, show onboarding
           setIsFirstLaunch(true);
-          await AsyncStorage.setItem('hasLaunched', 'true');
+          // Don't set hasLaunched to true here - let the onboarding screens do it
         } else {
+          // Not the first launch, skip onboarding
           setIsFirstLaunch(false);
         }
       } catch (error) {
@@ -110,8 +113,8 @@ const AppNavigator = () => {
 
     checkFirstLaunch();
 
-    // Add a listener to check for changes to the hasLaunched flag
-    const checkLaunchStatus = async () => {
+    // Add a listener for AsyncStorage changes
+    const handleAppStateChange = async () => {
       try {
         const hasLaunched = await AsyncStorage.getItem('hasLaunched');
         if (hasLaunched !== null) {
@@ -122,11 +125,18 @@ const AppNavigator = () => {
       }
     };
 
-    // Set up an interval to check the launch status
-    const interval = setInterval(checkLaunchStatus, 1000);
+    // Listen for app state changes (foreground, background, etc.)
+    AppState.addEventListener('change', handleAppStateChange);
 
-    // Clean up the interval when the component unmounts
-    return () => clearInterval(interval);
+    // Check for hasLaunched changes every 500ms
+    // This is a workaround to detect AsyncStorage changes
+    const interval = setInterval(checkFirstLaunch, 500);
+
+    // Clean up the listener and interval when the component unmounts
+    return () => {
+      AppState.removeEventListener('change', handleAppStateChange);
+      clearInterval(interval);
+    };
   }, []);
 
   // Show loading while checking first launch or auth status
@@ -136,76 +146,64 @@ const AppNavigator = () => {
 
   return (
     <NavigationContainer>
-      {isFirstLaunch ? (
-        // Onboarding Navigator
-        <Stack.Navigator
-          screenOptions={{
-            headerShown: false,
-            contentStyle: {
-              backgroundColor: isDarkMode ? themeColors.dark.default : themeColors.light.default,
-            },
-          }}
-        >
+      <Stack.Navigator
+        screenOptions={{
+          headerShown: false,
+          contentStyle: {
+            backgroundColor: isDarkMode ? themeColors.dark.default : themeColors.light.default,
+          },
+        }}
+      >
+        {isFirstLaunch ? (
+          // Onboarding Screen
           <Stack.Screen name="Onboarding" component={OnboardingScreen} />
-        </Stack.Navigator>
-      ) : !isAuthenticated ? (
-        // Auth Navigator
-        <Stack.Navigator
-          screenOptions={{
-            headerShown: false,
-            contentStyle: {
-              backgroundColor: isDarkMode ? themeColors.dark.default : themeColors.light.default,
-            },
-          }}
-        >
+        ) : !isAuthenticated ? (
+          // Auth Navigator
           <Stack.Screen name="Auth" component={AuthNavigator} />
-        </Stack.Navigator>
-      ) : (
-        // Main App Navigator
-        <Stack.Navigator
-          screenOptions={{
-            headerShown: false,
-            contentStyle: {
-              backgroundColor: isDarkMode ? themeColors.dark.default : themeColors.light.default,
-            },
-          }}
-        >
+        ) : (
+          // Main App Navigator
           <Stack.Screen name="Main" component={MainNavigator} />
-          <Stack.Screen
-            name="GroupDetails"
-            component={GroupDetailsScreen}
-            options={{
-              headerShown: false,
-              headerTitle: '',
-              headerTransparent: false,
-              headerTintColor: themeColors.white,
-            }}
-          />
-          <Stack.Screen
-            name="CreateGroup"
-            component={CreateGroupScreen}
-            options={{
-              headerShown: true,
-              headerTitle: 'Create Group',
-              headerTintColor: isDarkMode ? themeColors.white : themeColors.dark.default,
-              headerStyle: {
-                backgroundColor: isDarkMode ? themeColors.dark.default : themeColors.light.default,
-              },
-            }}
-          />
-          <Stack.Screen
-            name="AddExpense"
-            component={AddExpenseScreen}
-            options={{
-              headerShown: false,
-              headerTintColor: isDarkMode ? themeColors.white : themeColors.dark.default,
-              headerStyle: {
-                backgroundColor: isDarkMode ? themeColors.dark.default : themeColors.light.default,
-              },
-            }}
-          />
-        </Stack.Navigator>
-      )}
+        )}
+
+        {/* These screens are accessible from the main navigator */}
+        {!isFirstLaunch && isAuthenticated && (
+          <>
+            <Stack.Screen
+              name="GroupDetails"
+              component={GroupDetailsScreen}
+              options={{
+                headerShown: false,
+                headerTitle: '',
+                headerTransparent: false,
+                headerTintColor: themeColors.white,
+              }}
+            />
+            <Stack.Screen
+              name="CreateGroup"
+              component={CreateGroupScreen}
+              options={{
+                headerShown: true,
+                headerTitle: 'Create Group',
+                headerTintColor: isDarkMode ? themeColors.white : themeColors.dark.default,
+                headerStyle: {
+                  backgroundColor: isDarkMode ? themeColors.dark.default : themeColors.light.default,
+                },
+              }}
+            />
+            <Stack.Screen
+              name="AddExpense"
+              component={AddExpenseScreen}
+              options={{
+                headerShown: false,
+                headerTintColor: isDarkMode ? themeColors.white : themeColors.dark.default,
+                headerStyle: {
+                  backgroundColor: isDarkMode ? themeColors.dark.default : themeColors.light.default,
+                },
+              }}
+            />
+          </>
+        )}
+      </Stack.Navigator>
     </NavigationContainer>
   );
 };

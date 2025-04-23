@@ -25,8 +25,8 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const checkAuthStatus = async () => {
       try {
-        // For demo purposes, we'll just check if the user has launched the app before
-        const hasLaunched = await AsyncStorage.getItem('hasLaunched');
+        // We don't need to check hasLaunched here anymore
+        // This is now handled by the navigation component
 
         // Check if user profile exists
         const userProfileData = await AsyncStorage.getItem('userProfile');
@@ -37,9 +37,8 @@ export const AuthProvider = ({ children }) => {
           setIsAuthenticated(false);
         }
 
-        if (hasLaunched === null) {
-          await AsyncStorage.setItem('hasLaunched', 'true');
-        }
+        // We don't set hasLaunched here anymore
+        // Let the onboarding screens handle this
       } catch (error) {
         console.error('Error checking auth status:', error);
         setIsAuthenticated(false);
@@ -102,14 +101,17 @@ export const AuthProvider = ({ children }) => {
     return true;
   };
 
-  // Login function (for backward compatibility)
+  // Login function (for onboarding completion)
   const login = async () => {
-    // In a real app, you would validate credentials and store tokens
-    setIsAuthenticated(true);
-
-    // Ensure the hasLaunched flag is set to true
-    // This fixes the issue with onboarding navigation
+    // Set the hasLaunched flag to true to indicate onboarding is complete
     await AsyncStorage.setItem('hasLaunched', 'true');
+
+    // Force a re-render of the navigation component
+    // This will cause the app to check isFirstLaunch again and show the login screen
+    setIsLoading(true);
+    setTimeout(() => {
+      setIsLoading(false);
+    }, 100);
   };
 
   // Logout function

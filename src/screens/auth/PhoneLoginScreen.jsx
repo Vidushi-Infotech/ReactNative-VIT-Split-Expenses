@@ -57,7 +57,7 @@ const countryCodes = [
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const SNAP_POINTS = {
   BOTTOM: 0,
-  MIDDLE: SCREEN_HEIGHT * 0.5,
+  MIDDLE: SCREEN_HEIGHT * 0.2,
   FULL: SCREEN_HEIGHT * 0.9
 };
 

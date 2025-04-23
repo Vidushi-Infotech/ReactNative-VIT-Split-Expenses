@@ -2,7 +2,6 @@ import React, { useState, useRef } from 'react';
 import { View, Text, Image, FlatList, Dimensions, TouchableOpacity, StyleSheet } from 'react-native';
 import SafeAreaWrapper from '../../components/common/SafeAreaWrapper';
 import { useAuth } from '../../context/AuthContext';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width } = Dimensions.get('window');
 
@@ -45,17 +44,15 @@ const OnboardingScreen = () => {
         animated: true,
       });
     } else {
-      // Complete onboarding and login the user
-      // Ensure the hasLaunched flag is set to true
-      await AsyncStorage.setItem('hasLaunched', 'true');
+      // Complete onboarding and navigate to login screen
+      // The login function will handle setting hasLaunched and triggering navigation
       login();
     }
   };
 
   const handleSkip = async () => {
-    // Skip onboarding and login the user
-    // Ensure the hasLaunched flag is set to true
-    await AsyncStorage.setItem('hasLaunched', 'true');
+    // Skip onboarding and navigate to login screen
+    // The login function will handle setting hasLaunched and triggering navigation
     login();
   };
 
