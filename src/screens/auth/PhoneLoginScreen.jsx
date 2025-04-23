@@ -592,7 +592,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.xl,
-    elevation: 2,
+    // elevation: 2,
     shadowColor: "#000",
     shadowOffset: {
       width: 0,
