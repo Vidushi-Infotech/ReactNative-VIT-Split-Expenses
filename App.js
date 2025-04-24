@@ -10,6 +10,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import Navigation from './src/navigation/index.jsx';
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 import { AuthProvider } from './src/context/AuthContext';
+import PermissionsManager from './src/components/common/PermissionsManager';
 
 // StatusBar component that uses the theme context
 const ThemedStatusBar = () => {
@@ -36,7 +37,9 @@ function App() {
     <SafeAreaProvider>
       <ThemeProvider>
         <AuthProvider>
-          <AppContent />
+          <PermissionsManager>
+            <AppContent />
+          </PermissionsManager>
         </AuthProvider>
       </ThemeProvider>
     </SafeAreaProvider>

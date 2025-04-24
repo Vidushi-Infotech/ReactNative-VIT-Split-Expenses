@@ -1,5 +1,8 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { collection, addDoc, getDocs, query, where, setDoc, doc } from 'firebase/firestore';
+import { db } from '../config/firebase';
+import { extractCountryCodeAndNumber } from '../utils/phoneUtils';
 
 // Create the context
 const AuthContext = createContext({
@@ -52,59 +55,181 @@ export const AuthProvider = ({ children }) => {
 
   // Send OTP function
   const sendOTP = async (phoneNum) => {
-    // In a real app, you would call an API to send OTP
+    console.log('AuthContext: sendOTP called with:', phoneNum);
+    // Store the phone number in state
     setPhoneNumber(phoneNum);
 
-    // For demo purposes, we'll simulate checking if user exists
-    // In a real app, this would be determined by your backend
-    const randomIsNewUser = Math.random() > 0.5;
-    setIsNewUser(randomIsNewUser);
+    try {
+      // Check if user exists in Firestore
+      console.log('AuthContext: Checking if user exists in Firestore');
 
-    return true; // Indicate success
+      // Extract country code and phone number using the utility function
+      // This will correctly identify country codes like "+91" for India
+      const { countryCode, phoneNumber: phoneNumberOnly } = extractCountryCodeAndNumber(phoneNum);
+
+      // Query Firestore to check if the phone number exists
+      const usersRef = collection(db, 'Users');
+      const q = query(usersRef, where("phoneNumber", "==", phoneNumberOnly));
+      const querySnapshot = await getDocs(q);
+
+      if (!querySnapshot.empty) {
+        console.log('AuthContext: User found in Firestore');
+        setIsNewUser(false);
+      } else {
+        console.log('AuthContext: User not found in Firestore, treating as new user');
+        setIsNewUser(true);
+      }
+
+      return true; // Indicate success
+    } catch (error) {
+      console.error('AuthContext: Error checking user in Firestore:', error);
+      // Default to new user in case of error
+      setIsNewUser(true);
+      return true; // Still return success to not block the flow
+    }
   };
 
   // Verify OTP function
   const verifyOTP = async (otp) => {
-    // In a real app, you would validate OTP with your backend
+    console.log('AuthContext: verifyOTP called with:', otp);
+    // For this implementation, we'll use a static OTP: "1234"
+    const staticOTP = "1234";
+
+    if (otp !== staticOTP) {
+      console.log('AuthContext: Invalid OTP provided');
+      return { success: false, message: "Invalid OTP" };
+    }
+
+    console.log('AuthContext: OTP is valid');
+    console.log('AuthContext: isNewUser status:', isNewUser);
 
     // If existing user, log them in directly
     if (!isNewUser) {
-      // For demo, we'll create a mock profile for existing users
-      const mockProfile = {
-        name: 'Existing User',
-        phoneNumber: phoneNumber,
-        avatar: `https://randomuser.me/api/portraits/${Math.random() > 0.5 ? 'men' : 'women'}/${Math.floor(Math.random() * 100)}.jpg`,
-        createdAt: new Date().toISOString(),
-      };
+      try {
+        console.log('AuthContext: Attempting to fetch existing user profile from Firestore');
+        // Extract country code and phone number using the utility function
+        // This will correctly identify country codes like "+91" for India
+        const { countryCode, phoneNumber: phoneNumberOnly } = extractCountryCodeAndNumber(phoneNumber);
 
-      setUserProfile(mockProfile);
-      await AsyncStorage.setItem('userProfile', JSON.stringify(mockProfile));
-      setIsAuthenticated(true);
+        // First try to get the document directly using the phone number as ID
+        const userDocRef = doc(db, 'Users', phoneNumberOnly);
+        const userDocSnap = await getDocs(query(collection(db, 'Users'), where("phoneNumber", "==", phoneNumberOnly)));
+
+        if (!userDocSnap.empty) {
+          const userDoc = userDocSnap.docs[0].data();
+          const userProfile = {
+            id: phoneNumberOnly, // Use phone number as ID
+            ...userDoc
+          };
+
+          console.log('AuthContext: User profile found in Firestore:', userProfile);
+          setUserProfile(userProfile);
+          await AsyncStorage.setItem('userProfile', JSON.stringify(userProfile));
+          setIsAuthenticated(true);
+          console.log('AuthContext: User authenticated successfully');
+        } else {
+          console.log('AuthContext: No user profile found in Firestore, treating as new user');
+          // If no profile found, treat as new user
+          setIsNewUser(true);
+        }
+      } catch (error) {
+        console.error('AuthContext: Error fetching user from Firestore:', error);
+        // Don't fail the verification process due to errors
+        // Just log the error and continue as if it's a new user
+        setIsNewUser(true);
+      }
     }
 
+    console.log('AuthContext: Returning success with isNewUser:', isNewUser);
     return { success: true, isNewUser };
   };
 
   // Setup profile function for new users
   const setupProfile = async (profileData) => {
-    // In a real app, you would send this data to your backend
-    const newProfile = {
-      ...profileData,
-      phoneNumber: phoneNumber,
-      createdAt: new Date().toISOString(),
-    };
+    console.log('AuthContext: setupProfile called with:', profileData);
+    try {
+      // Extract country code and phone number using the utility function
+      // This will correctly identify country codes like "+91" for India
+      const { countryCode, phoneNumber: phoneNumberOnly } = extractCountryCodeAndNumber(phoneNumber);
 
-    setUserProfile(newProfile);
-    await AsyncStorage.setItem('userProfile', JSON.stringify(newProfile));
-    setIsAuthenticated(true);
+      // Use the phone number as the document ID (primary key)
+      // This ensures that each phone number can only have one user profile
+      const docId = phoneNumberOnly;
 
-    return true;
+      // Create a new user document in Firestore
+      const newProfile = {
+        ...profileData,
+        countryCode: countryCode,
+        phoneNumber: phoneNumberOnly,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      console.log('AuthContext: Creating new user profile in Firestore with phone number as ID');
+
+      // Set the user document with the phone number as the ID
+      await setDoc(doc(db, 'Users', docId), newProfile);
+      console.log('AuthContext: User added to Firestore with phone number as ID:', docId);
+
+      // Add the document ID to the profile
+      const profileWithId = {
+        id: docId,
+        ...newProfile
+      };
+
+      console.log('AuthContext: Setting user profile in state');
+      setUserProfile(profileWithId);
+
+      console.log('AuthContext: Saving user profile to AsyncStorage');
+      await AsyncStorage.setItem('userProfile', JSON.stringify(profileWithId));
+
+      console.log('AuthContext: Setting isAuthenticated to true');
+      setIsAuthenticated(true);
+
+      return true;
+    } catch (error) {
+      console.error('AuthContext: Error saving user to Firestore:', error);
+
+      // Even if Firestore fails, we can still authenticate the user locally
+      try {
+        console.log('AuthContext: Attempting to authenticate user locally despite Firestore error');
+        // Extract country code and phone number using the utility function
+        // This will correctly identify country codes like "+91" for India
+        const { countryCode, phoneNumber: phoneNumberOnly } = extractCountryCodeAndNumber(phoneNumber);
+
+        const localProfile = {
+          ...profileData,
+          countryCode: countryCode,
+          phoneNumber: phoneNumberOnly,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          id: phoneNumberOnly // Use phone number as ID even for local profile
+        };
+
+        setUserProfile(localProfile);
+        await AsyncStorage.setItem('userProfile', JSON.stringify(localProfile));
+        setIsAuthenticated(true);
+        console.log('AuthContext: User authenticated locally');
+        return true;
+      } catch (localError) {
+        console.error('AuthContext: Error authenticating user locally:', localError);
+        return false;
+      }
+    }
   };
 
-  // Login function (for onboarding completion)
-  const login = async () => {
+  // Login function (for onboarding completion or direct login with profile)
+  const login = async (profile = null) => {
     // Set the hasLaunched flag to true to indicate onboarding is complete
     await AsyncStorage.setItem('hasLaunched', 'true');
+
+    // If a profile is provided, set it as the current user profile
+    if (profile) {
+      console.log('AuthContext: Login with provided profile:', profile);
+      setUserProfile(profile);
+      await AsyncStorage.setItem('userProfile', JSON.stringify(profile));
+      setIsAuthenticated(true);
+    }
 
     // Force a re-render of the navigation component
     // This will cause the app to check isFirstLaunch again and show the login screen

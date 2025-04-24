@@ -1,11 +1,13 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Image, ScrollView, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Image, ScrollView, ActivityIndicator, Alert, Platform, ActionSheetIOS } from 'react-native';
 import SafeAreaWrapper from '../../components/common/SafeAreaWrapper';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import Icon from 'react-native-vector-icons/Ionicons';
 import Animated, { FadeInUp } from 'react-native-reanimated';
 import { spacing, fontSizes, borderRadius } from '../../theme/theme';
+import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
+import usePermissions from '../../hooks/usePermissions';
 
 const ProfileSetupScreen = ({ navigation, route }) => {
   const { phoneNumber } = route.params;
@@ -29,14 +31,24 @@ const ProfileSetupScreen = ({ navigation, route }) => {
     setLoading(true);
 
     try {
-      // Use the setupProfile function from AuthContext
+      // Prepare profile data
       const profileData = {
         name: name.trim(),
         username: username.trim() || undefined,
         avatar: profileImage,
+        phoneNumber: phoneNumber, // Include the phone number
+        updatedAt: new Date().toISOString(),
       };
 
-      await setupProfile(profileData);
+      // Log the profile data being sent
+      console.log('Sending profile data to Firestore:', profileData);
+
+      // Use the setupProfile function from AuthContext
+      const success = await setupProfile(profileData);
+
+      if (!success) {
+        setError('Failed to create profile. Please try again.');
+      }
       // The AuthContext will handle the login automatically
     } catch (error) {
       setError('Failed to create profile. Please try again.');
@@ -46,11 +58,120 @@ const ProfileSetupScreen = ({ navigation, route }) => {
     }
   };
 
-  const handleSelectImage = () => {
-    // In a real app, you would use image picker library
-    // For demo purposes, we'll just set a random image
-    const randomImage = `https://randomuser.me/api/portraits/${Math.random() > 0.5 ? 'men' : 'women'}/${Math.floor(Math.random() * 100)}.jpg`;
-    setProfileImage(randomImage);
+  // Use our custom permissions hook
+  const { requestPermission } = usePermissions();
+
+  // Directly handle image selection with minimal popups
+  const handleSelectImage = async () => {
+    // Create a simple action sheet with minimal UI
+    const options = ['Take Photo', 'Choose from Gallery', 'Cancel'];
+    const cancelButtonIndex = 2;
+
+    // Use ActionSheetIOS on iOS for native feel
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          options,
+          cancelButtonIndex,
+        },
+        async (buttonIndex) => {
+          if (buttonIndex === 0) {
+            // Camera - directly request permission and launch camera
+            const hasPermission = await requestPermission('camera', false); // false = no explanation popup
+            if (hasPermission) {
+              launchCamera(
+                {
+                  mediaType: 'photo',
+                  includeBase64: false,
+                  maxHeight: 500,
+                  maxWidth: 500,
+                  quality: 0.8,
+                },
+                handleImagePickerResponse
+              );
+            }
+          } else if (buttonIndex === 1) {
+            // Gallery - directly request permission and launch gallery
+            const hasPermission = await requestPermission('photoLibrary', false); // false = no explanation popup
+            if (hasPermission) {
+              launchImageLibrary(
+                {
+                  mediaType: 'photo',
+                  includeBase64: false,
+                  maxHeight: 500,
+                  maxWidth: 500,
+                  quality: 0.8,
+                  selectionLimit: 1,
+                },
+                handleImagePickerResponse
+              );
+            }
+          }
+        }
+      );
+    } else {
+      // Use Alert on Android (could be replaced with a custom bottom sheet for better UX)
+      Alert.alert(
+        'Select Profile Picture',
+        '',
+        [
+          {
+            text: 'Cancel',
+            style: 'cancel',
+          },
+          {
+            text: 'Take Photo',
+            onPress: async () => {
+              const hasPermission = await requestPermission('camera', false); // false = no explanation popup
+              if (hasPermission) {
+                launchCamera(
+                  {
+                    mediaType: 'photo',
+                    includeBase64: false,
+                    maxHeight: 500,
+                    maxWidth: 500,
+                    quality: 0.8,
+                  },
+                  handleImagePickerResponse
+                );
+              }
+            },
+          },
+          {
+            text: 'Choose from Gallery',
+            onPress: async () => {
+              const hasPermission = await requestPermission('photoLibrary', false); // false = no explanation popup
+              if (hasPermission) {
+                launchImageLibrary(
+                  {
+                    mediaType: 'photo',
+                    includeBase64: false,
+                    maxHeight: 500,
+                    maxWidth: 500,
+                    quality: 0.8,
+                    selectionLimit: 1,
+                  },
+                  handleImagePickerResponse
+                );
+              }
+            },
+          },
+        ],
+        { cancelable: true }
+      );
+    }
+  };
+
+  // Common handler for image picker response
+  const handleImagePickerResponse = (response) => {
+    if (response.didCancel) {
+      console.log('User cancelled image picker');
+    } else if (response.errorCode) {
+      console.error('ImagePicker Error:', response.errorMessage);
+      // Silently handle errors without showing alerts
+    } else if (response.assets && response.assets.length > 0) {
+      setProfileImage(response.assets[0].uri);
+    }
   };
 
   return (
