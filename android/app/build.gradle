@@ -120,3 +120,8 @@ dependencies {
         implementation jscFlavor
     }
 }
+
+// Exclude problematic packages
+configurations.all {
+    exclude group: 'com.reactnativepagerview', module: 'react-native-pager-view'
+}

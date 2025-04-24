@@ -126,7 +126,7 @@ const AppNavigator = () => {
     };
 
     // Listen for app state changes (foreground, background, etc.)
-    AppState.addEventListener('change', handleAppStateChange);
+    const appStateSubscription = AppState.addEventListener('change', handleAppStateChange);
 
     // Check for hasLaunched changes every 500ms
     // This is a workaround to detect AsyncStorage changes
@@ -134,7 +134,8 @@ const AppNavigator = () => {
 
     // Clean up the listener and interval when the component unmounts
     return () => {
-      AppState.removeEventListener('change', handleAppStateChange);
+      // Clean up the subscription
+      appStateSubscription.remove();
       clearInterval(interval);
     };
   }, []);

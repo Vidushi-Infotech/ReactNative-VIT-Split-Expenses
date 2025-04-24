@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "115276068172",
+    "project_id": "vitroi",
+    "storage_bucket": "vitroi.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:115276068172:android:4bd94301bf0dbe58ec8be9",
+        "android_client_info": {
+          "package_name": "com.vitsplit"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBl4eAbhS3atAteejg3LgQ0aEBpZ16mxnQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
