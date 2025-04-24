@@ -1,15 +1,38 @@
-import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Image, StyleSheet } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import { mockUsers } from '../../utils/mockData';
-import { useTheme } from '../../context/ThemeContext';
+import React, {useState, useEffect} from 'react';
+import {
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  Image,
+  StyleSheet,
+  Alert,
+  ActivityIndicator,
+  Platform,
+  TextInput,
+} from 'react-native';
+import {useNavigation} from '@react-navigation/native';
+import {useTheme} from '../../context/ThemeContext';
+import {useAuth} from '../../context/AuthContext';
 import Input from '../../components/common/Input';
 import Button from '../../components/common/Button';
 import Avatar from '../../components/common/Avatar';
 import Icon from 'react-native-vector-icons/Ionicons';
-import Animated, { FadeInUp } from 'react-native-reanimated';
-import { spacing, fontSizes } from '../../theme/theme';
+import Animated, {FadeInUp} from 'react-native-reanimated';
+import {spacing, fontSizes} from '../../theme/theme';
 import SafeAreaWrapper from '../../components/common/SafeAreaWrapper';
+import {launchImageLibrary} from 'react-native-image-picker';
+import GroupService from '../../services/GroupService';
+import UserService from '../../services/UserService';
+import ContactService from '../../services/ContactService'; // Import the ContactService instead of direct Contacts
+import PermissionService from '../../services/PermissionService'; // Import the PermissionService
+// Import fallback permission functions in case PermissionService is not available
+import {
+  checkPermission,
+  requestPermission,
+  isPermissionGranted,
+  openAppSettings,
+} from '../../utils/permissionsManager';
 
 const CreateGroupScreen = () => {
   const [groupName, setGroupName] = useState('');
@@ -17,8 +40,12 @@ const CreateGroupScreen = () => {
   const [selectedUsers, setSelectedUsers] = useState([]);
   const [groupImage, setGroupImage] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [deviceContacts, setDeviceContacts] = useState([]);
+  const [isLoadingDeviceContacts, setIsLoadingDeviceContacts] = useState(false);
+
   const navigation = useNavigation();
-  const { colors: themeColors } = useTheme();
+  const {colors: themeColors} = useTheme();
+  const {userProfile} = useAuth();
 
   // Helper function to get color with opacity
   const getColorWithOpacity = (color, opacity) => {
@@ -32,209 +59,539 @@ const CreateGroupScreen = () => {
     return color;
   };
 
-  // Filter users based on search query
-  const filteredUsers = mockUsers.filter(
-    (user) =>
-      user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      user.username.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Load device contacts on mount
+  useEffect(() => {
+    // Check contacts permission and load device contacts if granted
+    checkContactsPermission();
+  }, []);
 
-  const handleSelectUser = (user) => {
-    if (selectedUsers.some((selectedUser) => selectedUser.id === user.id)) {
-      setSelectedUsers(selectedUsers.filter((selectedUser) => selectedUser.id !== user.id));
+  // Check contacts permission and load device contacts if granted
+  const checkContactsPermission = async () => {
+    try {
+      console.log('=== CHECKING CONTACTS PERMISSION ===');
+      console.log('Platform:', Platform.OS, Platform.Version);
+      let isGranted = false;
+
+      // Try using PermissionService first
+      if (
+        PermissionService &&
+        typeof PermissionService.checkAndRequestPermission === 'function'
+      ) {
+        console.log('Using PermissionService.checkAndRequestPermission');
+        isGranted = await PermissionService.checkAndRequestPermission(
+          'contacts',
+        );
+        console.log('PermissionService result:', isGranted);
+      } else {
+        // Fallback to direct permission functions
+        console.log('Falling back to direct permission functions');
+        // Check if permission is already granted
+        const status = await checkPermission('contacts');
+        console.log('Permission status:', status);
+
+        if (isPermissionGranted(status)) {
+          console.log('Permission already granted');
+          isGranted = true;
+        } else {
+          // Request permission
+          console.log('Requesting permission...');
+          const result = await requestPermission('contacts');
+          console.log('Permission request result:', result);
+          isGranted = isPermissionGranted(result);
+          console.log('Is permission granted:', isGranted);
+        }
+      }
+
+      if (isGranted) {
+        console.log('Permission granted, loading contacts...');
+        loadDeviceContacts();
+      } else {
+        console.log('Permission denied, showing alert...');
+        Alert.alert(
+          'Permission Required',
+          'To add contacts from your device, please allow access to your contacts.',
+          [
+            {text: 'Cancel', style: 'cancel'},
+            {
+              text: 'Debug',
+              onPress: () => navigation.navigate('DeviceContactsDebug'),
+            },
+            {
+              text: 'Open Settings',
+              onPress: PermissionService?.openSettings || openAppSettings,
+            },
+          ],
+        );
+      }
+    } catch (error) {
+      console.error('Error checking contacts permission:', error);
+      Alert.alert(
+        'Error',
+        'There was an error checking contacts permission. Would you like to try the debug screen?',
+        [
+          {text: 'Cancel', style: 'cancel'},
+          {
+            text: 'Debug Contacts',
+            onPress: () => navigation.navigate('DeviceContactsDebug'),
+          },
+        ],
+      );
+    }
+  };
+
+  // We no longer need to load all users from the database
+  // as we're only showing device contacts that are app users
+
+  // Load contacts from the device
+  const loadDeviceContacts = async () => {
+    try {
+      console.log('=== LOADING DEVICE CONTACTS ===');
+      setIsLoadingDeviceContacts(true);
+
+      // Get all contacts from the device using ContactService
+      console.log('Getting contacts using ContactService.getAllContacts()');
+      const contacts = await ContactService.getAllContacts();
+      console.log(`Retrieved ${contacts.length} contacts from ContactService`);
+
+      if (contacts.length === 0) {
+        console.log('No contacts returned from ContactService');
+        Alert.alert(
+          'No Contacts Found',
+          'No contacts were found on your device or permission might not be properly granted.',
+          [
+            {text: 'OK'},
+            {
+              text: 'Debug',
+              onPress: () => navigation.navigate('DeviceContactsDebug'),
+            },
+          ],
+        );
+        setDeviceContacts([]);
+        return;
+      }
+
+      // Get all app users to match with device contacts
+      console.log('Getting all app users to match with device contacts...');
+      const appUsers = await UserService.getAllUsers();
+      console.log(`Retrieved ${appUsers.length} app users`);
+
+      // Find device contacts that are also app users (excluding the current user)
+      console.log(
+        'Finding registered contacts (device contacts that are also app users)...',
+      );
+      console.log(
+        'Current user:',
+        userProfile
+          ? `${userProfile.name} (${userProfile.phoneNumber})`
+          : 'Not available',
+      );
+      const registeredContacts = ContactService.findRegisteredContacts(
+        contacts,
+        appUsers,
+        userProfile,
+      );
+      console.log(
+        `Found ${registeredContacts.length} registered contacts (excluding current user)`,
+      );
+
+      // Format the registered contacts for the UI
+      console.log('Processing registered contacts for UI...');
+      const processedContacts = registeredContacts.map((contact, index) => {
+        // Prioritize app user data over contact data
+        return {
+          id: contact.appUserId || contact.contactId || `contact-${index}-${Date.now()}`,
+          name: contact.name,
+          phoneNumber: contact.primaryPhoneClean || contact.phoneNumber,
+          isAppUser: true, // These are app users
+          // Use avatar from app database for profile photo
+          avatar: contact.avatar || null, // App user's avatar from database
+          // Add a unique key to prevent duplicate key warnings
+          uniqueKey: `${contact.appUserId || contact.contactId || contact.phoneNumber}-${index}`,
+        };
+      });
+
+      console.log(
+        `Processed ${processedContacts.length} registered contacts for the UI`,
+      );
+
+      // Filter out the current user from the device contacts
+      const filteredContacts = processedContacts.filter(contact => {
+        // Check if this contact is the current user
+        if (
+          userProfile &&
+          (contact.id === userProfile.id ||
+            contact.phoneNumber === userProfile.phoneNumber)
+        ) {
+          console.log(
+            `Filtering out current user from device contacts: ${contact.name}`,
+          );
+          return false;
+        }
+        return true;
+      });
+
+      console.log(
+        `Filtered out current user, ${filteredContacts.length} contacts remaining`,
+      );
+
+      // Set the device contacts (only those that are app users, excluding current user)
+      setDeviceContacts(filteredContacts);
+      console.log('Registered device contacts set successfully');
+    } catch (error) {
+      console.error('Error loading device contacts:', error);
+      Alert.alert(
+        'Error',
+        'Failed to load device contacts. Please try again.',
+      );
+    } finally {
+      setIsLoadingDeviceContacts(false);
+      console.log('=== DEVICE CONTACTS LOADING COMPLETE ===');
+    }
+  };
+
+  // Filter contacts based on phone number search query
+  const getFilteredContacts = () => {
+    if (!searchQuery.trim()) {
+      // If no search query, return all device contacts
+      return deviceContacts;
+    }
+
+    // Clean the search query (remove non-numeric characters)
+    const cleanSearchQuery = searchQuery.replace(/\D/g, '');
+
+    // Only filter by phone number
+    return deviceContacts.filter(
+      contact =>
+        contact.phoneNumber && contact.phoneNumber.includes(cleanSearchQuery),
+    );
+  };
+
+  const filteredContacts = getFilteredContacts();
+
+  const handleSelectUser = user => {
+    if (selectedUsers.some(selectedUser => selectedUser.id === user.id)) {
+      setSelectedUsers(
+        selectedUsers.filter(selectedUser => selectedUser.id !== user.id),
+      );
     } else {
       setSelectedUsers([...selectedUsers, user]);
     }
   };
 
-  const handleSelectImage = () => {
-    // In a real app, we would use react-native-image-picker here
-    // For demo purposes, we'll just set a random image
-    const demoImages = [
-      'https://images.unsplash.com/photo-1522202176988-66273c2fd55f',
-      'https://images.unsplash.com/photo-1520333789090-1afc82db536a',
-      'https://images.unsplash.com/photo-1529156069898-49953e39b3ac',
-      'https://images.unsplash.com/photo-1469571486292-b5175cb0e95b',
-    ];
-    const randomImage = demoImages[Math.floor(Math.random() * demoImages.length)];
-    setGroupImage(randomImage);
+
+
+  const handleSelectImage = async () => {
+    try {
+      const result = await launchImageLibrary({
+        mediaType: 'photo',
+        quality: 0.8,
+        maxWidth: 800,
+        maxHeight: 800,
+      });
+
+      if (result.assets && result.assets.length > 0) {
+        setGroupImage(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error('Error selecting image:', error);
+      Alert.alert('Error', 'Failed to select image. Please try again.');
+    }
   };
 
-  const handleCreateGroup = () => {
+  const handleCreateGroup = async () => {
     if (!groupName.trim() || selectedUsers.length === 0) {
-      // Show error in a real app
+      Alert.alert(
+        'Error',
+        'Please enter a group name and add at least one member.',
+      );
       return;
     }
 
     setLoading(true);
 
-    // Simulate API call
-    setTimeout(() => {
+    try {
+      // Get app users from selected users (all selected users should be app users now)
+      const appUserIds = selectedUsers.map(user => user.id);
+
+      // Prepare group data
+      const groupData = {
+        name: groupName.trim(),
+        image: groupImage,
+        createdBy: userProfile.id,
+        members: [userProfile.id, ...appUserIds],
+        // No invited contacts since we only allow adding app users
+        invitedContacts: [],
+      };
+
+      // Create the group in Firestore
+      await GroupService.createGroup(groupData);
+
+      // Navigate back to the main tab navigator
+      navigation.navigate('Main');
+    } catch (error) {
+      console.error('Error creating group:', error);
+      Alert.alert('Error', 'Failed to create group. Please try again.');
+    } finally {
       setLoading(false);
-      navigation.navigate('Groups');
-    }, 1500);
+    }
   };
 
   return (
     <SafeAreaWrapper>
       <ScrollView
-        style={[styles.container, { backgroundColor: themeColors.background }]}
-        contentContainerStyle={styles.contentContainer}
-      >
-      <Animated.View
-        style={styles.photoContainer}
-        entering={FadeInUp.duration(800)}
-      >
-        <TouchableOpacity
-          onPress={handleSelectImage}
-          style={styles.photoButton}
-        >
-          {groupImage ? (
-            <Image
-              source={{ uri: groupImage }}
-              style={styles.groupImage}
-            />
-          ) : (
-            <View
-              style={[styles.imagePlaceholder, { backgroundColor: themeColors.surface }]}
-            >
-              <Icon name="image-outline" size={40} color={themeColors.textSecondary} />
-            </View>
-          )}
-
-          <View
-            style={[styles.cameraButton, { backgroundColor: themeColors.primary.default }]}
-          >
-            <Icon name="camera-outline" size={16} color={themeColors.white} />
-          </View>
-        </TouchableOpacity>
-
-        <Text style={[styles.photoText, { color: themeColors.textSecondary }]}>
-          Add Group Photo
-        </Text>
-      </Animated.View>
-
-      <Animated.View entering={FadeInUp.duration(800).delay(100)}>
-        <Input
-          label="Group Name"
-          placeholder="Enter group name"
-          value={groupName}
-          onChangeText={setGroupName}
-          leftIcon={<Icon name="people-outline" size={20} color={themeColors.textSecondary} />}
-        />
-      </Animated.View>
-
-      <Animated.View entering={FadeInUp.duration(800).delay(200)}>
-        <Text style={[styles.sectionTitle, { color: themeColors.text }]}>
-          Add Members
-        </Text>
-
-        <Input
-          placeholder="Search by name or username"
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          leftIcon={<Icon name="search-outline" size={20} color={themeColors.textSecondary} />}
-        />
-      </Animated.View>
-
-      {selectedUsers.length > 0 && (
+        style={[styles.container, {backgroundColor: themeColors.background}]}
+        contentContainerStyle={styles.contentContainer}>
         <Animated.View
-          style={styles.selectedUsersContainer}
-          entering={FadeInUp.duration(800).delay(300)}
-        >
-          <Text style={[styles.sectionSubtitle, { color: themeColors.textSecondary }]}>
-            Selected ({selectedUsers.length})
-          </Text>
-
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.selectedUsersScroll}
-          >
-            {selectedUsers.map((user) => (
-              <View key={user.id} style={styles.selectedUserItem}>
-                <View style={styles.avatarContainer}>
-                  <Avatar source={user.avatar} name={user.name} size="md" />
-                  <TouchableOpacity
-                    onPress={() => handleSelectUser(user)}
-                    style={[styles.removeUserButton, { backgroundColor: themeColors.danger }]}
-                  >
-                    <Icon name="close" size={12} color={themeColors.white} />
-                  </TouchableOpacity>
-                </View>
-                <Text
-                  style={[styles.selectedUserName, { color: themeColors.textSecondary }]}
-                  numberOfLines={1}
-                >
-                  {user.name.split(' ')[0]}
-                </Text>
+          style={styles.photoContainer}
+          entering={FadeInUp.duration(800)}>
+          <TouchableOpacity
+            onPress={handleSelectImage}
+            style={styles.photoButton}>
+            {groupImage ? (
+              <Image source={{uri: groupImage}} style={styles.groupImage} />
+            ) : (
+              <View
+                style={[
+                  styles.imagePlaceholder,
+                  {backgroundColor: themeColors.surface},
+                ]}>
+                <Icon
+                  name="image-outline"
+                  size={40}
+                  color={themeColors.textSecondary}
+                />
               </View>
-            ))}
-          </ScrollView>
-        </Animated.View>
-      )}
+            )}
 
-      <Animated.View entering={FadeInUp.duration(800).delay(400)}>
-        <Text style={[styles.sectionSubtitle, { color: themeColors.textSecondary }]}>
-          Suggested
-        </Text>
+            <View
+              style={[
+                styles.cameraButton,
+                {backgroundColor: themeColors.primary.default},
+              ]}>
+              <Icon name="camera-outline" size={16} color={themeColors.white} />
+            </View>
+          </TouchableOpacity>
 
-        {filteredUsers.length === 0 ? (
-          <Text style={[styles.emptyText, { color: themeColors.textSecondary }]}>
-            No users found
+          <Text style={[styles.photoText, {color: themeColors.textSecondary}]}>
+            Add Group Photo
           </Text>
-        ) : (
-          filteredUsers.map((user) => {
-            const isSelected = selectedUsers.some((selectedUser) => selectedUser.id === user.id);
-            const backgroundColor = isSelected
-              ? getColorWithOpacity(themeColors.primary.default, 0.15) // 15% opacity
-              : themeColors.surface;
+        </Animated.View>
 
-            return (
-              <TouchableOpacity
-                key={user.id}
-                onPress={() => handleSelectUser(user)}
-                style={[styles.userItem, { backgroundColor }]}
-              >
-                <Avatar source={user.avatar} name={user.name} size="sm" />
+        <Animated.View entering={FadeInUp.duration(800).delay(100)}>
+          <Input
+            label="Group Name"
+            placeholder="Enter group name"
+            value={groupName}
+            onChangeText={setGroupName}
+            leftIcon={
+              <Icon
+                name="people-outline"
+                size={20}
+                color={themeColors.textSecondary}
+              />
+            }
+          />
+        </Animated.View>
 
-                <View style={styles.userInfo}>
-                  <Text style={[styles.userName, { color: themeColors.text }]}>
-                    {user.name}
+        <Animated.View entering={FadeInUp.duration(800).delay(200)}>
+          <Text style={[styles.sectionTitle, {color: themeColors.text}]}>
+            Add Members
+          </Text>
+
+          <Input
+            placeholder="Search by phone number"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            keyboardType="phone-pad"
+            leftIcon={
+              <Icon
+                name="call-outline"
+                size={20}
+                color={themeColors.textSecondary}
+              />
+            }
+          />
+        </Animated.View>
+
+        {selectedUsers.length > 0 && (
+          <Animated.View
+            style={styles.selectedUsersContainer}
+            entering={FadeInUp.duration(800).delay(300)}>
+            <Text
+              style={[
+                styles.sectionSubtitle,
+                {color: themeColors.textSecondary},
+              ]}>
+              Selected ({selectedUsers.length})
+            </Text>
+
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.selectedUsersScroll}>
+              {selectedUsers.map((user, index) => (
+                <View
+                  key={`selected-${user.id}-${index}`}
+                  style={styles.selectedUserItem}>
+                  <View style={styles.avatarContainer}>
+                    <Avatar source={user.avatar} name={user.name} size="md" />
+                    <TouchableOpacity
+                      onPress={() => handleSelectUser(user)}
+                      style={[
+                        styles.removeUserButton,
+                        {backgroundColor: themeColors.danger},
+                      ]}>
+                      <Icon name="close" size={12} color={themeColors.white} />
+                    </TouchableOpacity>
+                  </View>
+                  <Text
+                    style={[
+                      styles.selectedUserName,
+                      {color: themeColors.textSecondary},
+                    ]}
+                    numberOfLines={1}>
+                    {user.name.split(' ')[0]}
                   </Text>
-                  <Text style={[styles.userUsername, { color: themeColors.textSecondary }]}>
-                    @{user.username}
-                  </Text>
+
                 </View>
-
-                {isSelected && (
-                  <Icon name="checkmark-circle" size={24} color={themeColors.primary.default} />
-                )}
-              </TouchableOpacity>
-            );
-          })
+              ))}
+            </ScrollView>
+          </Animated.View>
         )}
-      </Animated.View>
 
-      <Animated.View
-        style={styles.buttonContainer}
-        entering={FadeInUp.duration(800).delay(500)}
-      >
-        <Button
-          title="Create Group"
-          onPress={handleCreateGroup}
-          loading={loading}
-          disabled={!groupName.trim() || selectedUsers.length === 0}
-          fullWidth
-          size="lg"
-        />
-      </Animated.View>
-    </ScrollView>
+        <Animated.View entering={FadeInUp.duration(800).delay(400)}>
+          <Text style={[styles.sectionTitle, {color: themeColors.text}]}>
+            Suggested Contacts
+          </Text>
+
+          {/* Show device contacts that are app users */}
+          {isLoadingDeviceContacts ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator
+                size="small"
+                color={themeColors.primary.default}
+              />
+              <Text
+                style={[
+                  styles.loadingText,
+                  {color: themeColors.textSecondary},
+                ]}>
+                Finding app users in your contacts...
+              </Text>
+            </View>
+          ) : deviceContacts.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <Icon
+                name="people-outline"
+                size={40}
+                color={themeColors.textSecondary}
+              />
+              <Text
+                style={[styles.emptyText, {color: themeColors.textSecondary}]}>
+                No app users found in your contacts
+              </Text>
+              <Text
+                style={[
+                  styles.emptySubText,
+                  {color: themeColors.textSecondary},
+                ]}>
+                We only show contacts who are already using the app (excluding
+                yourself)
+              </Text>
+              <TouchableOpacity
+                style={[
+                  styles.refreshButton,
+                  {backgroundColor: themeColors.primary.default},
+                ]}
+                onPress={checkContactsPermission}>
+                <Text style={styles.refreshButtonText}>Refresh Contacts</Text>
+              </TouchableOpacity>
+            </View>
+          ) : filteredContacts.length === 0 ? (
+            <Text
+              style={[styles.emptyText, {color: themeColors.textSecondary}]}>
+              No user found with this phone number
+            </Text>
+          ) : (
+            filteredContacts.map((contact, index) => {
+              const isSelected = selectedUsers.some(
+                selectedUser => selectedUser.id === contact.id,
+              );
+              const backgroundColor = isSelected
+                ? getColorWithOpacity(themeColors.primary.default, 0.15) // 15% opacity
+                : themeColors.surface;
+
+              return (
+                <TouchableOpacity
+                  key={contact.uniqueKey || `contact-${contact.id}-${index}`}
+                  onPress={() => handleSelectUser(contact)}
+                  style={[styles.userItem, {backgroundColor}]}>
+                  <Avatar
+                    source={contact.avatar}
+                    name={contact.name}
+                    size="sm"
+                  />
+
+                  <View style={styles.userInfo}>
+                    <Text style={[styles.userName, {color: themeColors.text}]}>
+                      {contact.name}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.userUsername,
+                        {color: themeColors.textSecondary},
+                      ]}>
+                      {contact.phoneNumber}
+                    </Text>
+                  </View>
+
+                  {isSelected ? (
+                    <Icon
+                      name="checkmark-circle"
+                      size={24}
+                      color={themeColors.primary.default}
+                    />
+                  ) : (
+                    <Icon
+                      name="person"
+                      size={20}
+                      color={themeColors.primary.default}
+                    />
+                  )}
+                </TouchableOpacity>
+              );
+            })
+          )}
+        </Animated.View>
+
+        <Animated.View
+          style={styles.buttonContainer}
+          entering={FadeInUp.duration(800).delay(500)}>
+          <Button
+            title="Create Group"
+            onPress={handleCreateGroup}
+            loading={loading}
+            disabled={!groupName.trim() || selectedUsers.length === 0}
+            fullWidth
+            size="lg"
+          />
+        </Animated.View>
+      </ScrollView>
     </SafeAreaWrapper>
   );
 };
 
 const styles = StyleSheet.create({
+
+
+  loadingContainer: {
+    padding: spacing.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingText: {
+    marginTop: spacing.sm,
+  },
   container: {
     flex: 1,
   },
@@ -249,13 +606,13 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   groupImage: {
-    width: 96, // 24 * 4
-    height: 96, // 24 * 4
+    width: 96,
+    height: 96,
     borderRadius: 48,
   },
   imagePlaceholder: {
-    width: 96, // 24 * 4
-    height: 96, // 24 * 4
+    width: 96,
+    height: 96,
     borderRadius: 48,
     justifyContent: 'center',
     alignItems: 'center',
@@ -264,7 +621,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 0,
     right: 0,
-    borderRadius: 9999, // rounded-full
+    borderRadius: 9999,
     padding: spacing.sm,
   },
   photoText: {
@@ -297,16 +654,41 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: -4,
     right: -4,
-    borderRadius: 9999, // rounded-full
+    borderRadius: 9999,
     padding: spacing.xs,
   },
   selectedUserName: {
     fontSize: fontSizes.xs,
     marginTop: spacing.xs,
   },
+
+  // Removed tab styles as we no longer need tabs
   emptyText: {
     textAlign: 'center',
-    paddingVertical: spacing.lg,
+    paddingVertical: spacing.sm,
+    fontSize: fontSizes.md,
+    fontWeight: '500',
+  },
+  emptySubText: {
+    textAlign: 'center',
+    paddingBottom: spacing.lg,
+    fontSize: fontSizes.sm,
+    opacity: 0.8,
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.xl,
+  },
+  refreshButton: {
+    marginTop: spacing.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: 8,
+  },
+  refreshButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '500',
   },
   userItem: {
     flexDirection: 'row',
@@ -325,6 +707,7 @@ const styles = StyleSheet.create({
   userUsername: {
     fontSize: fontSizes.sm,
   },
+
   buttonContainer: {
     marginTop: spacing.xl,
     marginBottom: spacing.xl,

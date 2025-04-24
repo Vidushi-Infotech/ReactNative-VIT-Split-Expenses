@@ -1,20 +1,51 @@
-import React, { useState } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, Image, TextInput } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, Image, TextInput, ActivityIndicator } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { mockGroups } from '../../utils/mockData';
 import { useTheme } from '../../context/ThemeContext';
+import { useAuth } from '../../context/AuthContext';
+import GroupService from '../../services/GroupService';
 import SafeAreaWrapper from '../../components/common/SafeAreaWrapper';
 import Animated, { FadeInDown, FadeInRight, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { getColorWithOpacity, shadows } from '../../theme/theme';
 
 const GroupsScreen = ({ navigation }) => {
   const { colors: themeColors, isDarkMode } = useTheme();
+  const { userProfile } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const [groups, setGroups] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   // Animation values
   const headerOpacity = useSharedValue(1);
   const addButtonScale = useSharedValue(1);
+
+  // Fetch groups when component mounts or when refreshing
+  useEffect(() => {
+    fetchGroups();
+  }, [userProfile]);
+
+  // Function to fetch groups from Firebase
+  const fetchGroups = async () => {
+    if (!userProfile || !userProfile.id) {
+      console.log('No user profile found, cannot fetch groups');
+      setLoading(false);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      console.log('Fetching groups for user:', userProfile.id);
+      const userGroups = await GroupService.getUserGroups(userProfile.id);
+      console.log('Fetched groups:', userGroups.length);
+      setGroups(userGroups);
+    } catch (error) {
+      console.error('Error fetching groups:', error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
 
   const handleCreateGroup = () => {
     navigation.navigate('CreateGroup');
@@ -22,15 +53,18 @@ const GroupsScreen = ({ navigation }) => {
 
   const handleSearch = (text) => {
     setSearchQuery(text);
-    // In a real app, we would filter the groups here
+    // We don't need to filter here as we'll filter in the render
   };
+
+  // Filter groups based on search query
+  const filteredGroups = searchQuery.trim()
+    ? groups.filter(group =>
+        group.name.toLowerCase().includes(searchQuery.toLowerCase()))
+    : groups;
 
   const handleRefresh = () => {
     setRefreshing(true);
-    // Simulate a refresh
-    setTimeout(() => {
-      setRefreshing(false);
-    }, 1500);
+    fetchGroups();
   };
 
   // Animated styles
@@ -154,47 +188,56 @@ const GroupsScreen = ({ navigation }) => {
           </Animated.View>
         </Animated.View>
 
-        <FlatList
-          data={mockGroups}
-          renderItem={renderGroupItem}
-          keyExtractor={item => item.id}
-          contentContainerStyle={styles.listContent}
-          showsVerticalScrollIndicator={false}
-          onRefresh={handleRefresh}
-          refreshing={refreshing}
-          ListEmptyComponent={() => (
-            <Animated.View
-              entering={FadeInDown.duration(800)}
-              style={styles.emptyContainer}
-            >
-              <Icon name="people-outline" size={60} color={getColorWithOpacity(themeColors.primary.default, 0.5)} />
-              <Text style={[styles.emptyTitle, { color: themeColors.text }]}>No Groups Yet</Text>
-              <Text style={[styles.emptySubtitle, { color: themeColors.textSecondary }]}>Create a group to start splitting expenses with friends</Text>
+        {loading && !refreshing ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={themeColors.primary.default} />
+            <Text style={[styles.loadingText, { color: themeColors.textSecondary }]}>Loading groups...</Text>
+          </View>
+        ) : (
+          <>
+            <FlatList
+              data={filteredGroups}
+              renderItem={renderGroupItem}
+              keyExtractor={item => item.id}
+              contentContainerStyle={styles.listContent}
+              showsVerticalScrollIndicator={false}
+              onRefresh={handleRefresh}
+              refreshing={refreshing}
+              ListEmptyComponent={() => (
+                <Animated.View
+                  entering={FadeInDown.duration(800)}
+                  style={styles.emptyContainer}
+                >
+                  <Icon name="people-outline" size={60} color={getColorWithOpacity(themeColors.primary.default, 0.5)} />
+                  <Text style={[styles.emptyTitle, { color: themeColors.text }]}>No Groups Yet</Text>
+                  <Text style={[styles.emptySubtitle, { color: themeColors.textSecondary }]}>Create a group to start splitting expenses with friends</Text>
+                  <TouchableOpacity
+                    style={[styles.emptyButton, { backgroundColor: themeColors.primary.default }]}
+                    onPress={handleCreateGroup}
+                  >
+                    <Icon name="add" size={20} color={themeColors.white} style={{ marginRight: 8 }} />
+                    <Text style={styles.emptyButtonText}>Create Group</Text>
+                  </TouchableOpacity>
+                </Animated.View>
+              )}
+            />
+
+            <Animated.View style={addButtonAnimatedStyle}>
               <TouchableOpacity
-                style={[styles.emptyButton, { backgroundColor: themeColors.primary.default }]}
+                style={[styles.fab, { backgroundColor: themeColors.primary.default }]}
                 onPress={handleCreateGroup}
+                onPressIn={() => {
+                  addButtonScale.value = withSpring(0.9);
+                }}
+                onPressOut={() => {
+                  addButtonScale.value = withSpring(1);
+                }}
               >
-                <Icon name="add" size={20} color={themeColors.white} style={{ marginRight: 8 }} />
-                <Text style={styles.emptyButtonText}>Create Group</Text>
+                <Icon name="add" size={24} color={themeColors.white} />
               </TouchableOpacity>
             </Animated.View>
-          )}
-        />
-
-        <Animated.View style={addButtonAnimatedStyle}>
-          <TouchableOpacity
-            style={[styles.fab, { backgroundColor: themeColors.primary.default }]}
-            onPress={handleCreateGroup}
-            onPressIn={() => {
-              addButtonScale.value = withSpring(0.9);
-            }}
-            onPressOut={() => {
-              addButtonScale.value = withSpring(1);
-            }}
-          >
-            <Icon name="add" size={24} color={themeColors.white} />
-          </TouchableOpacity>
-        </Animated.View>
+          </>
+        )}
       </View>
     </SafeAreaWrapper>
   );
@@ -385,6 +428,16 @@ const styles = StyleSheet.create({
     color: 'white',
     fontWeight: '600',
     fontSize: 14,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
   },
 });
 

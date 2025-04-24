@@ -20,6 +20,8 @@ import CreateGroupScreen from '../screens/groups/CreateGroupScreen';
 import AddExpenseScreen from '../screens/expenses/AddExpenseScreen';
 import ProfileScreen from '../screens/profile/ProfileScreen';
 import NotificationsScreen from '../screens/notifications/NotificationsScreen';
+import ContactsDebugScreen from '../screens/debug/ContactsDebugScreen';
+import DeviceContactsDebugScreen from '../screens/debug/DeviceContactsDebugScreen';
 
 // Create navigators
 const Stack = createNativeStackNavigator();
@@ -200,6 +202,20 @@ const AppNavigator = () => {
                 headerStyle: {
                   backgroundColor: isDarkMode ? themeColors.dark.default : themeColors.light.default,
                 },
+              }}
+            />
+            <Stack.Screen
+              name="ContactsDebug"
+              component={ContactsDebugScreen}
+              options={{
+                headerShown: false,
+              }}
+            />
+            <Stack.Screen
+              name="DeviceContactsDebug"
+              component={DeviceContactsDebugScreen}
+              options={{
+                headerShown: false,
               }}
             />
           </>

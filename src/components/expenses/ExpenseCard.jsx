@@ -1,6 +1,5 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { getUserById } from '../../utils/mockData.jsx';
 import { useTheme } from '../../context/ThemeContext.jsx';
 import Avatar from '../common/Avatar.jsx';
 import Card from '../common/Card.jsx';
@@ -9,7 +8,12 @@ import { colors, spacing, fontSizes, borderRadius } from '../../theme/theme.js';
 
 const ExpenseCard = ({ expense }) => {
   const { isDarkMode } = useTheme();
-  const paidByUser = getUserById(expense.paidBy);
+  // Use the paidByUser from the expense object if available, or use a default
+  const paidByUser = expense.paidByUser || {
+    id: expense.paidBy,
+    name: 'Unknown User',
+    avatar: null
+  };
 
   // Format date
   const formatDate = (dateString) => {

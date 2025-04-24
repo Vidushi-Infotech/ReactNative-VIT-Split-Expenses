@@ -326,8 +326,8 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     right: 0,
-    bottom: -20, // Ensure it extends past the bottom of the screen
-    paddingBottom: 20, // Add padding at the bottom to compensate
+    bottom: -20,
+    paddingBottom: 20,
     zIndex: 1001,
     elevation: 1001,
     borderTopLeftRadius: borderRadius.xl,

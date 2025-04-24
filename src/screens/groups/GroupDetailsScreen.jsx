@@ -1,8 +1,12 @@
-import React, { useState } from 'react';
-import { View, Text, Image, ScrollView, TouchableOpacity, StyleSheet, Dimensions, StatusBar, Platform } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, Image, ScrollView, TouchableOpacity, StyleSheet, Dimensions, StatusBar, Platform, ActivityIndicator, RefreshControl, Alert } from 'react-native';
 import { useRoute, useNavigation } from '@react-navigation/native';
-import { getGroupById, getExpensesByGroupId, calculateGroupBalances, getUserById, currentUser } from '../../utils/mockData.jsx';
 import { useTheme } from '../../context/ThemeContext.jsx';
+import { useAuth } from '../../context/AuthContext';
+import GroupService from '../../services/GroupService';
+import ExpenseService from '../../services/ExpenseService';
+import UserService from '../../services/UserService';
+import PaymentService from '../../services/PaymentService';
 import AvatarGroup from '../../components/common/AvatarGroup.jsx';
 import ExpenseCard from '../../components/expenses/ExpenseCard.jsx';
 import Icon from 'react-native-vector-icons/Ionicons';
@@ -17,26 +21,98 @@ const GroupDetailsScreen = () => {
   const route = useRoute();
   const navigation = useNavigation();
   const { colors: themeColors, isDarkMode } = useTheme();
+  const { userProfile } = useAuth();
+
+  // State for data
+  const [group, setGroup] = useState(null);
+  const [expenses, setExpenses] = useState([]);
+  const [paymentRecords, setPaymentRecords] = useState([]);
+  const [balances, setBalances] = useState({});
+  const [users, setUsers] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [updatingPayment, setUpdatingPayment] = useState(false);
 
   // Animation values
   const tabIndicatorPosition = useSharedValue(0);
 
-  // No refs needed
-
   const { groupId } = route.params || {};
 
-  // Add error handling for group data retrieval
-  let group, expenses, balances;
-  try {
-    group = getGroupById(groupId);
-    expenses = group ? getExpensesByGroupId(groupId) : [];
-    balances = group ? calculateGroupBalances(groupId) : {};
-  } catch (error) {
-    console.error('Error retrieving group data:', error);
-    group = null;
-    expenses = [];
-    balances = {};
-  }
+  // Fetch group data when component mounts
+  useEffect(() => {
+    fetchGroupData();
+  }, [groupId]);
+
+  // Function to fetch group data
+  const fetchGroupData = async () => {
+    if (!groupId || !userProfile) {
+      setLoading(false);
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      // Fetch group details
+      const groupData = await GroupService.getGroupById(groupId);
+      setGroup(groupData);
+
+      if (groupData) {
+        // Fetch expenses for the group
+        const expensesData = await ExpenseService.getExpensesByGroupId(groupId);
+        setExpenses(expensesData);
+
+        // Fetch payments for the group is now handled by generatePaymentRecords
+
+        // Calculate balances
+        const balancesData = await ExpenseService.calculateGroupBalances(groupId, expensesData, groupData.members);
+        setBalances(balancesData);
+
+        // Generate payment records based on balances
+        const records = await PaymentService.generatePaymentRecords(groupId, userProfile);
+        setPaymentRecords(records);
+
+        // Fetch user details for all members
+        const allUsers = await UserService.getAllUsers();
+        const usersMap = {};
+        allUsers.forEach(user => {
+          usersMap[user.id] = user;
+        });
+        setUsers(usersMap);
+      }
+    } catch (error) {
+      console.error('Error fetching group data:', error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  // Function to refresh data
+  const handleRefresh = () => {
+    setRefreshing(true);
+    fetchGroupData();
+  };
+
+  // Function to handle payment status update
+  const handleUpdatePaymentStatus = async (paymentId, newStatus) => {
+    try {
+      setUpdatingPayment(true);
+
+      // Update payment status in Firebase
+      await PaymentService.updatePaymentStatus(paymentId, newStatus);
+
+      // Refresh data to get updated payments
+      await fetchGroupData();
+
+      Alert.alert('Success', 'Payment status updated successfully');
+    } catch (error) {
+      console.error('Error updating payment status:', error);
+      Alert.alert('Error', 'Failed to update payment status. Please try again.');
+    } finally {
+      setUpdatingPayment(false);
+    }
+  };
 
   // Custom tab implementation
   const [activeTab, setActiveTab] = useState('expenses');
@@ -66,10 +142,25 @@ const GroupDetailsScreen = () => {
 
   // No header animation needed
 
+  // Function to get user by ID from the users map
+  const getUserById = (userId) => {
+    return users[userId] || { id: userId, name: 'Unknown User', avatar: null };
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.centerContainer}>
+        <ActivityIndicator size="large" color={themeColors.primary.default} />
+        <Text style={[styles.text, { color: themeColors.text, marginTop: 16 }]}>Loading group details...</Text>
+      </View>
+    );
+  }
+
   if (!group) {
     return (
       <View style={styles.centerContainer}>
-        <Text style={styles.text}>Group not found</Text>
+        <Icon name="alert-circle-outline" size={60} color={themeColors.danger} />
+        <Text style={[styles.text, { color: themeColors.text, marginTop: 16 }]}>Group not found</Text>
       </View>
     );
   }
@@ -139,7 +230,11 @@ const GroupDetailsScreen = () => {
               </View>
 
               <View style={styles.groupMembersRow}>
-                <AvatarGroup users={group.members} max={4} size="sm" />
+                <AvatarGroup
+                  users={group.members.map(memberId => getUserById(memberId))}
+                  max={4}
+                  size="sm"
+                />
                 <Text style={{ color: themeColors.textSecondary }}>
                   {group.members.length} members
                 </Text>
@@ -195,6 +290,14 @@ const GroupDetailsScreen = () => {
               style={styles.tabContent}
               showsVerticalScrollIndicator={false}
               contentContainerStyle={styles.expensesContainer}
+              refreshControl={
+                <RefreshControl
+                  refreshing={refreshing}
+                  onRefresh={handleRefresh}
+                  colors={[themeColors.primary.default]}
+                  tintColor={themeColors.primary.default}
+                />
+              }
             >
               {expenses.length === 0 ? (
                 <Animated.View
@@ -222,15 +325,23 @@ const GroupDetailsScreen = () => {
                   </TouchableOpacity>
                 </Animated.View>
               ) : (
-                expenses.map((expense, index) => (
-                  <Animated.View
-                    key={expense.id}
-                    entering={FadeInDown.delay(index * 100).duration(400)}
-                    style={styles.expenseCardContainer}
-                  >
-                    <ExpenseCard expense={expense} />
-                  </Animated.View>
-                ))
+                expenses.map((expense, index) => {
+                  // Add the paidByUser to the expense object
+                  const expenseWithUser = {
+                    ...expense,
+                    paidByUser: getUserById(expense.paidBy)
+                  };
+
+                  return (
+                    <Animated.View
+                      key={expense.id}
+                      entering={FadeInDown.delay(index * 100).duration(400)}
+                      style={styles.expenseCardContainer}
+                    >
+                      <ExpenseCard expense={expenseWithUser} />
+                    </Animated.View>
+                  );
+                })
               )}
             </ScrollView>
           )}
@@ -240,13 +351,21 @@ const GroupDetailsScreen = () => {
               style={styles.tabContent}
               showsVerticalScrollIndicator={false}
               contentContainerStyle={styles.balancesContainer}
+              refreshControl={
+                <RefreshControl
+                  refreshing={refreshing}
+                  onRefresh={handleRefresh}
+                  colors={[themeColors.primary.default]}
+                  tintColor={themeColors.primary.default}
+                />
+              }
             >
               {Object.keys(balances).map((userId, index) => {
                 const user = getUserById(userId);
                 const balance = balances[userId];
                 const isPositive = balance > 0;
                 const isNegative = balance < 0;
-                // We'll use !isPositive && !isNegative to check if settled
+                const isSettled = !isPositive && !isNegative;
 
                 // Determine background color based on balance
                 const getBalanceBackgroundColor = () => {
@@ -262,14 +381,17 @@ const GroupDetailsScreen = () => {
                   return themeColors.textSecondary;
                 };
 
-                const isSettled = !isPositive && !isNegative;
-
                 // Determine balance icon
                 const getBalanceIcon = () => {
                   if (isPositive) return 'trending-up';
                   if (isNegative) return 'trending-down';
                   return 'remove'; // for settled (zero balance)
                 };
+
+                // Skip the current user if they have no balance
+                if (userId === userProfile?.id && isSettled) {
+                  return null;
+                }
 
                 return (
                   <Animated.View
@@ -282,10 +404,16 @@ const GroupDetailsScreen = () => {
                     }]}
                   >
                     <View style={styles.userInfoContainer}>
-                      <Image
-                        source={{ uri: user.avatar }}
-                        style={styles.userAvatar}
-                      />
+                      {user.avatar ? (
+                        <Image
+                          source={{ uri: user.avatar }}
+                          style={styles.userAvatar}
+                        />
+                      ) : (
+                        <View style={[styles.userAvatarPlaceholder, { backgroundColor: themeColors.primary.default }]}>
+                          <Text style={styles.userAvatarText}>{user.name.charAt(0).toUpperCase()}</Text>
+                        </View>
+                      )}
                       <View style={styles.userTextContainer}>
                         <Text style={[styles.userName, { color: themeColors.text }]}>
                           {user.name}
@@ -314,28 +442,224 @@ const GroupDetailsScreen = () => {
                     </View>
                   </Animated.View>
                 );
-              })}
+              }).filter(Boolean)}
             </ScrollView>
           )}
 
           {activeTab === 'payments' && (
-            <Animated.View
-              style={styles.comingSoonContainer}
-              entering={FadeInDown.duration(600)}
+            <ScrollView
+              style={styles.tabContent}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.paymentsContainer}
+              refreshControl={
+                <RefreshControl
+                  refreshing={refreshing}
+                  onRefresh={handleRefresh}
+                  colors={[themeColors.primary.default]}
+                  tintColor={themeColors.primary.default}
+                />
+              }
             >
-              <Icon
-                name="cash-outline"
-                size={70}
-                color={themeColors.textSecondary}
-                style={styles.emptyStateIcon}
-              />
-              <Text style={[styles.emptyStateTitle, { color: themeColors.text }]}>
-                Coming Soon
-              </Text>
-              <Text style={[styles.emptyStateText, { color: themeColors.textSecondary }]}>
-                Payment tracking will be available in the next update.
-              </Text>
-            </Animated.View>
+              {paymentRecords.length === 0 ? (
+                <Animated.View
+                  style={styles.emptyStateContainer}
+                  entering={FadeInDown.duration(600)}
+                >
+                  <Icon
+                    name="cash-outline"
+                    size={70}
+                    color={themeColors.textSecondary}
+                    style={styles.emptyStateIcon}
+                  />
+                  <Text style={[styles.emptyStateTitle, { color: themeColors.text }]}>
+                    No Payments Needed
+                  </Text>
+                  <Text style={[styles.emptyStateText, { color: themeColors.textSecondary }]}>
+                    All expenses are settled in this group.
+                  </Text>
+                </Animated.View>
+              ) : (
+                paymentRecords.map((payment, index) => {
+                  const isReceiving = payment.type === 'receive';
+                  const isPaying = payment.type === 'pay';
+                  const isCompleted = payment.status === 'completed';
+                  const isPending = payment.status === 'pending';
+
+                  // Format date
+                  const formatDate = (dateString) => {
+                    const date = new Date(dateString);
+                    return date.toLocaleDateString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric'
+                    });
+                  };
+
+                  return (
+                    <Animated.View
+                      key={payment.id}
+                      entering={FadeInDown.delay(index * 100).duration(400)}
+                      style={[styles.paymentItem, {
+                        backgroundColor: isCompleted ? themeColors.success + '15' : themeColors.warning + '15',
+                        borderLeftWidth: 4,
+                        borderLeftColor: isCompleted ? themeColors.success : themeColors.warning
+                      }]}
+                    >
+                      <View style={styles.paymentHeader}>
+                        <View style={styles.userInfoContainer}>
+                          <View style={styles.paymentUsers}>
+                            {isPaying ? (
+                              // Current user is paying
+                              <>
+                                <View style={styles.paymentUserContainer}>
+                                  {userProfile.avatar ? (
+                                    <Image
+                                      source={{ uri: userProfile.avatar }}
+                                      style={styles.paymentUserAvatar}
+                                    />
+                                  ) : (
+                                    <View style={[styles.paymentUserAvatarPlaceholder, { backgroundColor: themeColors.primary.default }]}>
+                                      <Text style={styles.paymentUserAvatarText}>{userProfile.name.charAt(0).toUpperCase()}</Text>
+                                    </View>
+                                  )}
+                                  <Text style={[styles.paymentUserName, { color: themeColors.text }]}>
+                                    You
+                                  </Text>
+                                </View>
+
+                                <View style={styles.paymentArrow}>
+                                  <Icon
+                                    name="arrow-forward"
+                                    size={16}
+                                    color={isCompleted ? themeColors.success : themeColors.warning}
+                                  />
+                                </View>
+
+                                <View style={styles.paymentUserContainer}>
+                                  {payment.user.avatar ? (
+                                    <Image
+                                      source={{ uri: payment.user.avatar }}
+                                      style={styles.paymentUserAvatar}
+                                    />
+                                  ) : (
+                                    <View style={[styles.paymentUserAvatarPlaceholder, { backgroundColor: themeColors.primary.default }]}>
+                                      <Text style={styles.paymentUserAvatarText}>{payment.user.name.charAt(0).toUpperCase()}</Text>
+                                    </View>
+                                  )}
+                                  <Text style={[styles.paymentUserName, { color: themeColors.text }]}>
+                                    {payment.user.name.split(' ')[0]}
+                                  </Text>
+                                </View>
+                              </>
+                            ) : (
+                              // Current user is receiving
+                              <>
+                                <View style={styles.paymentUserContainer}>
+                                  {payment.user.avatar ? (
+                                    <Image
+                                      source={{ uri: payment.user.avatar }}
+                                      style={styles.paymentUserAvatar}
+                                    />
+                                  ) : (
+                                    <View style={[styles.paymentUserAvatarPlaceholder, { backgroundColor: themeColors.primary.default }]}>
+                                      <Text style={styles.paymentUserAvatarText}>{payment.user.name.charAt(0).toUpperCase()}</Text>
+                                    </View>
+                                  )}
+                                  <Text style={[styles.paymentUserName, { color: themeColors.text }]}>
+                                    {payment.user.name.split(' ')[0]}
+                                  </Text>
+                                </View>
+
+                                <View style={styles.paymentArrow}>
+                                  <Icon
+                                    name="arrow-forward"
+                                    size={16}
+                                    color={isCompleted ? themeColors.success : themeColors.warning}
+                                  />
+                                </View>
+
+                                <View style={styles.paymentUserContainer}>
+                                  {userProfile.avatar ? (
+                                    <Image
+                                      source={{ uri: userProfile.avatar }}
+                                      style={styles.paymentUserAvatar}
+                                    />
+                                  ) : (
+                                    <View style={[styles.paymentUserAvatarPlaceholder, { backgroundColor: themeColors.primary.default }]}>
+                                      <Text style={styles.paymentUserAvatarText}>{userProfile.name.charAt(0).toUpperCase()}</Text>
+                                    </View>
+                                  )}
+                                  <Text style={[styles.paymentUserName, { color: themeColors.text }]}>
+                                    You
+                                  </Text>
+                                </View>
+                              </>
+                            )}
+                          </View>
+                        </View>
+
+                        <Text style={[styles.paymentAmount, {
+                          color: isCompleted ? themeColors.success : themeColors.warning
+                        }]}>
+                          ₹{payment.amount.toFixed(2)}
+                        </Text>
+                      </View>
+
+                      <View style={styles.paymentFooter}>
+                        <View style={styles.paymentMeta}>
+                          <Text style={[styles.paymentDate, { color: themeColors.textSecondary }]}>
+                            {formatDate(payment.createdAt)}
+                          </Text>
+
+                          {/* Only show status badge for payments the user is receiving */}
+                          {isReceiving && (
+                            <View style={styles.statusActions}>
+                              <View style={[styles.paymentStatusBadge, {
+                                backgroundColor: isCompleted ? themeColors.success + '20' : themeColors.warning + '20'
+                              }]}>
+                                <Text style={[styles.paymentStatusText, {
+                                  color: isCompleted ? themeColors.success : themeColors.warning
+                                }]}>
+                                  {isCompleted ? 'Received' : 'Pending'}
+                                </Text>
+                              </View>
+
+                              {/* Show action button only for pending payments */}
+                              {isPending && (
+                                <TouchableOpacity
+                                  style={[styles.actionButton, { backgroundColor: themeColors.success }]}
+                                  onPress={() => handleUpdatePaymentStatus(payment.id, 'completed')}
+                                  disabled={updatingPayment}
+                                >
+                                  {updatingPayment ? (
+                                    <ActivityIndicator size="small" color="white" />
+                                  ) : (
+                                    <Text style={styles.actionButtonText}>Mark as Received</Text>
+                                  )}
+                                </TouchableOpacity>
+                              )}
+                            </View>
+                          )}
+
+                          {/* For payments the user is making, just show the status */}
+                          {isPaying && (
+                            <View style={[styles.paymentStatusBadge, {
+                              backgroundColor: isCompleted ? themeColors.success + '20' : themeColors.warning + '20'
+                            }]}>
+                              <Text style={[styles.paymentStatusText, {
+                                color: isCompleted ? themeColors.success : themeColors.warning
+                              }]}>
+                                {isCompleted ? 'Paid' : 'To Pay'}
+                              </Text>
+                            </View>
+                          )}
+                        </View>
+                      </View>
+                    </Animated.View>
+                  );
+                })
+              )}
+            </ScrollView>
           )}
         </View>
       </View>
@@ -556,6 +880,21 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: 'rgba(255,255,255,0.8)',
   },
+  userAvatarPlaceholder: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: spacing.md,
+  },
+  userAvatarText: {
+    color: 'white',
+    fontSize: fontSizes.lg,
+    fontWeight: 'bold',
+  },
   userTextContainer: {
     marginLeft: spacing.md,
   },
@@ -582,6 +921,104 @@ const styles = StyleSheet.create({
   balanceText: {
     fontWeight: 'bold',
     fontSize: 18,
+  },
+
+  // Payments styles
+  paymentsContainer: {
+    padding: spacing.lg,
+    paddingBottom: 100, // Extra padding for FAB
+  },
+  paymentItem: {
+    borderRadius: 12,
+    marginBottom: spacing.md,
+    padding: spacing.md,
+    overflow: 'hidden',
+  },
+  paymentHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: spacing.sm,
+  },
+  paymentUsers: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  paymentUserContainer: {
+    alignItems: 'center',
+  },
+  paymentUserAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.8)',
+  },
+  paymentUserAvatarPlaceholder: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  paymentUserAvatarText: {
+    color: 'white',
+    fontSize: fontSizes.md,
+    fontWeight: 'bold',
+  },
+  paymentUserName: {
+    fontSize: 12,
+    marginTop: 4,
+    fontWeight: '500',
+  },
+  paymentArrow: {
+    marginHorizontal: spacing.sm,
+  },
+  paymentAmount: {
+    fontWeight: 'bold',
+    fontSize: 18,
+  },
+  paymentFooter: {
+    marginTop: spacing.sm,
+  },
+  paymentMeta: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  paymentDate: {
+    fontSize: 12,
+  },
+  paymentStatusBadge: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: 12,
+  },
+  paymentStatusText: {
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  paymentNote: {
+    marginTop: spacing.sm,
+    fontSize: 12,
+    fontStyle: 'italic',
+  },
+  statusActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  actionButton: {
+    marginLeft: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: 16,
+  },
+  actionButtonText: {
+    color: 'white',
+    fontSize: 10,
+    fontWeight: '600',
   },
 
   // Add button styles

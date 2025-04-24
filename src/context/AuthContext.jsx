@@ -14,6 +14,7 @@ const AuthContext = createContext({
   sendOTP: () => {},
   verifyOTP: () => {},
   setupProfile: () => {},
+  updateProfile: () => {},
 });
 
 // Provider component
@@ -241,10 +242,60 @@ export const AuthProvider = ({ children }) => {
 
   // Logout function
   const logout = async () => {
-    // In a real app, you would clear tokens here
-    await AsyncStorage.removeItem('userProfile');
-    setUserProfile(null);
-    setIsAuthenticated(false);
+    try {
+      console.log('AuthContext: Logging out user');
+      // In a real app, you would clear tokens here
+      await AsyncStorage.removeItem('userProfile');
+      setUserProfile(null);
+      setIsAuthenticated(false);
+      console.log('AuthContext: User logged out successfully');
+      return true;
+    } catch (error) {
+      console.error('AuthContext: Error logging out:', error);
+      throw error;
+    }
+  };
+
+  // Update profile function
+  const updateProfile = async (updatedData) => {
+    try {
+      console.log('AuthContext: updateProfile called with:', updatedData);
+
+      if (!userProfile || !userProfile.id) {
+        console.error('AuthContext: Cannot update profile - no user is logged in');
+        return Promise.resolve(false);
+      }
+
+      // Get the document ID (phone number)
+      const docId = userProfile.id;
+
+      // Prepare the update data
+      const updateData = {
+        ...updatedData,
+        updatedAt: new Date().toISOString(),
+      };
+
+      console.log('AuthContext: Updating user profile in Firestore with ID:', docId);
+
+      // Update the user document in Firestore
+      await setDoc(doc(db, 'Users', docId), updateData, { merge: true });
+      console.log('AuthContext: User profile updated in Firestore');
+
+      // Update the local user profile
+      const updatedProfile = {
+        ...userProfile,
+        ...updateData,
+      };
+
+      // Update state and AsyncStorage
+      setUserProfile(updatedProfile);
+      await AsyncStorage.setItem('userProfile', JSON.stringify(updatedProfile));
+
+      return Promise.resolve(true);
+    } catch (error) {
+      console.error('AuthContext: Error updating user profile:', error);
+      return Promise.resolve(false);
+    }
   };
 
   return (
@@ -258,6 +309,7 @@ export const AuthProvider = ({ children }) => {
         sendOTP,
         verifyOTP,
         setupProfile,
+        updateProfile,
       }}
     >
       {children}

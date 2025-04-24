@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,34 +9,105 @@ import {
   StyleSheet,
   Platform,
   SafeAreaView,
-  KeyboardAvoidingView
+  KeyboardAvoidingView,
+  Alert,
+  ActivityIndicator,
+  Modal
 } from 'react-native';
 import { useRoute, useNavigation } from '@react-navigation/native';
-import { getGroupById, expenseCategories } from '../../utils/mockData';
 import { useTheme } from '../../context/ThemeContext';
-import Input from '../../components/common/Input';
+import { useAuth } from '../../context/AuthContext';
+import GroupService from '../../services/GroupService';
+import ExpenseService from '../../services/ExpenseService';
+import UserService from '../../services/UserService';
 import Button from '../../components/common/Button';
 import Avatar from '../../components/common/Avatar';
 import Icon from 'react-native-vector-icons/Ionicons';
 import Animated, { FadeInUp, FadeIn, SlideInRight } from 'react-native-reanimated';
 import { colors, spacing, fontSizes, borderRadius } from '../../theme/theme';
-import { BlurView } from '@react-native-community/blur';
+import ImagePicker from 'react-native-image-crop-picker';
+import DatePicker from 'react-native-date-picker';
 
 const AddExpenseScreen = () => {
   const route = useRoute();
   const navigation = useNavigation();
   const { isDarkMode } = useTheme();
+  const { userProfile } = useAuth();
 
   const { groupId } = route.params;
-  const group = getGroupById(groupId);
+  const [group, setGroup] = useState(null);
+  const [groupMembers, setGroupMembers] = useState([]);
+  const [fetchingGroup, setFetchingGroup] = useState(true);
 
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState('');
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [date, setDate] = useState(new Date());
   const [image, setImage] = useState(null);
   const [participants, setParticipants] = useState([]);
   const [loading, setLoading] = useState(false);
+
+  // UI state
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
+  const [imagePickerModalVisible, setImagePickerModalVisible] = useState(false);
+
+  // Define expense categories
+  const expenseCategories = [
+    'Food', 'Transport', 'Shopping', 'Entertainment', 'Groceries',
+    'Bills', 'Travel', 'Health', 'Education', 'Other'
+  ];
+
+  // Fetch group data when component mounts
+  useEffect(() => {
+    fetchGroupData();
+  }, [groupId]);
+
+  // Function to fetch group data
+  const fetchGroupData = async () => {
+    if (!groupId) {
+      setFetchingGroup(false);
+      return;
+    }
+
+    try {
+      setFetchingGroup(true);
+
+      // Fetch group details
+      const groupData = await GroupService.getGroupById(groupId);
+      setGroup(groupData);
+
+      if (groupData) {
+        try {
+          // Fetch user details for all members
+          const memberPromises = groupData.members.map(async memberId => {
+            try {
+              return await UserService.getUserById(memberId);
+            } catch (error) {
+              console.error(`Error fetching user ${memberId}:`, error);
+              return null;
+            }
+          });
+
+          const memberDetails = await Promise.all(memberPromises);
+          setGroupMembers(memberDetails.filter(Boolean)); // Filter out any null values
+        } catch (error) {
+          console.error('Error fetching group members:', error);
+          // Fallback to just using the group members array
+          setGroupMembers(groupData.members.map(memberId => ({
+            id: memberId,
+            name: 'User ' + memberId.substring(0, 5),
+            phoneNumber: 'Unknown',
+            avatar: null
+          })));
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching group data:', error);
+      Alert.alert('Error', 'Failed to load group data. Please try again.');
+    } finally {
+      setFetchingGroup(false);
+    }
+  };
 
   // Define theme colors based on mode
   const themeColors = {
@@ -49,24 +120,75 @@ const AddExpenseScreen = () => {
     inputBg: isDarkMode ? 'rgba(30, 30, 40, 0.8)' : 'rgba(250, 250, 255, 0.9)',
   };
 
+  if (fetchingGroup) {
+    return (
+      <View style={[styles.centerContainer, { backgroundColor: themeColors.background }]}>
+        <ActivityIndicator size="large" color={colors.primary.default} />
+        <Text style={[styles.text, { color: themeColors.text, marginTop: 16 }]}>Loading group details...</Text>
+      </View>
+    );
+  }
+
   if (!group) {
     return (
       <View style={[styles.centerContainer, { backgroundColor: themeColors.background }]}>
-        <Text style={[styles.text, { color: themeColors.text }]}>Group not found</Text>
+        <Icon name="alert-circle-outline" size={60} color={colors.error} />
+        <Text style={[styles.text, { color: themeColors.text, marginTop: 16 }]}>Group not found</Text>
+        <TouchableOpacity
+          style={[styles.backButtonLarge, { backgroundColor: colors.primary.default, marginTop: 24 }]}
+          onPress={() => navigation.goBack()}
+        >
+          <Text style={styles.backButtonText}>Go Back</Text>
+        </TouchableOpacity>
       </View>
     );
   }
 
   const handleSelectImage = () => {
-    // In a real app, we would use react-native-image-picker here
-    // For demo purposes, we'll just set a random image
-    const demoImages = [
-      'https://images.unsplash.com/photo-1554118811-1e0d58224f24',
-      'https://images.unsplash.com/photo-1607434472257-d9f8e57a643d',
-      'https://images.unsplash.com/photo-1526948531399-320e7e40f0ca',
-    ];
-    const randomImage = demoImages[Math.floor(Math.random() * demoImages.length)];
-    setImage(randomImage);
+    // Show options to select image from camera or gallery
+    setImagePickerModalVisible(true);
+  };
+
+  const takePhotoFromCamera = () => {
+    setImagePickerModalVisible(false);
+
+    ImagePicker.openCamera({
+      width: 1200,
+      height: 1200,
+      cropping: true,
+      compressImageQuality: 0.8,
+    })
+      .then(image => {
+        console.log('Camera image:', image);
+        setImage(image.path);
+      })
+      .catch(error => {
+        if (error.code !== 'E_PICKER_CANCELLED') {
+          console.error('Error capturing image:', error);
+          Alert.alert('Error', 'Failed to capture image. Please try again.');
+        }
+      });
+  };
+
+  const choosePhotoFromGallery = () => {
+    setImagePickerModalVisible(false);
+
+    ImagePicker.openPicker({
+      width: 1200,
+      height: 1200,
+      cropping: true,
+      compressImageQuality: 0.8,
+    })
+      .then(image => {
+        console.log('Gallery image:', image);
+        setImage(image.path);
+      })
+      .catch(error => {
+        if (error.code !== 'E_PICKER_CANCELLED') {
+          console.error('Error selecting image:', error);
+          Alert.alert('Error', 'Failed to select image. Please try again.');
+        }
+      });
   };
 
   const handleToggleParticipant = (userId) => {
@@ -77,19 +199,53 @@ const AddExpenseScreen = () => {
     }
   };
 
-  const handleAddExpense = () => {
+  const handleAddExpense = async () => {
     if (!amount || !description || participants.length === 0) {
-      // Show error in a real app
+      Alert.alert('Missing Information', 'Please fill in all required fields and select at least one participant.');
+      return;
+    }
+
+    if (!category) {
+      Alert.alert('Missing Category', 'Please select a category for this expense.');
+      return;
+    }
+
+    if (!userProfile || !userProfile.id) {
+      Alert.alert('Error', 'You must be logged in to add an expense.');
       return;
     }
 
     setLoading(true);
 
-    // Simulate API call
-    setTimeout(() => {
+    try {
+      // Create expense data object
+      const expenseData = {
+        groupId,
+        amount: parseFloat(amount),
+        description,
+        category,
+        date: date.toISOString(),
+        paidBy: userProfile.id,
+        participants: participants,
+        createdAt: new Date().toISOString(),
+        image: image || null,
+      };
+
+      // Add expense to Firestore
+      const expenseId = await ExpenseService.createExpense(expenseData);
+      console.log('Expense created with ID:', expenseId);
+
+      // Show success message
+      Alert.alert(
+        'Success',
+        'Expense added successfully!',
+        [{ text: 'OK', onPress: () => navigation.goBack() }]
+      );
+    } catch (error) {
+      console.error('Error adding expense:', error);
+      Alert.alert('Error', 'Failed to add expense. Please try again.');
       setLoading(false);
-      navigation.goBack();
-    }, 1500);
+    }
   };
 
   return (
@@ -133,7 +289,7 @@ const AddExpenseScreen = () => {
             </View>
             <Text style={[styles.groupName, { color: themeColors.text }]}>{group.name}</Text>
             <Text style={[styles.groupMembers, { color: themeColors.textSecondary }]}>
-              {group.members.length} members
+              {groupMembers.length} members
             </Text>
           </Animated.View>
 
@@ -258,11 +414,12 @@ const AddExpenseScreen = () => {
             </Text>
 
             <TouchableOpacity
+              onPress={() => setDatePickerOpen(true)}
               style={[styles.dateButton, { backgroundColor: themeColors.inputBg }]}
             >
               <Icon name="calendar-outline" size={20} color={colors.primary.default} />
               <Text style={[styles.dateText, { color: themeColors.text }]}>
-                {new Date().toLocaleDateString('en-US', {
+                {date.toLocaleDateString('en-US', {
                   year: 'numeric',
                   month: 'long',
                   day: 'numeric',
@@ -270,6 +427,21 @@ const AddExpenseScreen = () => {
               </Text>
               <Icon name="chevron-down" size={18} color={themeColors.textSecondary} style={styles.dateIcon} />
             </TouchableOpacity>
+
+            <DatePicker
+              modal
+              open={datePickerOpen}
+              date={date}
+              mode="date"
+              maximumDate={new Date()}
+              onConfirm={(selectedDate) => {
+                setDatePickerOpen(false);
+                setDate(selectedDate);
+              }}
+              onCancel={() => {
+                setDatePickerOpen(false);
+              }}
+            />
           </Animated.View>
 
           {/* Receipt Section */}
@@ -341,12 +513,15 @@ const AddExpenseScreen = () => {
                 Split With
               </Text>
               <Text style={[styles.selectedCount, { color: colors.primary.default }]}>
-                {participants.length}/{group.members.length} Selected
+                {participants.length}/{groupMembers.length} Selected
               </Text>
             </View>
 
             <View style={styles.participantsContainer}>
-              {group.members.map((member, index) => {
+              {groupMembers.map((member, index) => {
+                // Skip the current user as they are the one paying
+                if (member.id === userProfile?.id) return null;
+
                 const isSelected = participants.includes(member.id);
 
                 return (
@@ -358,7 +533,7 @@ const AddExpenseScreen = () => {
                       onPress={() => handleToggleParticipant(member.id)}
                       style={[
                         styles.participantRow,
-                        index < group.members.length - 1 && {
+                        index < groupMembers.length - 1 && {
                           borderBottomWidth: 1,
                           borderBottomColor: themeColors.border
                         }
@@ -378,7 +553,7 @@ const AddExpenseScreen = () => {
                             {member.name}
                           </Text>
                           <Text style={[styles.participantEmail, { color: themeColors.textSecondary }]}>
-                            {member.email || 'No email'}
+                            {member.phoneNumber || 'No phone'}
                           </Text>
                         </View>
                       </View>
@@ -399,7 +574,7 @@ const AddExpenseScreen = () => {
                     </TouchableOpacity>
                   </Animated.View>
                 );
-              })}
+              }).filter(Boolean)}
             </View>
           </Animated.View>
 
@@ -417,6 +592,47 @@ const AddExpenseScreen = () => {
           </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* Image Picker Modal */}
+      <Modal
+        visible={imagePickerModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setImagePickerModalVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setImagePickerModalVisible(false)}
+        >
+          <View style={[styles.modalContent, { backgroundColor: themeColors.card }]}>
+            <Text style={[styles.modalTitle, { color: themeColors.text }]}>Select Photo</Text>
+
+            <TouchableOpacity
+              style={[styles.modalOption, { borderBottomColor: themeColors.border }]}
+              onPress={takePhotoFromCamera}
+            >
+              <Icon name="camera-outline" size={24} color={colors.primary.default} style={styles.modalOptionIcon} />
+              <Text style={[styles.modalOptionText, { color: themeColors.text }]}>Take Photo</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.modalOption}
+              onPress={choosePhotoFromGallery}
+            >
+              <Icon name="image-outline" size={24} color={colors.primary.default} style={styles.modalOptionIcon} />
+              <Text style={[styles.modalOptionText, { color: themeColors.text }]}>Choose from Gallery</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.cancelButton, { backgroundColor: themeColors.border }]}
+              onPress={() => setImagePickerModalVisible(false)}
+            >
+              <Text style={[styles.cancelButtonText, { color: themeColors.text }]}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -797,6 +1013,60 @@ const styles = StyleSheet.create({
   buttonContainer: {
     marginTop: spacing.lg,
     marginBottom: Platform.OS === 'ios' ? spacing.xxl : spacing.xl,
+  },
+  backButtonLarge: {
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  backButtonText: {
+    color: colors.white,
+    fontSize: fontSizes.md,
+    fontWeight: '600',
+  },
+
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    borderTopLeftRadius: borderRadius.xl,
+    borderTopRightRadius: borderRadius.xl,
+    padding: spacing.lg,
+    paddingBottom: Platform.OS === 'ios' ? spacing.xxl : spacing.xl,
+  },
+  modalTitle: {
+    fontSize: fontSizes.lg,
+    fontWeight: '600',
+    marginBottom: spacing.lg,
+    textAlign: 'center',
+  },
+  modalOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+  },
+  modalOptionIcon: {
+    marginRight: spacing.md,
+  },
+  modalOptionText: {
+    fontSize: fontSizes.md,
+  },
+  cancelButton: {
+    marginTop: spacing.lg,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.lg,
+    alignItems: 'center',
+  },
+  cancelButtonText: {
+    fontSize: fontSizes.md,
+    fontWeight: '500',
   },
 });
 
