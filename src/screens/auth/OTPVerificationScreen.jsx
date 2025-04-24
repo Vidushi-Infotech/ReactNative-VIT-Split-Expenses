@@ -6,6 +6,9 @@ import { useAuth } from '../../context/AuthContext';
 import Icon from 'react-native-vector-icons/Ionicons';
 import Animated, { FadeInUp } from 'react-native-reanimated';
 import { spacing, fontSizes, borderRadius } from '../../theme/theme';
+import { collection, getDocs, query, where, setDoc, doc } from 'firebase/firestore';
+import { db } from '../../config/firebase';
+import { extractCountryCodeAndNumber } from '../../utils/phoneUtils';
 
 const OTPVerificationScreen = ({ navigation, route }) => {
   const { phoneNumber } = route.params;
@@ -14,7 +17,8 @@ const OTPVerificationScreen = ({ navigation, route }) => {
 
   const [error, setError] = useState('');
 
-  const [otp, setOtp] = useState(['', '', '', '']);
+  // Using static OTP "1234" for this implementation
+  const [otp, setOtp] = useState(['1', '2', '3', '4']);
   const [loading, setLoading] = useState(false);
   const [resendTimer, setResendTimer] = useState(30);
   const [canResend, setCanResend] = useState(false);
@@ -62,6 +66,7 @@ const OTPVerificationScreen = ({ navigation, route }) => {
 
   const handleVerifyOTP = async () => {
     setError('');
+    console.log('Starting OTP verification process');
 
     const otpValue = otp.join('');
     if (otpValue.length !== 4) {
@@ -72,20 +77,80 @@ const OTPVerificationScreen = ({ navigation, route }) => {
     setLoading(true);
 
     try {
-      // Use the verifyOTP function from AuthContext
+      console.log('Verifying OTP:', otpValue);
+
+      // Verify the OTP
       const result = await verifyOTP(otpValue);
+      console.log('OTP verification result:', result);
 
       if (result.success) {
-        if (result.isNewUser) {
-          // New user - navigate to profile setup
+        // Check if the phone number already exists in Firestore
+        try {
+          console.log('Checking if phone number already exists in Firestore:', phoneNumber);
+
+          // Extract country code and phone number using the utility function
+          // This will correctly identify country codes like "+91" for India
+          const { countryCode, phoneNumber: phoneNumberOnly } = extractCountryCodeAndNumber(phoneNumber);
+
+          // Check if the phone number already exists in Firestore
+          const usersRef = collection(db, 'Users');
+          const q = query(usersRef, where("phoneNumber", "==", phoneNumberOnly));
+          const querySnapshot = await getDocs(q);
+
+          if (querySnapshot.empty) {
+            // Phone number doesn't exist, add a new document with phone number as ID
+            console.log('Phone number does not exist in Firestore, adding new document with phone number as ID');
+
+            // Use the phone number as the document ID (primary key)
+            const docId = phoneNumberOnly;
+
+            // Create a minimal user document with just the phone verification info
+            await setDoc(doc(db, 'Users', docId), {
+              countryCode: countryCode,
+              phoneNumber: phoneNumberOnly,
+              verifiedAt: new Date().toISOString(),
+              createdAt: new Date().toISOString(),
+            });
+            console.log('Phone number successfully stored in Firestore with ID:', phoneNumberOnly);
+
+            // New user - navigate to profile setup
+            console.log('New user detected, navigating to profile setup');
+            navigation.navigate('ProfileSetup', { phoneNumber });
+          } else {
+            // Phone number already exists - do not store or update anything
+            console.log('Phone number already exists in Firestore, not updating any data');
+
+            // Existing user - redirect to home screen (Main navigator)
+            console.log('Existing user, redirecting to home screen');
+
+            // Set the user as authenticated in AuthContext
+            // This will trigger the navigation to Main in the AppNavigator
+            const userDoc = querySnapshot.docs[0].data();
+            const userProfile = {
+              id: querySnapshot.docs[0].id, // This should be the phone number
+              ...userDoc
+            };
+
+            // Store the user profile in AsyncStorage through AuthContext
+            // This will automatically redirect to the Main navigator
+            await login(userProfile);
+          }
+        } catch (firestoreError) {
+          console.error('Error handling phone number in Firestore:', firestoreError);
+          // Continue with the flow even if Firestore storage fails
+          // Default to treating as a new user
+          console.log('Error occurred, defaulting to new user flow');
           navigation.navigate('ProfileSetup', { phoneNumber });
         }
-        // If existing user, the AuthContext will handle the login automatically
+      } else {
+        console.log('OTP verification failed:', result.message);
+        setError(result.message || 'Invalid OTP. Please try again.');
       }
     } catch (error) {
+      console.error('Error in OTP verification process:', error);
       setError('Invalid OTP. Please try again.');
-      console.error('Error verifying OTP:', error);
     } finally {
+      console.log('Completing OTP verification process');
       setLoading(false);
     }
   };

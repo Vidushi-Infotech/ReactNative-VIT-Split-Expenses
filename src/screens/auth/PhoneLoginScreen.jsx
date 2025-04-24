@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,81 +8,70 @@ import {
   Image,
   ScrollView,
   ActivityIndicator,
-  Keyboard,
   Platform,
-  Dimensions,
-  Animated,
-  PanResponder
+  Dimensions
 } from 'react-native';
 import SafeAreaWrapper from '../../components/common/SafeAreaWrapper';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { spacing, fontSizes, borderRadius } from '../../theme/theme';
-import { FadeInUp } from 'react-native-reanimated';
+import Animated, { FadeInUp } from 'react-native-reanimated';
+import CountryCodePicker from '../../components/common/CountryCodePicker';
+import { countryCodes, formatPhoneNumber, validatePhoneNumber } from '../../utils/countryCodesData';
 
-// Mock country codes - same as before
-const countryCodes = [
-  { code: '+91', country: 'India', flag: '🇮🇳' },
-  { code: '+1', country: 'United States', flag: '🇺🇸' },
-  { code: '+44', country: 'United Kingdom', flag: '🇬🇧' },
-  { code: '+61', country: 'Australia', flag: '🇦🇺' },
-  { code: '+86', country: 'China', flag: '🇨🇳' },
-  { code: '+49', country: 'Germany', flag: '🇩🇪' },
-  { code: '+33', country: 'France', flag: '🇫🇷' },
-  { code: '+81', country: 'Japan', flag: '🇯🇵' },
-  { code: '+7', country: 'Russia', flag: '🇷🇺' },
-  { code: '+55', country: 'Brazil', flag: '🇧🇷' },
-  { code: '+39', country: 'Italy', flag: '🇮🇹' },
-  { code: '+34', country: 'Spain', flag: '🇪🇸' },
-  { code: '+82', country: 'South Korea', flag: '🇰🇷' },
-  { code: '+52', country: 'Mexico', flag: '🇲🇽' },
-  { code: '+971', country: 'United Arab Emirates', flag: '🇦🇪' },
-  { code: '+966', country: 'Saudi Arabia', flag: '🇸🇦' },
-  { code: '+65', country: 'Singapore', flag: '🇸🇬' },
-  { code: '+60', country: 'Malaysia', flag: '🇲🇾' },
-  { code: '+63', country: 'Philippines', flag: '🇵🇭' },
-  { code: '+64', country: 'New Zealand', flag: '🇳🇿' },
-  { code: '+27', country: 'South Africa', flag: '🇿🇦' },
-  { code: '+234', country: 'Nigeria', flag: '🇳🇬' },
-  { code: '+20', country: 'Egypt', flag: '🇪🇬' },
-  { code: '+972', country: 'Israel', flag: '🇮🇱' },
-  { code: '+90', country: 'Turkey', flag: '🇹🇷' },
-  { code: '+92', country: 'Pakistan', flag: '🇵🇰' },
-  { code: '+880', country: 'Bangladesh', flag: '🇧🇩' },
-  { code: '+84', country: 'Vietnam', flag: '🇻🇳' },
-  { code: '+62', country: 'Indonesia', flag: '🇮🇩' },
-];
-
+// Get screen dimensions
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
-const SNAP_POINTS = {
-  BOTTOM: 0,
-  MIDDLE: SCREEN_HEIGHT * 0.2,
-  FULL: SCREEN_HEIGHT * 0.9
-};
+
 
 const PhoneLoginScreen = ({ navigation }) => {
   const { colors: themeColors } = useTheme();
   const { sendOTP } = useAuth();
-  const [selectedCountry, setSelectedCountry] = useState(countryCodes[0]);
+  const [selectedCountry, setSelectedCountry] = useState(countryCodes.find(c => c.code === "+91") || countryCodes[0]);
   const [phoneNumber, setPhoneNumber] = useState('');
-  const [showCountryModal, setShowCountryModal] = useState(false);
+  const [formattedPhoneNumber, setFormattedPhoneNumber] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filteredCountries, setFilteredCountries] = useState(countryCodes);
-  const searchInputRef = useRef(null);
+  const [isValid, setIsValid] = useState(false);
 
-  // Animation values
-  const translateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
-  const backdropOpacity = useRef(new Animated.Value(0)).current;
-  const activeSnapPoint = useRef(SNAP_POINTS.MIDDLE);
+
+
+  // Handle phone number input and formatting
+  const handlePhoneNumberChange = (text) => {
+    // Remove any non-digit characters from the input
+    const digitsOnly = text.replace(/\D/g, '');
+    setPhoneNumber(digitsOnly);
+
+    // Format the phone number according to the selected country's format
+    const formatted = formatPhoneNumber(digitsOnly, selectedCountry.code);
+    setFormattedPhoneNumber(formatted);
+
+    // Validate the phone number
+    const isValidNumber = validatePhoneNumber(formatted, selectedCountry.code);
+    setIsValid(isValidNumber);
+
+    // Clear any previous errors when the user types
+    if (error) setError('');
+  };
+
+  // Handle country selection
+  const handleCountrySelect = (country) => {
+    setSelectedCountry(country);
+
+    // Re-format the phone number according to the new country format
+    const formatted = formatPhoneNumber(phoneNumber, country.code);
+    setFormattedPhoneNumber(formatted);
+
+    // Re-validate with the new country code
+    const isValidNumber = validatePhoneNumber(formatted, country.code);
+    setIsValid(isValidNumber);
+  };
 
   const handleSendOTP = async () => {
     setError('');
 
-    if (phoneNumber.length < 10) {
-      setError('Please enter a valid phone number');
+    if (!isValid) {
+      setError(`Please enter a valid phone number in the format: ${selectedCountry.example}`);
       return;
     }
 
@@ -91,13 +80,15 @@ const PhoneLoginScreen = ({ navigation }) => {
     try {
       // Use the sendOTP function from AuthContext
       const fullPhoneNumber = selectedCountry.code + phoneNumber;
-      const success = sendOTP(fullPhoneNumber);
+      const success = await sendOTP(fullPhoneNumber);
 
       if (success) {
-        // Navigate to OTP verification screen
+        // Navigate to OTP verification screen with static OTP
         navigation.navigate('OTPVerification', {
           phoneNumber: fullPhoneNumber,
         });
+      } else {
+        setError('Failed to send OTP. Please try again.');
       }
     } catch (error) {
       setError('Failed to send OTP. Please try again.');
@@ -107,188 +98,18 @@ const PhoneLoginScreen = ({ navigation }) => {
     }
   };
 
-  // Filter countries based on search query
+  // Effect to validate phone number when country changes
   useEffect(() => {
-    if (searchQuery.trim() === '') {
-      setFilteredCountries(countryCodes);
-    } else {
-      const query = searchQuery.toLowerCase();
-      const filtered = countryCodes.filter(
-        country =>
-          country.country.toLowerCase().includes(query) ||
-          country.code.includes(query)
-      );
-      setFilteredCountries(filtered);
+    if (phoneNumber) {
+      // Re-format the phone number according to the new country format
+      const formatted = formatPhoneNumber(phoneNumber, selectedCountry.code);
+      setFormattedPhoneNumber(formatted);
+
+      // Re-validate with the new country code
+      const isValidNumber = validatePhoneNumber(formatted, selectedCountry.code);
+      setIsValid(isValidNumber);
     }
-  }, [searchQuery]);
-
-  // Set up the pan responder
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: (evt, _gestureState) => {
-        // Only respond to pan gestures on the handle area
-        const { locationY } = evt.nativeEvent;
-        return locationY < 60; // Approximate height of the handle + header
-      },
-      onMoveShouldSetPanResponder: (evt, gestureState) => {
-        // Only respond to pan gestures on the handle area
-        const { locationY } = evt.nativeEvent;
-        return locationY < 60 && Math.abs(gestureState.dy) > 5;
-      },
-      onPanResponderGrant: () => {
-        // Remember the current position
-      },
-      onPanResponderMove: (_event, gestureState) => {
-        const dragY = Math.max(0, gestureState.dy);
-        translateY.setValue(activeSnapPoint.current + dragY);
-      },
-      onPanResponderRelease: (_event, gestureState) => {
-        const velocity = gestureState.vy;
-        const currentPosition = translateY._value;
-
-        // Define where to snap based on velocity and position
-        if (velocity > 0.5) {
-          // Swiping down fast - close
-          Animated.timing(backdropOpacity, {
-            toValue: 0,
-            duration: 300,
-            useNativeDriver: true,
-          }).start();
-
-          Animated.timing(translateY, {
-            toValue: SCREEN_HEIGHT,
-            duration: 300,
-            useNativeDriver: true,
-          }).start(() => {
-            finishClosing();
-          });
-          return;
-        }
-
-        // Calculate which snap point is closest
-        if (currentPosition > SNAP_POINTS.MIDDLE + 100) {
-          // Close
-          Animated.timing(backdropOpacity, {
-            toValue: 0,
-            duration: 300,
-            useNativeDriver: true,
-          }).start();
-
-          Animated.timing(translateY, {
-            toValue: SCREEN_HEIGHT,
-            duration: 300,
-            useNativeDriver: true,
-          }).start(() => {
-            finishClosing();
-          });
-        } else if (currentPosition < SNAP_POINTS.MIDDLE - 100) {
-          // Expand to full
-          Animated.timing(backdropOpacity, {
-            toValue: 1,
-            duration: 300,
-            useNativeDriver: true,
-          }).start();
-
-          Animated.timing(translateY, {
-            toValue: SNAP_POINTS.BOTTOM,
-            duration: 300,
-            useNativeDriver: true,
-          }).start();
-          activeSnapPoint.current = SNAP_POINTS.BOTTOM;
-        } else {
-          // Stay at middle
-          Animated.timing(backdropOpacity, {
-            toValue: 1,
-            duration: 300,
-            useNativeDriver: true,
-          }).start();
-
-          Animated.timing(translateY, {
-            toValue: SNAP_POINTS.MIDDLE,
-            duration: 300,
-            useNativeDriver: true,
-          }).start();
-          activeSnapPoint.current = SNAP_POINTS.MIDDLE;
-        }
-      },
-    })
-  ).current;
-
-  const openCountryModal = () => {
-    Keyboard.dismiss();
-    setSearchQuery('');
-    setFilteredCountries(countryCodes);
-    setShowCountryModal(true);
-    translateY.setValue(SCREEN_HEIGHT);
-
-    // Start animations
-    Animated.timing(backdropOpacity, {
-      toValue: 1,
-      duration: 300,
-      useNativeDriver: true,
-    }).start();
-
-    Animated.timing(translateY, {
-      toValue: SNAP_POINTS.MIDDLE,
-      duration: 300,
-      useNativeDriver: true,
-    }).start();
-
-    activeSnapPoint.current = SNAP_POINTS.MIDDLE;
-
-    // Focus search input after animation
-    setTimeout(() => {
-      if (searchInputRef.current) {
-        searchInputRef.current.focus();
-      }
-    }, 400);
-  };
-
-  const closeCountryModal = () => {
-    Keyboard.dismiss();
-
-    // Start animations
-    Animated.timing(backdropOpacity, {
-      toValue: 0,
-      duration: 300,
-      useNativeDriver: true,
-    }).start();
-
-    Animated.timing(translateY, {
-      toValue: SCREEN_HEIGHT,
-      duration: 300,
-      useNativeDriver: true,
-    }).start(() => {
-      finishClosing();
-    });
-  };
-
-  const finishClosing = () => {
-    setShowCountryModal(false);
-  };
-
-  const selectCountry = (country) => {
-    setSelectedCountry(country);
-    closeCountryModal();
-  };
-
-  // Animated styles
-  const bottomSheetStyle = {
-    transform: [{ translateY: translateY }],
-  };
-
-  const backdropStyle = {
-    opacity: backdropOpacity,
-  };
-
-  // Calculate the sheet height
-  const maxSheetHeight = {
-    height: SCREEN_HEIGHT * 0.8,
-    maxHeight: SCREEN_HEIGHT * 0.9,
-  };
-
-  // Determine if we're on iOS
-  const isIOS = Platform.OS === 'ios';
+  }, [selectedCountry]);
 
   return (
     <SafeAreaWrapper>
@@ -326,24 +147,12 @@ const PhoneLoginScreen = ({ navigation }) => {
             backgroundColor: themeColors.surface,
             borderColor: error ? themeColors.danger : themeColors.border
           }]}>
-            {/* Country Code Selector */}
-            <TouchableOpacity
-              style={styles.countrySelector}
-              onPress={openCountryModal}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.countryFlag, { color: themeColors.text }]}>
-                {selectedCountry.flag}
-              </Text>
-              <Text style={[styles.countryCode, { color: themeColors.text }]}>
-                {selectedCountry.code}
-              </Text>
-              <Icon
-                name="chevron-down"
-                size={16}
-                color={themeColors.textSecondary}
-              />
-            </TouchableOpacity>
+            {/* Country Code Picker */}
+            <CountryCodePicker
+              selectedCountry={selectedCountry}
+              onSelectCountry={handleCountrySelect}
+              themeColors={themeColors}
+            />
 
             {/* Divider */}
             <View style={[styles.divider, { backgroundColor: themeColors.border }]} />
@@ -351,26 +160,30 @@ const PhoneLoginScreen = ({ navigation }) => {
             {/* Phone Number Input */}
             <TextInput
               style={[styles.phoneInput, { color: themeColors.text }]}
-              placeholder="Enter your phone number"
+              placeholder={`Format: ${selectedCountry.format}`}
               placeholderTextColor={themeColors.textSecondary}
-              value={phoneNumber}
-              onChangeText={setPhoneNumber}
+              value={formattedPhoneNumber}
+              onChangeText={handlePhoneNumberChange}
               keyboardType="phone-pad"
-              maxLength={10}
             />
           </View>
+
+          {/* Format example */}
+          <Text style={[styles.formatExample, { color: themeColors.textSecondary }]}>
+            Example: {selectedCountry.example}
+          </Text>
 
           <TouchableOpacity
             style={[
               styles.button,
               {
-                backgroundColor: phoneNumber.length < 10
-                  ? `${themeColors.primary.default}80`
-                  : themeColors.primary.default
+                backgroundColor: isValid
+                  ? themeColors.primary.default
+                  : `${themeColors.primary.default}80`
               }
             ]}
             onPress={handleSendOTP}
-            disabled={loading || phoneNumber.length < 10}
+            disabled={loading || !isValid}
             activeOpacity={0.8}
           >
             {loading ? (
@@ -385,135 +198,7 @@ const PhoneLoginScreen = ({ navigation }) => {
           </Text>
         </Animated.View>
 
-        {/* Country Selection Bottom Sheet Modal */}
-        {showCountryModal && (
-          <>
-            <Animated.View
-              style={[
-                styles.bottomSheetOverlay,
-                { backgroundColor: 'rgba(0,0,0,0.5)' },
-                backdropStyle
-              ]}
-            >
-              <TouchableOpacity
-                style={styles.backdropTouchable}
-                activeOpacity={1}
-                onPress={closeCountryModal}
-              />
-            </Animated.View>
 
-            <Animated.View
-              style={[
-                styles.bottomSheet,
-                bottomSheetStyle,
-                maxSheetHeight,
-                { backgroundColor: themeColors.surface }
-              ]}
-            >
-                {/* Drag handle area - this is where pan responder is attached */}
-                <View {...panResponder.panHandlers} style={styles.dragHandleArea}>
-                  <View style={styles.handleContainer}>
-                    <View style={[styles.bottomSheetHandle, { backgroundColor: themeColors.border }]} />
-                  </View>
-
-                  <View style={styles.modalHeader}>
-                    <Text style={[styles.modalTitle, { color: themeColors.text }]}>Select Country</Text>
-                    <TouchableOpacity
-                      onPress={closeCountryModal}
-                      hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
-                    >
-                      <Icon name="close" size={24} color={themeColors.textSecondary} />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-
-                <View style={[styles.searchContainer, { backgroundColor: themeColors.mode === 'dark' ? themeColors.surface : themeColors.background }]}>
-                  <Icon
-                    name="search-outline"
-                    size={20}
-                    color={themeColors.textSecondary}
-                    style={styles.searchIcon}
-                  />
-                  <TextInput
-                    ref={searchInputRef}
-                    style={[styles.searchInput, { color: themeColors.text }]}
-                    placeholder="Search country or code"
-                    placeholderTextColor={themeColors.textSecondary}
-                    value={searchQuery}
-                    onChangeText={setSearchQuery}
-                    autoCapitalize="none"
-                    returnKeyType="search"
-                    clearButtonMode="while-editing"
-                  />
-                  {searchQuery.length > 0 && Platform.OS === 'android' && (
-                    <TouchableOpacity
-                      onPress={() => setSearchQuery('')}
-                      hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
-                    >
-                      <Icon name="close-circle" size={18} color={themeColors.textSecondary} />
-                    </TouchableOpacity>
-                  )}
-                </View>
-
-                <View style={styles.countryListContainer}>
-                  {filteredCountries.length === 0 ? (
-                    <View style={styles.noResultsContainer}>
-                      <Icon
-                        name="search-outline"
-                        size={48}
-                        color={themeColors.textSecondary}
-                        style={styles.noResultsIcon}
-                      />
-                      <Text style={[styles.noResultsText, { color: themeColors.textSecondary }]}>
-                        No countries found
-                      </Text>
-                    </View>
-                  ) : (
-                    <ScrollView
-                      style={styles.countryList}
-                      contentContainerStyle={styles.countryListContent}
-                      keyboardShouldPersistTaps="handled"
-                      keyboardDismissMode="on-drag"
-                      showsVerticalScrollIndicator={true}
-                      indicatorStyle={themeColors.mode === 'dark' ? 'white' : 'black'}
-                      nestedScrollEnabled={true}
-                      bounces={true}
-                      alwaysBounceVertical={isIOS}
-                      scrollEventThrottle={16}
-                      overScrollMode={Platform.OS === 'android' ? 'always' : undefined}
-                    >
-                      {filteredCountries.map((country) => (
-                        <TouchableOpacity
-                          key={country.code}
-                          style={[
-                            styles.countryItem,
-                            selectedCountry.code === country.code && {
-                              backgroundColor: `${themeColors.primary.default}15`
-                            }
-                          ]}
-                          onPress={() => selectCountry(country)}
-                          activeOpacity={0.6}
-                          android_ripple={Platform.OS === 'android' ? { color: `${themeColors.primary.default}30`, borderless: false } : null}
-                        >
-                          <Text style={styles.countryFlag}>{country.flag}</Text>
-                          <Text style={[styles.countryName, { color: themeColors.text }]}>
-                            {country.country}
-                          </Text>
-                          <Text style={[styles.countryCodeItem, {
-                            color: selectedCountry.code === country.code
-                              ? themeColors.primary.default
-                              : themeColors.textSecondary
-                          }]}>
-                            {country.code}
-                          </Text>
-                        </TouchableOpacity>
-                      ))}
-                    </ScrollView>
-                  )}
-                </View>
-              </Animated.View>
-            </>
-          )}
         </ScrollView>
     </SafeAreaWrapper>
   );
@@ -585,6 +270,14 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: spacing.md,
     fontSize: fontSizes.base,
+  },
+  formatExample: {
+    fontSize: fontSizes.sm,
+    marginTop: spacing.xs,
+    marginBottom: spacing.md,
+    textAlign: 'right',
+    marginRight: spacing.md,
+    fontStyle: 'italic',
   },
   button: {
     paddingVertical: spacing.lg,
