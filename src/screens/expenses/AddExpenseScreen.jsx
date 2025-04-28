@@ -20,6 +20,7 @@ import { useAuth } from '../../context/AuthContext';
 import GroupService from '../../services/GroupService';
 import ExpenseService from '../../services/ExpenseService';
 import UserService from '../../services/UserService';
+import NotificationService from '../../services/NotificationService';
 import Button from '../../components/common/Button';
 import Avatar from '../../components/common/Avatar';
 import Icon from 'react-native-vector-icons/Ionicons';
@@ -61,6 +62,13 @@ const AddExpenseScreen = () => {
   useEffect(() => {
     fetchGroupData();
   }, [groupId]);
+
+  // Set current user as a participant by default when userProfile is available
+  useEffect(() => {
+    if (userProfile && userProfile.id && !participants.includes(userProfile.id)) {
+      setParticipants([userProfile.id]);
+    }
+  }, [userProfile]);
 
   // Function to fetch group data
   const fetchGroupData = async () => {
@@ -234,6 +242,39 @@ const AddExpenseScreen = () => {
       // Add expense to Firestore
       const expenseId = await ExpenseService.createExpense(expenseData);
       console.log('Expense created with ID:', expenseId);
+
+      // Create split payment records with 'pending' status for each participant
+      try {
+        await ExpenseService.createSplitPaymentRecords(expenseId, expenseData);
+        console.log('Split payment records created successfully');
+      } catch (splitError) {
+        console.error('Error creating split payment records:', splitError);
+        // Continue even if split payment creation fails
+      }
+
+      // Send notifications to all participants except the creator
+      const participantsToNotify = participants.filter(userId => userId !== userProfile.id);
+
+      if (participantsToNotify.length > 0) {
+        try {
+          // Send notifications in parallel
+          await Promise.all(participantsToNotify.map(userId => {
+            return NotificationService.createExpenseAddedNotification(
+              userId,
+              group.name,
+              userProfile.name || 'A user',
+              parseFloat(amount),
+              description,
+              groupId,
+              expenseId
+            );
+          }));
+          console.log(`Sent expense notifications to ${participantsToNotify.length} users`);
+        } catch (notifError) {
+          console.error('Error sending expense notifications:', notifError);
+          // Continue even if notifications fail
+        }
+      }
 
       // Show success message
       Alert.alert(
@@ -519,8 +560,6 @@ const AddExpenseScreen = () => {
 
             <View style={styles.participantsContainer}>
               {groupMembers.map((member, index) => {
-                // Skip the current user as they are the one paying
-                if (member.id === userProfile?.id) return null;
 
                 const isSelected = participants.includes(member.id);
 
@@ -550,10 +589,10 @@ const AddExpenseScreen = () => {
                         </View>
                         <View>
                           <Text style={[styles.participantName, { color: themeColors.text }]}>
-                            {member.name}
+                            {member.id === userProfile?.id ? 'Me' : member.name}
                           </Text>
                           <Text style={[styles.participantEmail, { color: themeColors.textSecondary }]}>
-                            {member.phoneNumber || 'No phone'}
+                            {member.id === userProfile?.id ? 'You' : (member.phoneNumber || 'No phone')}
                           </Text>
                         </View>
                       </View>

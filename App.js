@@ -7,9 +7,11 @@
 import React from 'react';
 import { StatusBar, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { NavigationContainer } from '@react-navigation/native';
 import Navigation from './src/navigation/index.jsx';
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 import { AuthProvider } from './src/context/AuthContext';
+import { NotificationProvider } from './src/context/NotificationContext';
 import PermissionsManager from './src/components/common/PermissionsManager';
 
 // StatusBar component that uses the theme context
@@ -37,9 +39,13 @@ function App() {
     <SafeAreaProvider>
       <ThemeProvider>
         <AuthProvider>
-          <PermissionsManager>
-            <AppContent />
-          </PermissionsManager>
+          <NavigationContainer>
+            <NotificationProvider>
+              <PermissionsManager>
+                <AppContent />
+              </PermissionsManager>
+            </NotificationProvider>
+          </NavigationContainer>
         </AuthProvider>
       </ThemeProvider>
     </SafeAreaProvider>

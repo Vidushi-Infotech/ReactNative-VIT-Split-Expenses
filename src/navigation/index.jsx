@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { AppState } from 'react-native';
-import { NavigationContainer } from '@react-navigation/native';
+// NavigationContainer is now in App.js
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -16,8 +16,10 @@ import OTPVerificationScreen from '../screens/auth/OTPVerificationScreen';
 import ProfileSetupScreen from '../screens/auth/ProfileSetupScreen';
 import GroupsScreen from '../screens/groups/GroupsScreen';
 import GroupDetailsScreen from '../screens/groups/GroupDetailsScreen';
+import GroupMembersScreen from '../screens/groups/GroupMembersScreen';
 import CreateGroupScreen from '../screens/groups/CreateGroupScreen';
 import AddExpenseScreen from '../screens/expenses/AddExpenseScreen';
+import ExpenseDetailsScreen from '../screens/expenses/ExpenseDetailsScreen';
 import ProfileScreen from '../screens/profile/ProfileScreen';
 import NotificationsScreen from '../screens/notifications/NotificationsScreen';
 import ContactsDebugScreen from '../screens/debug/ContactsDebugScreen';
@@ -148,15 +150,14 @@ const AppNavigator = () => {
   }
 
   return (
-    <NavigationContainer>
-      <Stack.Navigator
-        screenOptions={{
-          headerShown: false,
-          contentStyle: {
-            backgroundColor: isDarkMode ? themeColors.dark.default : themeColors.light.default,
-          },
-        }}
-      >
+    <Stack.Navigator
+      screenOptions={{
+        headerShown: false,
+        contentStyle: {
+          backgroundColor: isDarkMode ? themeColors.dark.default : themeColors.light.default,
+        },
+      }}
+    >
         {isFirstLaunch ? (
           // Onboarding Screen
           <Stack.Screen name="Onboarding" component={OnboardingScreen} />
@@ -179,6 +180,18 @@ const AppNavigator = () => {
                 headerTitle: '',
                 headerTransparent: false,
                 headerTintColor: themeColors.white,
+              }}
+            />
+            <Stack.Screen
+              name="GroupMembers"
+              component={GroupMembersScreen}
+              options={{
+                headerShown: false,
+                headerTitle: 'Group Members',
+                headerTintColor: isDarkMode ? themeColors.white : themeColors.dark.default,
+                headerStyle: {
+                  backgroundColor: isDarkMode ? themeColors.dark.default : themeColors.light.default,
+                },
               }}
             />
             <Stack.Screen
@@ -205,6 +218,17 @@ const AppNavigator = () => {
               }}
             />
             <Stack.Screen
+              name="ExpenseDetails"
+              component={ExpenseDetailsScreen}
+              options={{
+                headerShown: false,
+                headerTintColor: isDarkMode ? themeColors.white : themeColors.dark.default,
+                headerStyle: {
+                  backgroundColor: isDarkMode ? themeColors.dark.default : themeColors.light.default,
+                },
+              }}
+            />
+            <Stack.Screen
               name="ContactsDebug"
               component={ContactsDebugScreen}
               options={{
@@ -221,7 +245,6 @@ const AppNavigator = () => {
           </>
         )}
       </Stack.Navigator>
-    </NavigationContainer>
   );
 };
 

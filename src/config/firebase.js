@@ -1,5 +1,7 @@
 import { initializeApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
+import { getStorage } from 'firebase/storage';
+import { Platform } from 'react-native';
 
 // Your web app's Firebase configuration
 // These values match those in your google-services.json file
@@ -12,13 +14,51 @@ const firebaseConfig = {
   appId: "1:115276068172:android:4bd94301bf0dbe58ec8be9"
 };
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
+let app;
+let db;
+let storage;
+let isInitialized = false;
 
-// Initialize Firestore
-const db = getFirestore(app);
+try {
+  // Initialize Firebase
+  app = initializeApp(firebaseConfig);
 
-// Log initialization
-console.log('Firebase initialized with real project credentials');
+  // Initialize Firestore
+  db = getFirestore(app);
 
-export { db };
+  // Initialize Storage
+  storage = getStorage(app);
+
+  isInitialized = true;
+
+  // Log initialization
+  console.log('Firebase initialized with real project credentials');
+} catch (error) {
+  console.error('Firebase initialization error:', error);
+  isInitialized = false;
+}
+
+// Function to check if Firebase is initialized
+const isFirebaseInitialized = () => {
+  return isInitialized;
+};
+
+// Function to get Firestore instance
+const getFirestoreDb = () => {
+  if (!isInitialized) {
+    console.error('Firebase is not initialized. Cannot access Firestore.');
+    return null;
+  }
+  return db;
+};
+
+// Function to get Storage instance
+const getFirebaseStorage = () => {
+  if (!isInitialized) {
+    console.error('Firebase is not initialized. Cannot access Storage.');
+    return null;
+  }
+  return storage;
+};
+
+export { getFirestoreDb, getFirebaseStorage, isFirebaseInitialized };

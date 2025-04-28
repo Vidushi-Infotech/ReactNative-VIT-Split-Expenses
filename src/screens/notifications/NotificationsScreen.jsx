@@ -1,170 +1,164 @@
-import React, { useState } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useTheme } from '../../context/ThemeContext';
+import { useNotification } from '../../context/NotificationContext';
+import { useAuth } from '../../context/AuthContext';
 import SafeAreaWrapper from '../../components/common/SafeAreaWrapper';
-import Animated, { FadeInDown, FadeInRight, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
-import { getColorWithOpacity, shadows } from '../../theme/theme';
+// Removed unused animation imports
+import { getColorWithOpacity } from '../../theme/theme';
 
-// Mock data for notifications
-const mockNotifications = [
-  {
-    id: '1',
-    type: 'expense_added',
-    title: 'New expense added',
-    message: 'John added "Dinner at Restaurant" expense in Trip to Paris',
-    time: '2 hours ago',
-    read: false,
+// Notification types and their details
+const NOTIFICATION_TYPES = {
+  expense_added: {
+    icon: 'receipt-outline',
+    color: 'info',
+    label: 'Expenses',
   },
-  {
-    id: '2',
-    type: 'payment_reminder',
-    title: 'Payment reminder',
-    message: 'You need to pay Sarah ₹25.50 for Groceries',
-    time: 'Yesterday',
-    read: true,
+  payment_reminder: {
+    icon: 'cash-outline',
+    color: 'warning',
+    label: 'Reminders',
   },
-  {
-    id: '3',
-    type: 'group_invite',
-    title: 'Group invitation',
-    message: 'Mike invited you to join "Weekend Getaway"',
-    time: '3 days ago',
-    read: false,
+  group_invite: {
+    icon: 'people-outline',
+    color: 'primary',
+    label: 'Invites',
   },
-  {
-    id: '4',
-    type: 'payment_received',
-    title: 'Payment received',
-    message: 'Alex paid you ₹15.75',
-    time: 'Last week',
-    read: true,
+  payment_received: {
+    icon: 'checkmark-circle-outline',
+    color: 'success',
+    label: 'Payments',
   },
-];
+};
 
 const NotificationsScreen = () => {
   const { colors: themeColors } = useTheme();
-  const [refreshing, setRefreshing] = useState(false);
+  const { userProfile } = useAuth();
+  const {
+    notifications,
+    loading,
+    refreshing,
+    fetchNotifications,
+    markAsRead,
+    markAllAsRead,
+    refreshNotifications,
+    createTestNotification
+  } = useNotification();
   const [filterType, setFilterType] = useState('all');
 
-  // Animation values
-  const headerOpacity = useSharedValue(1);
-  const markAllButtonScale = useSharedValue(1);
+  // Load notifications when the screen mounts
+  useEffect(() => {
+    if (userProfile) {
+      fetchNotifications();
+    }
+  }, [userProfile]);
 
   const handleRefresh = () => {
-    setRefreshing(true);
-    // Simulate a refresh
-    setTimeout(() => {
-      setRefreshing(false);
-    }, 1500);
+    refreshNotifications();
   };
 
   const handleMarkAllAsRead = () => {
-    // In a real app, we would mark all notifications as read here
-    console.log('Mark all as read');
+    markAllAsRead();
+  };
+
+  const handleNotificationPress = (notification) => {
+    // Mark the notification as read
+    if (!notification.read) {
+      markAsRead(notification.id);
+    }
   };
 
   const handleFilterChange = (type) => {
     setFilterType(type);
-    // In a real app, we would filter the notifications here
   };
-
-  // Animated styles
-  const markAllButtonAnimatedStyle = useAnimatedStyle(() => {
-    return {
-      transform: [{ scale: markAllButtonScale.value }]
-    };
-  });
 
   // Filter notifications based on selected type
   const filteredNotifications = filterType === 'all'
-    ? mockNotifications
-    : mockNotifications.filter(item => item.type === filterType);
+    ? notifications
+    : notifications.filter(item => item.type === filterType);
+
+  // Format relative time
+  const formatRelativeTime = (dateString) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffSec = Math.floor(diffMs / 1000);
+    const diffMin = Math.floor(diffSec / 60);
+    const diffHour = Math.floor(diffMin / 60);
+    const diffDay = Math.floor(diffHour / 24);
+    const diffWeek = Math.floor(diffDay / 7);
+    const diffMonth = Math.floor(diffDay / 30);
+    const diffYear = Math.floor(diffDay / 365);
+
+    if (diffSec < 60) return 'Just now';
+    if (diffMin < 60) return `${diffMin} minute${diffMin > 1 ? 's' : ''} ago`;
+    if (diffHour < 24) return `${diffHour} hour${diffHour > 1 ? 's' : ''} ago`;
+    if (diffDay < 7) return `${diffDay} day${diffDay > 1 ? 's' : ''} ago`;
+    if (diffWeek < 4) return `${diffWeek} week${diffWeek > 1 ? 's' : ''} ago`;
+    if (diffMonth < 12) return `${diffMonth} month${diffMonth > 1 ? 's' : ''} ago`;
+    return `${diffYear} year${diffYear > 1 ? 's' : ''} ago`;
+  };
   // Get icon for notification type
   const getNotificationIcon = (type) => {
-    switch (type) {
-      case 'expense_added':
-        return 'receipt-outline';
-      case 'payment_reminder':
-        return 'cash-outline';
-      case 'group_invite':
-        return 'people-outline';
-      case 'payment_received':
-        return 'checkmark-circle-outline';
-      default:
-        return 'notifications-outline';
-    }
+    return NOTIFICATION_TYPES[type]?.icon || 'notifications-outline';
   };
 
-  const renderNotificationItem = ({ item, index }) => {
-    // Calculate a random delay for staggered animation
-    const animationDelay = index * 80;
-
+  const renderNotificationItem = ({ item, onPress }) => {
     return (
-      <Animated.View
-        entering={FadeInRight.delay(animationDelay).duration(400)}
+      <TouchableOpacity
+        style={[
+          styles.notificationCard,
+          { backgroundColor: themeColors.surface },
+          !item.read && { backgroundColor: getColorWithOpacity(themeColors.primary.default, 0.05) }
+        ]}
+        activeOpacity={0.7}
+        onPress={() => onPress && onPress(item)}
       >
-        <TouchableOpacity
-          style={[
-            styles.notificationCard,
-            { backgroundColor: themeColors.surface },
-            !item.read && { backgroundColor: getColorWithOpacity(themeColors.primary.default, 0.05) }
-          ]}
-          activeOpacity={0.7}
-          onPressIn={() => {
-            markAllButtonScale.value = withSpring(0.95);
-          }}
-          onPressOut={() => {
-            markAllButtonScale.value = withSpring(1);
-          }}
-        >
-          {!item.read && (
-            <View style={[styles.unreadIndicator, { backgroundColor: getNotificationColor(item.type) }]} />
-          )}
+        {!item.read && (
+          <View style={[styles.unreadIndicator, { backgroundColor: getNotificationColor(item.type) }]} />
+        )}
 
-          <View style={[
-            styles.iconContainer,
-            {
-              backgroundColor: getNotificationColor(item.type, 0.1),
-            }
-          ]}>
-            <Icon
-              name={getNotificationIcon(item.type)}
-              size={20}
-              color={getNotificationColor(item.type)}
-            />
+        <View style={[
+          styles.iconContainer,
+          { backgroundColor: getNotificationColor(item.type, 0.1) }
+        ]}>
+          <Icon
+            name={getNotificationIcon(item.type)}
+            size={20}
+            color={getNotificationColor(item.type)}
+          />
+        </View>
+
+        <View style={styles.notificationContent}>
+          <View style={styles.notificationHeader}>
+            <Text style={[styles.notificationTitle, { color: themeColors.text }]}>{item.title}</Text>
+            <Text style={[styles.notificationTime, { color: themeColors.textSecondary }]}>
+              {formatRelativeTime(item.createdAt || item.time)}
+            </Text>
           </View>
-
-          <View style={styles.notificationContent}>
-            <View style={styles.notificationHeader}>
-              <Text style={[styles.notificationTitle, { color: themeColors.text }]}>{item.title}</Text>
-              <Text style={[styles.notificationTime, { color: themeColors.textSecondary }]}>{item.time}</Text>
-            </View>
-            <Text style={[styles.notificationMessage, { color: themeColors.textSecondary }]}>{item.message}</Text>
-          </View>
-
-          <TouchableOpacity style={styles.moreButton}>
-            <Icon name="ellipsis-vertical" size={16} color={themeColors.textSecondary} />
-          </TouchableOpacity>
-        </TouchableOpacity>
-      </Animated.View>
+          <Text style={[styles.notificationMessage, { color: themeColors.textSecondary }]}>{item.message}</Text>
+        </View>
+      </TouchableOpacity>
     );
   };
 
   // Get color for notification type
   const getNotificationColor = (type, opacity) => {
+    const colorType = NOTIFICATION_TYPES[type]?.color || 'primary';
     let color;
-    switch (type) {
-      case 'expense_added':
+
+    switch (colorType) {
+      case 'info':
         color = themeColors.info;
         break;
-      case 'payment_reminder':
+      case 'warning':
         color = themeColors.warning;
         break;
-      case 'group_invite':
+      case 'primary':
         color = themeColors.primary.default;
         break;
-      case 'payment_received':
+      case 'success':
         color = themeColors.success;
         break;
       default:
@@ -179,43 +173,39 @@ const NotificationsScreen = () => {
   return (
     <SafeAreaWrapper>
       <View style={[styles.container, { backgroundColor: themeColors.background }]}>
-        <Animated.View style={[styles.header, { opacity: headerOpacity }]}>
+        <View style={[styles.header]}>
           <View style={styles.headerTitleContainer}>
-            <Animated.Text
-              entering={FadeInDown.duration(800)}
-              style={[styles.title, { color: themeColors.text }]}
-            >
+            <Text style={[styles.title, { color: themeColors.text }]}>
               Notifications
-            </Animated.Text>
-            <Animated.Text
-              entering={FadeInDown.delay(200).duration(800)}
-              style={[styles.subtitle, { color: themeColors.textSecondary }]}
-            >
+            </Text>
+            <Text style={[styles.subtitle, { color: themeColors.textSecondary }]}>
               Stay updated with your expenses
-            </Animated.Text>
+            </Text>
           </View>
 
-          <Animated.View style={markAllButtonAnimatedStyle}>
+          <View style={styles.headerButtons}>
+            {/* Dev buttons - only in development */}
+            {__DEV__ && (
+              <TouchableOpacity
+                style={[styles.headerButton, { backgroundColor: getColorWithOpacity(themeColors.success, 0.1), marginRight: 8 }]}
+                onPress={createTestNotification}
+              >
+                <Icon name="add-outline" size={14} color={themeColors.success} style={{ marginRight: 4 }} />
+                <Text style={[styles.headerButtonText, { color: themeColors.success }]}>Test</Text>
+              </TouchableOpacity>
+            )}
+
             <TouchableOpacity
               style={[styles.markAllButton, { backgroundColor: getColorWithOpacity(themeColors.primary.default, 0.1) }]}
               onPress={handleMarkAllAsRead}
-              onPressIn={() => {
-                markAllButtonScale.value = withSpring(0.9);
-              }}
-              onPressOut={() => {
-                markAllButtonScale.value = withSpring(1);
-              }}
             >
               <Icon name="checkmark-done-outline" size={14} color={themeColors.primary.default} style={{ marginRight: 4 }} />
               <Text style={[styles.markAllText, { color: themeColors.primary.default }]}>Mark all read</Text>
             </TouchableOpacity>
-          </Animated.View>
-        </Animated.View>
+          </View>
+        </View>
 
-        <Animated.View
-          entering={FadeInDown.delay(300).duration(800)}
-          style={styles.filterContainer}
-        >
+        <View style={styles.filterContainer}>
           <ScrollableFilter
             options={[
               { id: 'all', label: 'All', icon: 'notifications-outline' },
@@ -228,31 +218,37 @@ const NotificationsScreen = () => {
             onSelect={handleFilterChange}
             themeColors={themeColors}
           />
-        </Animated.View>
+        </View>
 
-        <FlatList
-          data={filteredNotifications}
-          renderItem={renderNotificationItem}
-          keyExtractor={item => item.id}
-          contentContainerStyle={styles.listContent}
-          showsVerticalScrollIndicator={false}
-          onRefresh={handleRefresh}
-          refreshing={refreshing}
-          ListEmptyComponent={() => (
-            <Animated.View
-              entering={FadeInDown.duration(800)}
-              style={styles.emptyContainer}
-            >
-              <Icon name="notifications-off-outline" size={60} color={getColorWithOpacity(themeColors.primary.default, 0.5)} />
-              <Text style={[styles.emptyTitle, { color: themeColors.text }]}>No Notifications</Text>
-              <Text style={[styles.emptySubtitle, { color: themeColors.textSecondary }]}>
-                {filterType === 'all'
-                  ? 'You don\'t have any notifications yet'
-                  : `You don\'t have any ${filterType.replace('_', ' ')} notifications`}
-              </Text>
-            </Animated.View>
-          )}
+        {loading && filteredNotifications.length === 0 ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={themeColors.primary.default} />
+            <Text style={[styles.loadingText, { color: themeColors.textSecondary }]}>
+              Loading notifications...
+            </Text>
+          </View>
+        ) : (
+          <FlatList
+            data={filteredNotifications}
+            renderItem={({ item }) => renderNotificationItem({ item, onPress: handleNotificationPress })}
+            keyExtractor={item => item.id}
+            contentContainerStyle={styles.listContent}
+            showsVerticalScrollIndicator={false}
+            onRefresh={handleRefresh}
+            refreshing={refreshing}
+            ListEmptyComponent={() => (
+              <View style={styles.emptyContainer}>
+                <Icon name="notifications-off-outline" size={60} color={getColorWithOpacity(themeColors.primary.default, 0.5)} />
+                <Text style={[styles.emptyTitle, { color: themeColors.text }]}>No Notifications</Text>
+                <Text style={[styles.emptySubtitle, { color: themeColors.textSecondary }]}>
+                  {filterType === 'all'
+                    ? 'You don\'t have any notifications yet'
+                    : `You don\'t have any ${filterType.replace('_', ' ')} notifications`}
+                </Text>
+              </View>
+            )}
         />
+        )}
       </View>
     </SafeAreaWrapper>
   );
@@ -323,6 +319,21 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 14,
     opacity: 0.8,
+  },
+  headerButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+  },
+  headerButtonText: {
+    fontWeight: '600',
+    fontSize: 12,
   },
   markAllButton: {
     flexDirection: 'row',
@@ -432,6 +443,17 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 24,
     opacity: 0.7,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+    marginTop: 40,
+  },
+  loadingText: {
+    fontSize: 16,
+    marginTop: 16,
   },
 });
 

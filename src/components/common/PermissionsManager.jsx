@@ -4,7 +4,6 @@ import { RESULTS } from 'react-native-permissions';
 import {
   checkMultiplePermissions,
   requestMultiplePermissions,
-  isPermissionGranted,
   PERMISSION_DESCRIPTIONS,
   openAppSettings,
 } from '../../utils/permissionsManager';
@@ -25,11 +24,17 @@ const PermissionsManager = ({ children }) => {
     'contacts',
     'location',
     'sms',
+    // Notification permissions are handled separately in NotificationContext
   ];
 
   // Check permissions when component mounts
   useEffect(() => {
-    checkPermissions();
+    const initPermissions = async () => {
+      // Check all permissions
+      await checkPermissions();
+    };
+
+    initPermissions();
   }, []);
 
   // Check all required permissions

@@ -58,7 +58,9 @@ const Card = ({
   return (
     <TouchableOpacity
       style={cardStyles}
-      activeOpacity={props.onPress ? 0.7 : 1}
+      activeOpacity={props.activeOpacity || (props.onPress ? 0.7 : 1)}
+      delayPressIn={0}
+      onPress={props.onPress}
       {...props}
     >
       {children}

@@ -27,6 +27,8 @@ linkage = ENV['USE_FRAMEWORKS']
 if linkage != nil
   Pod::UI.puts "Configuring Pod with #{linkage}ally linked Frameworks".green
   use_frameworks! :linkage => linkage.to_sym
+else
+  use_modular_headers!
 end
 
 target 'VitSplit' do
@@ -34,12 +36,6 @@ target 'VitSplit' do
 
   # Explicitly require react-native-permissions
   pod 'RNPermissions', :path => '../node_modules/react-native-permissions'
-
-  # Add permissions you need
-  pod 'Permission-Camera', :path => '../node_modules/react-native-permissions/ios/Camera'
-  pod 'Permission-PhotoLibrary', :path => '../node_modules/react-native-permissions/ios/PhotoLibrary'
-  pod 'Permission-Contacts', :path => '../node_modules/react-native-permissions/ios/Contacts'
-  pod 'Permission-LocationWhenInUse', :path => '../node_modules/react-native-permissions/ios/LocationWhenInUse'
 
   use_react_native!(
     :path => config[:reactNativePath],

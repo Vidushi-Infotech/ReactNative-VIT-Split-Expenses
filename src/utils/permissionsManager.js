@@ -17,15 +17,20 @@ const PLATFORM_PERMISSIONS = {
     contacts: PERMISSIONS.IOS.CONTACTS,
     location: PERMISSIONS.IOS.LOCATION_WHEN_IN_USE,
     sms: null, // iOS doesn't have SMS permission
+    notification: PERMISSIONS.IOS.NOTIFICATIONS,
   },
   android: {
     camera: PERMISSIONS.ANDROID.CAMERA,
-    photoLibrary: Platform.Version >= 33 
-      ? PERMISSIONS.ANDROID.READ_MEDIA_IMAGES 
+    photoLibrary: Platform.Version >= 33
+      ? PERMISSIONS.ANDROID.READ_MEDIA_IMAGES
       : PERMISSIONS.ANDROID.READ_EXTERNAL_STORAGE,
     contacts: PERMISSIONS.ANDROID.READ_CONTACTS,
     location: PERMISSIONS.ANDROID.ACCESS_FINE_LOCATION,
     sms: PERMISSIONS.ANDROID.READ_SMS,
+    // POST_NOTIFICATIONS permission is only available on Android 13+ (API 33+)
+    notification: Platform.Version >= 33
+      ? PERMISSIONS.ANDROID.POST_NOTIFICATIONS
+      : null,
   },
 };
 
@@ -38,12 +43,12 @@ const getPermission = (permissionType) => {
 // Check a single permission
 export const checkPermission = async (permissionType) => {
   const permission = getPermission(permissionType);
-  
+
   // If the permission doesn't exist for this platform
   if (!permission) {
     return RESULTS.UNAVAILABLE;
   }
-  
+
   try {
     const result = await check(permission);
     return result;
@@ -56,12 +61,12 @@ export const checkPermission = async (permissionType) => {
 // Request a single permission
 export const requestPermission = async (permissionType) => {
   const permission = getPermission(permissionType);
-  
+
   // If the permission doesn't exist for this platform
   if (!permission) {
     return RESULTS.UNAVAILABLE;
   }
-  
+
   try {
     const result = await request(permission);
     return result;
@@ -75,7 +80,7 @@ export const requestPermission = async (permissionType) => {
 export const checkMultiplePermissions = async (permissionTypes) => {
   const platform = Platform.OS;
   const permissionsToCheck = {};
-  
+
   // Filter out unavailable permissions for the platform
   permissionTypes.forEach(type => {
     const permission = PLATFORM_PERMISSIONS[platform][type];
@@ -83,7 +88,7 @@ export const checkMultiplePermissions = async (permissionTypes) => {
       permissionsToCheck[permission] = permission;
     }
   });
-  
+
   try {
     const statuses = await checkMultiple(Object.values(permissionsToCheck));
     return statuses;
@@ -97,7 +102,7 @@ export const checkMultiplePermissions = async (permissionTypes) => {
 export const requestMultiplePermissions = async (permissionTypes) => {
   const platform = Platform.OS;
   const permissionsToRequest = {};
-  
+
   // Filter out unavailable permissions for the platform
   permissionTypes.forEach(type => {
     const permission = PLATFORM_PERMISSIONS[platform][type];
@@ -105,7 +110,7 @@ export const requestMultiplePermissions = async (permissionTypes) => {
       permissionsToRequest[permission] = permission;
     }
   });
-  
+
   try {
     const statuses = await requestMultiple(Object.values(permissionsToRequest));
     return statuses;
@@ -152,5 +157,9 @@ export const PERMISSION_DESCRIPTIONS = {
   sms: {
     title: 'SMS Permission',
     message: 'VitSplit needs access to your SMS messages for verification purposes.',
+  },
+  notification: {
+    title: 'Notification Permission',
+    message: 'VitSplit needs permission to send you notifications about new expenses, payments, and group activities.',
   },
 };

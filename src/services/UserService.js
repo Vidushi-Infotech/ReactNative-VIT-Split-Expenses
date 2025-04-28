@@ -1,5 +1,5 @@
 import { collection, getDocs, query, where, doc, getDoc } from 'firebase/firestore';
-import { db } from '../config/firebase';
+import { getFirestoreDb, isFirebaseInitialized } from '../config/firebase';
 
 /**
  * Service for handling user-related operations with Firebase
@@ -12,6 +12,17 @@ class UserService {
    */
   static async getUserByPhoneNumber(phoneNumber) {
     try {
+      if (!isFirebaseInitialized()) {
+        console.error('Firebase is not initialized. Cannot get user by phone number.');
+        return null;
+      }
+
+      const db = getFirestoreDb();
+      if (!db) {
+        console.error('Failed to get Firestore instance');
+        return null;
+      }
+
       // Clean the phone number (remove any non-digit characters)
       const cleanPhoneNumber = phoneNumber.replace(/\D/g, '');
 
@@ -36,7 +47,7 @@ class UserService {
       return null;
     } catch (error) {
       console.error('Error getting user by phone number:', error);
-      throw error;
+      return null; // Return null instead of throwing to prevent app crashes
     }
   }
 
@@ -47,6 +58,11 @@ class UserService {
    */
   static async getUsersByPhoneNumbers(phoneNumbers) {
     try {
+      if (!isFirebaseInitialized()) {
+        console.error('Firebase is not initialized. Cannot get users by phone numbers.');
+        return [];
+      }
+
       const users = [];
 
       // Process each phone number sequentially
@@ -60,7 +76,7 @@ class UserService {
       return users;
     } catch (error) {
       console.error('Error getting users by phone numbers:', error);
-      throw error;
+      return []; // Return empty array instead of throwing to prevent app crashes
     }
   }
 
@@ -71,6 +87,11 @@ class UserService {
    */
   static async checkMultiplePhoneNumbers(phoneNumbers) {
     try {
+      if (!isFirebaseInitialized()) {
+        console.error('Firebase is not initialized. Cannot check multiple phone numbers.');
+        return {};
+      }
+
       const result = {};
 
       // Process each phone number sequentially
@@ -83,7 +104,7 @@ class UserService {
       return result;
     } catch (error) {
       console.error('Error checking multiple phone numbers:', error);
-      throw error;
+      return {}; // Return empty object instead of throwing to prevent app crashes
     }
   }
 
@@ -95,6 +116,17 @@ class UserService {
   static async getUserById(userId) {
     try {
       if (!userId) return null;
+
+      if (!isFirebaseInitialized()) {
+        console.error('Firebase is not initialized. Cannot get user by ID.');
+        return null;
+      }
+
+      const db = getFirestoreDb();
+      if (!db) {
+        console.error('Failed to get Firestore instance');
+        return null;
+      }
 
       // Get the document reference
       const docRef = doc(db, 'Users', userId);
@@ -124,20 +156,31 @@ class UserService {
    */
   static async getAllUsers() {
     try {
+      if (!isFirebaseInitialized()) {
+        console.error('Firebase is not initialized. Cannot get all users.');
+        return [];
+      }
+
+      const db = getFirestoreDb();
+      if (!db) {
+        console.error('Failed to get Firestore instance');
+        return [];
+      }
+
       const querySnapshot = await getDocs(collection(db, 'Users'));
       const users = [];
 
-      querySnapshot.forEach((doc) => {
+      querySnapshot.forEach((document) => {
         users.push({
-          id: doc.id,
-          ...doc.data(),
+          id: document.id,
+          ...document.data(),
         });
       });
 
       return users;
     } catch (error) {
       console.error('Error getting all users:', error);
-      throw error;
+      return []; // Return empty array instead of throwing to prevent app crashes
     }
   }
 }

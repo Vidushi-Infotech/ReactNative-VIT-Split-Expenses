@@ -1,7 +1,7 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { collection, addDoc, getDocs, query, where, setDoc, doc } from 'firebase/firestore';
-import { db } from '../config/firebase';
+import { getFirestoreDb, isFirebaseInitialized } from '../config/firebase';
 import { extractCountryCodeAndNumber } from '../utils/phoneUtils';
 
 // Create the context
@@ -61,6 +61,19 @@ export const AuthProvider = ({ children }) => {
     setPhoneNumber(phoneNum);
 
     try {
+      if (!isFirebaseInitialized()) {
+        console.error('Firebase is not initialized. Cannot check if user exists.');
+        setIsNewUser(true);
+        return true; // Still return success to not block the flow
+      }
+
+      const db = getFirestoreDb();
+      if (!db) {
+        console.error('Failed to get Firestore instance');
+        setIsNewUser(true);
+        return true; // Still return success to not block the flow
+      }
+
       // Check if user exists in Firestore
       console.log('AuthContext: Checking if user exists in Firestore');
 
@@ -107,13 +120,25 @@ export const AuthProvider = ({ children }) => {
     // If existing user, log them in directly
     if (!isNewUser) {
       try {
+        if (!isFirebaseInitialized()) {
+          console.error('Firebase is not initialized. Cannot fetch user profile.');
+          setIsNewUser(true);
+          return { success: true, isNewUser: true };
+        }
+
+        const db = getFirestoreDb();
+        if (!db) {
+          console.error('Failed to get Firestore instance');
+          setIsNewUser(true);
+          return { success: true, isNewUser: true };
+        }
+
         console.log('AuthContext: Attempting to fetch existing user profile from Firestore');
         // Extract country code and phone number using the utility function
         // This will correctly identify country codes like "+91" for India
-        const { countryCode, phoneNumber: phoneNumberOnly } = extractCountryCodeAndNumber(phoneNumber);
+        const { phoneNumber: phoneNumberOnly } = extractCountryCodeAndNumber(phoneNumber);
 
-        // First try to get the document directly using the phone number as ID
-        const userDocRef = doc(db, 'Users', phoneNumberOnly);
+        // Query for the user by phone number
         const userDocSnap = await getDocs(query(collection(db, 'Users'), where("phoneNumber", "==", phoneNumberOnly)));
 
         if (!userDocSnap.empty) {
@@ -149,6 +174,19 @@ export const AuthProvider = ({ children }) => {
   const setupProfile = async (profileData) => {
     console.log('AuthContext: setupProfile called with:', profileData);
     try {
+      if (!isFirebaseInitialized()) {
+        console.error('Firebase is not initialized. Cannot setup user profile in Firestore.');
+        // Fall back to local authentication
+        return setupProfileLocally(profileData);
+      }
+
+      const db = getFirestoreDb();
+      if (!db) {
+        console.error('Failed to get Firestore instance');
+        // Fall back to local authentication
+        return setupProfileLocally(profileData);
+      }
+
       // Extract country code and phone number using the utility function
       // This will correctly identify country codes like "+91" for India
       const { countryCode, phoneNumber: phoneNumberOnly } = extractCountryCodeAndNumber(phoneNumber);
@@ -190,32 +228,36 @@ export const AuthProvider = ({ children }) => {
       return true;
     } catch (error) {
       console.error('AuthContext: Error saving user to Firestore:', error);
+      // Fall back to local authentication
+      return setupProfileLocally(profileData);
+    }
+  };
 
-      // Even if Firestore fails, we can still authenticate the user locally
-      try {
-        console.log('AuthContext: Attempting to authenticate user locally despite Firestore error');
-        // Extract country code and phone number using the utility function
-        // This will correctly identify country codes like "+91" for India
-        const { countryCode, phoneNumber: phoneNumberOnly } = extractCountryCodeAndNumber(phoneNumber);
+  // Helper function to setup profile locally when Firestore fails
+  const setupProfileLocally = async (profileData) => {
+    try {
+      console.log('AuthContext: Attempting to authenticate user locally');
+      // Extract country code and phone number using the utility function
+      // This will correctly identify country codes like "+91" for India
+      const { countryCode, phoneNumber: phoneNumberOnly } = extractCountryCodeAndNumber(phoneNumber);
 
-        const localProfile = {
-          ...profileData,
-          countryCode: countryCode,
-          phoneNumber: phoneNumberOnly,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          id: phoneNumberOnly // Use phone number as ID even for local profile
-        };
+      const localProfile = {
+        ...profileData,
+        countryCode: countryCode,
+        phoneNumber: phoneNumberOnly,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        id: phoneNumberOnly // Use phone number as ID even for local profile
+      };
 
-        setUserProfile(localProfile);
-        await AsyncStorage.setItem('userProfile', JSON.stringify(localProfile));
-        setIsAuthenticated(true);
-        console.log('AuthContext: User authenticated locally');
-        return true;
-      } catch (localError) {
-        console.error('AuthContext: Error authenticating user locally:', localError);
-        return false;
-      }
+      setUserProfile(localProfile);
+      await AsyncStorage.setItem('userProfile', JSON.stringify(localProfile));
+      setIsAuthenticated(true);
+      console.log('AuthContext: User authenticated locally');
+      return true;
+    } catch (localError) {
+      console.error('AuthContext: Error authenticating user locally:', localError);
+      return false;
     }
   };
 
@@ -275,13 +317,7 @@ export const AuthProvider = ({ children }) => {
         updatedAt: new Date().toISOString(),
       };
 
-      console.log('AuthContext: Updating user profile in Firestore with ID:', docId);
-
-      // Update the user document in Firestore
-      await setDoc(doc(db, 'Users', docId), updateData, { merge: true });
-      console.log('AuthContext: User profile updated in Firestore');
-
-      // Update the local user profile
+      // Update the local user profile first
       const updatedProfile = {
         ...userProfile,
         ...updateData,
@@ -291,10 +327,26 @@ export const AuthProvider = ({ children }) => {
       setUserProfile(updatedProfile);
       await AsyncStorage.setItem('userProfile', JSON.stringify(updatedProfile));
 
+      // Try to update Firestore if available
+      if (isFirebaseInitialized()) {
+        const db = getFirestoreDb();
+        if (db) {
+          console.log('AuthContext: Updating user profile in Firestore with ID:', docId);
+          // Update the user document in Firestore
+          await setDoc(doc(db, 'Users', docId), updateData, { merge: true });
+          console.log('AuthContext: User profile updated in Firestore');
+        } else {
+          console.error('Failed to get Firestore instance');
+        }
+      } else {
+        console.error('Firebase is not initialized. Cannot update profile in Firestore.');
+      }
+
       return Promise.resolve(true);
     } catch (error) {
       console.error('AuthContext: Error updating user profile:', error);
-      return Promise.resolve(false);
+      // Even if Firestore update fails, we've already updated locally
+      return Promise.resolve(true);
     }
   };
 

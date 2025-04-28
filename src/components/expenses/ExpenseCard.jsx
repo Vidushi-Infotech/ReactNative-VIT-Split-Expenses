@@ -6,7 +6,9 @@ import Card from '../common/Card.jsx';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { colors, spacing, fontSizes, borderRadius } from '../../theme/theme.js';
 
-const ExpenseCard = ({ expense }) => {
+const ExpenseCard = ({ expense, onPress }) => {
+  // Log when the card is rendered
+  console.log('Rendering ExpenseCard for expense:', expense?.id);
   const { isDarkMode } = useTheme();
   // Use the paidByUser from the expense object if available, or use a default
   const paidByUser = expense.paidByUser || {
@@ -45,7 +47,18 @@ const ExpenseCard = ({ expense }) => {
   };
 
   return (
-    <Card variant="default" style={styles.card}>
+    <Card
+      variant="default"
+      style={styles.card}
+      onPress={() => {
+        console.log('ExpenseCard pressed for expense:', expense?.id);
+        // Ensure the onPress handler is called properly
+        if (typeof onPress === 'function') {
+          onPress();
+        }
+      }}
+      activeOpacity={0.6}
+    >
       <View style={styles.container}>
         <View
           style={[styles.iconContainer, { backgroundColor: isDarkMode ? colors.dark.light : colors.light.dark }]}

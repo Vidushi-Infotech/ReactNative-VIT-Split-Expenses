@@ -24,7 +24,8 @@ import SafeAreaWrapper from '../../components/common/SafeAreaWrapper';
 import {launchImageLibrary} from 'react-native-image-picker';
 import GroupService from '../../services/GroupService';
 import UserService from '../../services/UserService';
-import ContactService from '../../services/ContactService'; // Import the ContactService instead of direct Contacts
+import ContactService from '../../services/ContactService';
+import NotificationService from '../../services/NotificationService'; // Import the ContactService instead of direct Contacts
 import PermissionService from '../../services/PermissionService'; // Import the PermissionService
 // Import fallback permission functions in case PermissionService is not available
 import {
@@ -324,7 +325,23 @@ const CreateGroupScreen = () => {
       };
 
       // Create the group in Firestore
-      await GroupService.createGroup(groupData);
+      const groupId = await GroupService.createGroup(groupData);
+
+      // Send notifications to all members except the creator
+      for (const userId of appUserIds) {
+        try {
+          await NotificationService.createGroupInviteNotification(
+            userId,
+            groupName.trim(),
+            userProfile.name || 'A user',
+            groupId
+          );
+          console.log(`Sent group invitation notification to user ${userId}`);
+        } catch (notifError) {
+          console.error(`Error sending notification to user ${userId}:`, notifError);
+          // Continue with other notifications even if one fails
+        }
+      }
 
       // Navigate back to the main tab navigator
       navigation.navigate('Main');
