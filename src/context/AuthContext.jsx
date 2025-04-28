@@ -1,7 +1,12 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { collection, addDoc, getDocs, query, where, setDoc, doc } from 'firebase/firestore';
-import { getFirestoreDb, isFirebaseInitialized } from '../config/firebase';
+import { collection, getDocs, query, where, setDoc, doc } from 'firebase/firestore';
+import {
+  getFirestoreDb,
+  isFirebaseInitialized,
+  getInitializationError,
+  reinitializeFirebase
+} from '../config/firebase';
 import { extractCountryCodeAndNumber } from '../utils/phoneUtils';
 
 // Create the context
@@ -61,15 +66,26 @@ export const AuthProvider = ({ children }) => {
     setPhoneNumber(phoneNum);
 
     try {
+      // Check if Firebase is initialized
       if (!isFirebaseInitialized()) {
-        console.error('Firebase is not initialized. Cannot check if user exists.');
-        setIsNewUser(true);
-        return true; // Still return success to not block the flow
+        console.log('AuthContext: Firebase not initialized, attempting to reinitialize...');
+
+        // Try to reinitialize Firebase
+        const reinitialized = await reinitializeFirebase();
+
+        if (!reinitialized) {
+          console.error('AuthContext: Firebase reinitialization failed. Proceeding as new user.');
+          setIsNewUser(true);
+          return true; // Still return success to not block the flow
+        }
+
+        console.log('AuthContext: Firebase reinitialized successfully');
       }
 
+      // Get Firestore instance
       const db = getFirestoreDb();
       if (!db) {
-        console.error('Failed to get Firestore instance');
+        console.error('AuthContext: Failed to get Firestore instance. Proceeding as new user.');
         setIsNewUser(true);
         return true; // Still return success to not block the flow
       }
@@ -79,18 +95,23 @@ export const AuthProvider = ({ children }) => {
 
       // Extract country code and phone number using the utility function
       // This will correctly identify country codes like "+91" for India
-      const { countryCode, phoneNumber: phoneNumberOnly } = extractCountryCodeAndNumber(phoneNum);
+      const { phoneNumber: phoneNumberOnly } = extractCountryCodeAndNumber(phoneNum);
 
       // Query Firestore to check if the phone number exists
-      const usersRef = collection(db, 'Users');
-      const q = query(usersRef, where("phoneNumber", "==", phoneNumberOnly));
-      const querySnapshot = await getDocs(q);
+      try {
+        const usersRef = collection(db, 'Users');
+        const q = query(usersRef, where("phoneNumber", "==", phoneNumberOnly));
+        const querySnapshot = await getDocs(q);
 
-      if (!querySnapshot.empty) {
-        console.log('AuthContext: User found in Firestore');
-        setIsNewUser(false);
-      } else {
-        console.log('AuthContext: User not found in Firestore, treating as new user');
+        if (!querySnapshot.empty) {
+          console.log('AuthContext: User found in Firestore');
+          setIsNewUser(false);
+        } else {
+          console.log('AuthContext: User not found in Firestore, treating as new user');
+          setIsNewUser(true);
+        }
+      } catch (firestoreError) {
+        console.error('AuthContext: Error querying Firestore:', firestoreError);
         setIsNewUser(true);
       }
 
@@ -120,15 +141,26 @@ export const AuthProvider = ({ children }) => {
     // If existing user, log them in directly
     if (!isNewUser) {
       try {
+        // Check if Firebase is initialized
         if (!isFirebaseInitialized()) {
-          console.error('Firebase is not initialized. Cannot fetch user profile.');
-          setIsNewUser(true);
-          return { success: true, isNewUser: true };
+          console.log('AuthContext: Firebase not initialized, attempting to reinitialize...');
+
+          // Try to reinitialize Firebase
+          const reinitialized = await reinitializeFirebase();
+
+          if (!reinitialized) {
+            console.error('AuthContext: Firebase reinitialization failed. Proceeding as new user.');
+            setIsNewUser(true);
+            return { success: true, isNewUser: true };
+          }
+
+          console.log('AuthContext: Firebase reinitialized successfully');
         }
 
+        // Get Firestore instance
         const db = getFirestoreDb();
         if (!db) {
-          console.error('Failed to get Firestore instance');
+          console.error('AuthContext: Failed to get Firestore instance. Proceeding as new user.');
           setIsNewUser(true);
           return { success: true, isNewUser: true };
         }
@@ -138,24 +170,29 @@ export const AuthProvider = ({ children }) => {
         // This will correctly identify country codes like "+91" for India
         const { phoneNumber: phoneNumberOnly } = extractCountryCodeAndNumber(phoneNumber);
 
-        // Query for the user by phone number
-        const userDocSnap = await getDocs(query(collection(db, 'Users'), where("phoneNumber", "==", phoneNumberOnly)));
+        try {
+          // Query for the user by phone number
+          const userDocSnap = await getDocs(query(collection(db, 'Users'), where("phoneNumber", "==", phoneNumberOnly)));
 
-        if (!userDocSnap.empty) {
-          const userDoc = userDocSnap.docs[0].data();
-          const userProfile = {
-            id: phoneNumberOnly, // Use phone number as ID
-            ...userDoc
-          };
+          if (!userDocSnap.empty) {
+            const userDoc = userDocSnap.docs[0].data();
+            const userProfile = {
+              id: phoneNumberOnly, // Use phone number as ID
+              ...userDoc
+            };
 
-          console.log('AuthContext: User profile found in Firestore:', userProfile);
-          setUserProfile(userProfile);
-          await AsyncStorage.setItem('userProfile', JSON.stringify(userProfile));
-          setIsAuthenticated(true);
-          console.log('AuthContext: User authenticated successfully');
-        } else {
-          console.log('AuthContext: No user profile found in Firestore, treating as new user');
-          // If no profile found, treat as new user
+            console.log('AuthContext: User profile found in Firestore:', userProfile);
+            setUserProfile(userProfile);
+            await AsyncStorage.setItem('userProfile', JSON.stringify(userProfile));
+            setIsAuthenticated(true);
+            console.log('AuthContext: User authenticated successfully');
+          } else {
+            console.log('AuthContext: No user profile found in Firestore, treating as new user');
+            // If no profile found, treat as new user
+            setIsNewUser(true);
+          }
+        } catch (firestoreError) {
+          console.error('AuthContext: Error querying Firestore:', firestoreError);
           setIsNewUser(true);
         }
       } catch (error) {
@@ -174,15 +211,26 @@ export const AuthProvider = ({ children }) => {
   const setupProfile = async (profileData) => {
     console.log('AuthContext: setupProfile called with:', profileData);
     try {
+      // Check if Firebase is initialized
       if (!isFirebaseInitialized()) {
-        console.error('Firebase is not initialized. Cannot setup user profile in Firestore.');
-        // Fall back to local authentication
-        return setupProfileLocally(profileData);
+        console.log('AuthContext: Firebase not initialized, attempting to reinitialize...');
+
+        // Try to reinitialize Firebase
+        const reinitialized = await reinitializeFirebase();
+
+        if (!reinitialized) {
+          console.error('AuthContext: Firebase reinitialization failed. Falling back to local profile setup.');
+          // Fall back to local authentication
+          return setupProfileLocally(profileData);
+        }
+
+        console.log('AuthContext: Firebase reinitialized successfully');
       }
 
+      // Get Firestore instance
       const db = getFirestoreDb();
       if (!db) {
-        console.error('Failed to get Firestore instance');
+        console.error('AuthContext: Failed to get Firestore instance. Falling back to local profile setup.');
         // Fall back to local authentication
         return setupProfileLocally(profileData);
       }
@@ -206,28 +254,34 @@ export const AuthProvider = ({ children }) => {
 
       console.log('AuthContext: Creating new user profile in Firestore with phone number as ID');
 
-      // Set the user document with the phone number as the ID
-      await setDoc(doc(db, 'Users', docId), newProfile);
-      console.log('AuthContext: User added to Firestore with phone number as ID:', docId);
+      try {
+        // Set the user document with the phone number as the ID
+        await setDoc(doc(db, 'Users', docId), newProfile);
+        console.log('AuthContext: User added to Firestore with phone number as ID:', docId);
 
-      // Add the document ID to the profile
-      const profileWithId = {
-        id: docId,
-        ...newProfile
-      };
+        // Add the document ID to the profile
+        const profileWithId = {
+          id: docId,
+          ...newProfile
+        };
 
-      console.log('AuthContext: Setting user profile in state');
-      setUserProfile(profileWithId);
+        console.log('AuthContext: Setting user profile in state');
+        setUserProfile(profileWithId);
 
-      console.log('AuthContext: Saving user profile to AsyncStorage');
-      await AsyncStorage.setItem('userProfile', JSON.stringify(profileWithId));
+        console.log('AuthContext: Saving user profile to AsyncStorage');
+        await AsyncStorage.setItem('userProfile', JSON.stringify(profileWithId));
 
-      console.log('AuthContext: Setting isAuthenticated to true');
-      setIsAuthenticated(true);
+        console.log('AuthContext: Setting isAuthenticated to true');
+        setIsAuthenticated(true);
 
-      return true;
+        return true;
+      } catch (firestoreError) {
+        console.error('AuthContext: Error saving to Firestore:', firestoreError);
+        // Fall back to local authentication
+        return setupProfileLocally(profileData);
+      }
     } catch (error) {
-      console.error('AuthContext: Error saving user to Firestore:', error);
+      console.error('AuthContext: Error in setupProfile:', error);
       // Fall back to local authentication
       return setupProfileLocally(profileData);
     }
@@ -328,18 +382,33 @@ export const AuthProvider = ({ children }) => {
       await AsyncStorage.setItem('userProfile', JSON.stringify(updatedProfile));
 
       // Try to update Firestore if available
-      if (isFirebaseInitialized()) {
-        const db = getFirestoreDb();
-        if (db) {
+      if (!isFirebaseInitialized()) {
+        console.log('AuthContext: Firebase not initialized, attempting to reinitialize...');
+
+        // Try to reinitialize Firebase
+        const reinitialized = await reinitializeFirebase();
+
+        if (!reinitialized) {
+          console.error('AuthContext: Firebase reinitialization failed. Profile updated locally only.');
+          return Promise.resolve(true);
+        }
+
+        console.log('AuthContext: Firebase reinitialized successfully');
+      }
+
+      const db = getFirestoreDb();
+      if (db) {
+        try {
           console.log('AuthContext: Updating user profile in Firestore with ID:', docId);
           // Update the user document in Firestore
           await setDoc(doc(db, 'Users', docId), updateData, { merge: true });
           console.log('AuthContext: User profile updated in Firestore');
-        } else {
-          console.error('Failed to get Firestore instance');
+        } catch (firestoreError) {
+          console.error('AuthContext: Error updating profile in Firestore:', firestoreError);
+          // Even if Firestore update fails, we've already updated locally
         }
       } else {
-        console.error('Firebase is not initialized. Cannot update profile in Firestore.');
+        console.error('AuthContext: Failed to get Firestore instance. Profile updated locally only.');
       }
 
       return Promise.resolve(true);
