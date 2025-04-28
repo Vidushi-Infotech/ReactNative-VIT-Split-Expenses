@@ -23,12 +23,12 @@ const ExpenseDetailsScreen = () => {
   const navigation = useNavigation();
   const { isDarkMode, colors: themeColors } = useTheme();
   const { userProfile } = useAuth();
-  
+
   const { expense } = route.params || {};
   const [participants, setParticipants] = useState([]);
   const [paidByUser, setPaidByUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  
+
   useEffect(() => {
     if (expense) {
       loadExpenseDetails();
@@ -36,10 +36,10 @@ const ExpenseDetailsScreen = () => {
       setLoading(false);
     }
   }, [expense]);
-  
+
   const loadExpenseDetails = async () => {
     setLoading(true);
-    
+
     try {
       // Use the paidByUser from the expense object if available, otherwise fetch it
       if (expense.paidByUser) {
@@ -48,14 +48,14 @@ const ExpenseDetailsScreen = () => {
         const paidByUserData = await UserService.getUserById(expense.paidBy);
         setPaidByUser(paidByUserData);
       }
-      
+
       // Fetch participant details if needed
       if (expense.participants && expense.participants.length > 0) {
         const participantsData = await Promise.all(
           expense.participants.map(async (participantId) => {
             // Check if this is the current user
             const isCurrentUser = participantId === userProfile?.id;
-            
+
             // If we already have user data in the expense object, use it
             if (expense.participantsData && expense.participantsData[participantId]) {
               return {
@@ -63,7 +63,7 @@ const ExpenseDetailsScreen = () => {
                 isCurrentUser
               };
             }
-            
+
             // Otherwise fetch the user data
             try {
               const userData = await UserService.getUserById(participantId);
@@ -82,7 +82,7 @@ const ExpenseDetailsScreen = () => {
             }
           })
         );
-        
+
         setParticipants(participantsData);
       }
     } catch (error) {
@@ -91,7 +91,7 @@ const ExpenseDetailsScreen = () => {
       setLoading(false);
     }
   };
-  
+
   // Format date
   const formatDate = (dateString) => {
     if (!dateString) return 'Unknown date';
@@ -106,7 +106,7 @@ const ExpenseDetailsScreen = () => {
       return 'Invalid date';
     }
   };
-  
+
   // Get category icon
   const getCategoryIcon = (category) => {
     switch (category) {
@@ -137,7 +137,7 @@ const ExpenseDetailsScreen = () => {
         return 'cash-outline';
     }
   };
-  
+
   // Calculate amount per person
   const getAmountPerPerson = () => {
     if (!expense || !expense.amount || !expense.participants || expense.participants.length === 0) {
@@ -145,7 +145,25 @@ const ExpenseDetailsScreen = () => {
     }
     return expense.amount / expense.participants.length;
   };
-  
+
+  // Calculate participant balance
+  const getParticipantBalance = (participantId) => {
+    if (!expense || !expense.amount || !expense.participants || expense.participants.length === 0) {
+      return 0;
+    }
+
+    const amountPerPerson = expense.amount / expense.participants.length;
+
+    // If this participant is the payer
+    if (participantId === expense.paidBy) {
+      // Calculate how much they paid minus their share
+      return expense.amount - amountPerPerson;
+    } else {
+      // They owe their share
+      return -amountPerPerson;
+    }
+  };
+
   if (!expense) {
     return (
       <SafeAreaWrapper>
@@ -162,7 +180,7 @@ const ExpenseDetailsScreen = () => {
             </Text>
             <View style={styles.headerRight} />
           </View>
-          
+
           <View style={styles.centerContainer}>
             <Icon name="alert-circle-outline" size={60} color={themeColors.danger} />
             <Text style={[styles.errorText, { color: themeColors.text }]}>
@@ -173,7 +191,7 @@ const ExpenseDetailsScreen = () => {
       </SafeAreaWrapper>
     );
   }
-  
+
   if (loading) {
     return (
       <SafeAreaWrapper>
@@ -190,7 +208,7 @@ const ExpenseDetailsScreen = () => {
             </Text>
             <View style={styles.headerRight} />
           </View>
-          
+
           <View style={styles.centerContainer}>
             <ActivityIndicator size="large" color={themeColors.primary.default} />
             <Text style={[styles.loadingText, { color: themeColors.text }]}>
@@ -201,7 +219,7 @@ const ExpenseDetailsScreen = () => {
       </SafeAreaWrapper>
     );
   }
-  
+
   return (
     <SafeAreaWrapper>
       <View style={[styles.container, { backgroundColor: themeColors.background }]}>
@@ -217,7 +235,7 @@ const ExpenseDetailsScreen = () => {
           </Text>
           <View style={styles.headerRight} />
         </View>
-        
+
         <ScrollView
           style={styles.scrollView}
           contentContainerStyle={styles.scrollViewContent}
@@ -235,20 +253,20 @@ const ExpenseDetailsScreen = () => {
                 {expense.category || 'Other'}
               </Text>
             </View>
-            
+
             <Text style={[styles.expenseTitle, { color: themeColors.text }]}>
               {expense.description}
             </Text>
-            
+
             <Text style={[styles.expenseAmount, { color: themeColors.text }]}>
               ₹{parseFloat(expense.amount).toFixed(2)}
             </Text>
-            
+
             <Text style={[styles.expenseDate, { color: themeColors.textSecondary }]}>
               {formatDate(expense.date)}
             </Text>
           </View>
-          
+
           {/* Paid By Section */}
           <View style={[styles.section, { backgroundColor: themeColors.surface }]}>
             <View style={styles.sectionHeader}>
@@ -262,7 +280,7 @@ const ExpenseDetailsScreen = () => {
                 Paid by
               </Text>
             </View>
-            
+
             <View style={styles.paidByContainer}>
               {paidByUser ? (
                 <>
@@ -271,12 +289,12 @@ const ExpenseDetailsScreen = () => {
                     name={paidByUser.name || 'User'}
                     size="lg"
                   />
-                  
+
                   <View style={styles.paidByInfo}>
                     <Text style={[styles.paidByName, { color: themeColors.text }]}>
                       {paidByUser.id === userProfile?.id ? 'Me' : paidByUser.name || 'Unknown User'}
                     </Text>
-                    
+
                     <Text style={[styles.paidByAmount, { color: themeColors.success }]}>
                       Paid ₹{parseFloat(expense.amount).toFixed(2)}
                     </Text>
@@ -289,7 +307,7 @@ const ExpenseDetailsScreen = () => {
               )}
             </View>
           </View>
-          
+
           {/* Split Details Section */}
           <View style={[styles.section, { backgroundColor: themeColors.surface }]}>
             <View style={styles.sectionHeader}>
@@ -303,18 +321,50 @@ const ExpenseDetailsScreen = () => {
                 Split Details
               </Text>
             </View>
-            
+
             <View style={styles.splitDetailsContainer}>
               <Text style={[styles.splitInfo, { color: themeColors.text }]}>
                 Split equally among {participants.length || expense.participants?.length || 0} people
               </Text>
-              
+
               <Text style={[styles.amountPerPerson, { color: themeColors.warning }]}>
                 ₹{getAmountPerPerson().toFixed(2)} per person
               </Text>
+
+              <View style={styles.splitSummaryContainer}>
+                <View style={[styles.splitSummaryCard, { backgroundColor: themeColors.primary.light + '15' }]}>
+                  <Icon name="calculator-outline" size={20} color={themeColors.primary.default} />
+                  <Text style={[styles.splitSummaryTitle, { color: themeColors.textSecondary }]}>
+                    Total Expense
+                  </Text>
+                  <Text style={[styles.splitSummaryValue, { color: themeColors.text }]}>
+                    ₹{parseFloat(expense.amount).toFixed(2)}
+                  </Text>
+                </View>
+
+                <View style={[styles.splitSummaryCard, { backgroundColor: themeColors.success + '15' }]}>
+                  <Icon name="people-outline" size={20} color={themeColors.success} />
+                  <Text style={[styles.splitSummaryTitle, { color: themeColors.textSecondary }]}>
+                    Participants
+                  </Text>
+                  <Text style={[styles.splitSummaryValue, { color: themeColors.text }]}>
+                    {participants.length || expense.participants?.length || 0}
+                  </Text>
+                </View>
+
+                <View style={[styles.splitSummaryCard, { backgroundColor: themeColors.warning + '15' }]}>
+                  <Icon name="person-outline" size={20} color={themeColors.warning} />
+                  <Text style={[styles.splitSummaryTitle, { color: themeColors.textSecondary }]}>
+                    Per Person
+                  </Text>
+                  <Text style={[styles.splitSummaryValue, { color: themeColors.text }]}>
+                    ₹{getAmountPerPerson().toFixed(2)}
+                  </Text>
+                </View>
+              </View>
             </View>
           </View>
-          
+
           {/* Participants Section */}
           <View style={[styles.section, { backgroundColor: themeColors.surface }]}>
             <View style={styles.sectionHeader}>
@@ -328,7 +378,7 @@ const ExpenseDetailsScreen = () => {
                 Participants
               </Text>
             </View>
-            
+
             <View style={styles.participantsList}>
               {participants.length > 0 ? (
                 participants.map((participant) => (
@@ -339,17 +389,25 @@ const ExpenseDetailsScreen = () => {
                         name={participant.name || 'User'}
                         size="md"
                       />
-                      
+
                       <Text style={[styles.participantName, { color: themeColors.text }]}>
                         {participant.isCurrentUser ? 'Me' : participant.name || 'Unknown User'}
                       </Text>
                     </View>
-                    
-                    <View style={[styles.amountBadge, { backgroundColor: isDarkMode ? 'rgba(245, 54, 92, 0.2)' : 'rgba(245, 54, 92, 0.1)' }]}>
-                      <Text style={[styles.participantAmount, { color: themeColors.danger }]}>
-                        -₹{getAmountPerPerson().toFixed(2)}
-                      </Text>
-                    </View>
+
+                    {participant.id === expense.paidBy ? (
+                      <View style={[styles.amountBadge, { backgroundColor: isDarkMode ? 'rgba(39, 174, 96, 0.2)' : 'rgba(39, 174, 96, 0.1)' }]}>
+                        <Text style={[styles.participantAmount, { color: themeColors.success }]}>
+                          +₹{(expense.amount - getAmountPerPerson()).toFixed(2)}
+                        </Text>
+                      </View>
+                    ) : (
+                      <View style={[styles.amountBadge, { backgroundColor: isDarkMode ? 'rgba(245, 54, 92, 0.2)' : 'rgba(245, 54, 92, 0.1)' }]}>
+                        <Text style={[styles.participantAmount, { color: themeColors.danger }]}>
+                          -₹{getAmountPerPerson().toFixed(2)}
+                        </Text>
+                      </View>
+                    )}
                   </View>
                 ))
               ) : (
@@ -359,7 +417,7 @@ const ExpenseDetailsScreen = () => {
               )}
             </View>
           </View>
-          
+
           {/* Notes Section */}
           {expense.notes && (
             <View style={[styles.section, { backgroundColor: themeColors.surface }]}>
@@ -374,13 +432,13 @@ const ExpenseDetailsScreen = () => {
                   Notes
                 </Text>
               </View>
-              
+
               <Text style={[styles.notesText, { color: themeColors.text }]}>
                 {expense.notes}
               </Text>
             </View>
           )}
-          
+
           {/* Receipt Image Section */}
           {expense.image && (
             <View style={[styles.section, { backgroundColor: themeColors.surface }]}>
@@ -395,7 +453,7 @@ const ExpenseDetailsScreen = () => {
                   Receipt
                 </Text>
               </View>
-              
+
               <Image
                 source={{ uri: expense.image }}
                 style={styles.receiptImage}
@@ -403,7 +461,7 @@ const ExpenseDetailsScreen = () => {
               />
             </View>
           )}
-          
+
           {/* Bottom Spacing */}
           <View style={styles.bottomSpacing} />
         </ScrollView>
@@ -582,6 +640,27 @@ const styles = StyleSheet.create({
   },
   bottomSpacing: {
     height: 40,
+  },
+  splitSummaryContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: spacing.lg,
+  },
+  splitSummaryCard: {
+    flex: 1,
+    borderRadius: 12,
+    padding: spacing.md,
+    alignItems: 'center',
+    marginHorizontal: spacing.xs,
+  },
+  splitSummaryTitle: {
+    fontSize: 12,
+    marginTop: spacing.xs,
+    marginBottom: spacing.xs,
+  },
+  splitSummaryValue: {
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });
 

@@ -1,8 +1,8 @@
-import React from 'react';
-import { ScrollView, View, Text, Image, ActivityIndicator, RefreshControl } from 'react-native';
+import React, { useState } from 'react';
+import { ScrollView, View, Text, Image, ActivityIndicator, RefreshControl, Modal } from 'react-native';
 import { TouchableOpacity } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
-import Animated, { FadeInDown } from 'react-native-reanimated';
+import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 import { useTheme } from '../../../context/ThemeContext.jsx';
 import EmptyState from './EmptyState.jsx';
 import styles from './GroupDetailsStyles';
@@ -17,7 +17,9 @@ const StandingTab = ({
   refreshing,
   handleRefresh
 }) => {
-  const { colors: themeColors } = useTheme();
+  const { colors: themeColors, isDarkMode } = useTheme();
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [settlementModalVisible, setSettlementModalVisible] = useState(false);
 
   // Format date
   const formatDate = (dateString) => {
@@ -40,36 +42,135 @@ const StandingTab = ({
     );
   }
 
-  return (
-    <ScrollView
-      style={styles.tabContent}
-      showsVerticalScrollIndicator={false}
-      contentContainerStyle={styles.balancesContainer}
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={handleRefresh}
-          colors={[themeColors.primary.default]}
-          tintColor={themeColors.primary.default}
-        />
+  // Calculate total balances
+  const calculateTotals = () => {
+    let totalToReceive = 0;
+    let totalToPay = 0;
+
+    // Get the current user's balance
+    const currentUserBalance = balances[userProfile?.id] || 0;
+
+    // For each user (except current user)
+    Object.entries(balances).forEach(([userId, balance]) => {
+      if (userId !== userProfile?.id) {
+        // If the other user's balance is negative, they owe money (current user receives)
+        // If the other user's balance is positive, they are owed money (current user pays)
+        if (balance < 0) {
+          // Other user owes money to the group, so current user might receive
+          totalToReceive += Math.abs(balance);
+        } else if (balance > 0) {
+          // Other user is owed money by the group, so current user might pay
+          totalToPay += balance;
+        }
       }
-    >
+    });
 
+    // Adjust based on current user's balance
+    if (currentUserBalance > 0) {
+      // Current user is owed money by the group
+      totalToReceive = currentUserBalance;
+      totalToPay = 0;
+    } else if (currentUserBalance < 0) {
+      // Current user owes money to the group
+      totalToReceive = 0;
+      totalToPay = Math.abs(currentUserBalance);
+    }
 
-      {Object.keys(balances).map((userId, index) => {
+    return { totalToReceive, totalToPay };
+  };
+
+  const { totalToReceive, totalToPay } = calculateTotals();
+
+  // Handle opening the settlement modal
+  const openSettlementModal = (user) => {
+    setSelectedUser(user);
+    setSettlementModalVisible(true);
+  };
+
+  // Close the settlement modal
+  const closeSettlementModal = () => {
+    setSettlementModalVisible(false);
+    setSelectedUser(null);
+  };
+
+  return (
+    <View style={{ flex: 1 }}>
+      <ScrollView
+        style={styles.tabContent}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.balancesContainer}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            colors={[themeColors.primary.default]}
+            tintColor={themeColors.primary.default}
+          />
+        }
+      >
+        {/* Balance Summary Cards */}
+        <View style={styles.balanceSummaryContainer}>
+          <Animated.View
+            entering={FadeInDown.delay(100).duration(400)}
+            style={[styles.balanceSummaryCard, { backgroundColor: themeColors.surface }]}
+          >
+            <View style={[styles.balanceSummaryIconContainer, { backgroundColor: themeColors.success + '20' }]}>
+              <Icon name="arrow-down" size={20} color={themeColors.success} />
+            </View>
+            <Text style={[styles.balanceSummaryLabel, { color: themeColors.textSecondary }]}>
+              To Receive
+            </Text>
+            <Text style={[styles.balanceSummaryAmount, { color: themeColors.success }]}>
+              ₹{totalToReceive.toFixed(2)}
+            </Text>
+          </Animated.View>
+
+          <Animated.View
+            entering={FadeInDown.delay(200).duration(400)}
+            style={[styles.balanceSummaryCard, { backgroundColor: themeColors.surface }]}
+          >
+            <View style={[styles.balanceSummaryIconContainer, { backgroundColor: themeColors.danger + '20' }]}>
+              <Icon name="arrow-up" size={20} color={themeColors.danger} />
+            </View>
+            <Text style={[styles.balanceSummaryLabel, { color: themeColors.textSecondary }]}>
+              To Pay
+            </Text>
+            <Text style={[styles.balanceSummaryAmount, { color: themeColors.danger }]}>
+              ₹{totalToPay.toFixed(2)}
+            </Text>
+          </Animated.View>
+        </View>
+
+        {/* Section Title */}
+        <View style={styles.sectionHeader}>
+          <Text style={[styles.sectionTitle, { color: themeColors.text }]}>
+            Individual Balances
+          </Text>
+        </View>
+
+        {Object.keys(balances).map((userId, index) => {
+        // Skip the current user
+        if (userId === userProfile?.id) {
+          return null;
+        }
+
         const user = getUserById(userId);
         const balance = balances[userId];
-        const isPositive = balance > 0;
-        const isNegative = balance < 0;
+
+        // In the context of group expenses:
+        // If other user's balance is negative, they owe money to the group (current user receives)
+        // If other user's balance is positive, they are owed money by the group (current user pays)
+        const isNegative = balance < 0; // Other user owes money (current user receives)
+        const isPositive = balance > 0; // Other user is owed money (current user pays)
         const isSettled = !isPositive && !isNegative;
 
         // Find the corresponding payment record for this user
         const paymentRecord = paymentRecords.find(p => {
-          if (isPositive) {
-            // If balance is positive, current user is owed money by this user
+          if (isNegative) {
+            // If other user's balance is negative, they owe money to the current user
             return p.fromUser === userId && p.toUser === userProfile.id && p.type === 'receive';
-          } else if (isNegative) {
-            // If balance is negative, current user owes money to this user
+          } else if (isPositive) {
+            // If other user's balance is positive, current user owes money to them
             return p.fromUser === userProfile.id && p.toUser === userId && p.type === 'pay';
           }
           return false;
@@ -80,10 +181,10 @@ const StandingTab = ({
 
         // Determine background color based on balance and status
         const getBalanceBackgroundColor = () => {
-          if (isPositive) {
+          if (isNegative) { // Other user owes money (current user receives)
             return isCompleted ? themeColors.success + '15' : themeColors.warning + '15';
           }
-          if (isNegative) {
+          if (isPositive) { // Other user is owed money (current user pays)
             return isCompleted ? themeColors.success + '15' : themeColors.danger + '15';
           }
           return themeColors.surface;
@@ -91,10 +192,10 @@ const StandingTab = ({
 
         // Determine text color based on balance and status
         const getBalanceTextColor = () => {
-          if (isPositive) {
+          if (isNegative) { // Other user owes money (current user receives)
             return isCompleted ? themeColors.success : themeColors.warning;
           }
-          if (isNegative) {
+          if (isPositive) { // Other user is owed money (current user pays)
             return isCompleted ? themeColors.success : themeColors.danger;
           }
           return themeColors.textSecondary;
@@ -102,8 +203,8 @@ const StandingTab = ({
 
         // Determine balance icon
         const getBalanceIcon = () => {
-          if (isPositive) return 'trending-up';
-          if (isNegative) return 'trending-down';
+          if (isNegative) return 'trending-up'; // Other user owes money (current user receives)
+          if (isPositive) return 'trending-down'; // Other user is owed money (current user pays)
           return 'remove'; // for settled (zero balance)
         };
 
@@ -115,12 +216,12 @@ const StandingTab = ({
         return (
           <Animated.View
             key={userId}
-            entering={FadeInDown.delay(index * 100).duration(400)}
+            entering={FadeInDown.delay((index + 3) * 100).duration(400)}
             style={[styles.balanceItem, {
               backgroundColor: getBalanceBackgroundColor(),
               borderLeftWidth: 4,
-              borderLeftColor: isPositive ? (isCompleted ? themeColors.success : themeColors.warning) :
-                              isNegative ? (isCompleted ? themeColors.success : themeColors.danger) :
+              borderLeftColor: isNegative ? (isCompleted ? themeColors.success : themeColors.warning) :
+                              isPositive ? (isCompleted ? themeColors.success : themeColors.danger) :
                               themeColors.textSecondary
             }]}
           >
@@ -141,15 +242,15 @@ const StandingTab = ({
                     {user.name}
                   </Text>
                   <Text style={[styles.userStatus, { color: themeColors.textSecondary }]}>
-                    {isPositive ? 'is owed' : isNegative ? 'owes' : 'settled up'}
+                    {isNegative ? 'owes you' : isPositive ? 'you owe' : 'settled up'}
                   </Text>
                 </View>
               </View>
 
               <View style={styles.balanceContainer}>
                 <View style={[styles.balanceIconContainer, {
-                  backgroundColor: isPositive ? (isCompleted ? themeColors.success + '20' : themeColors.warning + '20') :
-                                  isNegative ? (isCompleted ? themeColors.success + '20' : themeColors.danger + '20') :
+                  backgroundColor: isNegative ? (isCompleted ? themeColors.success + '20' : themeColors.warning + '20') :
+                                  isPositive ? (isCompleted ? themeColors.success + '20' : themeColors.danger + '20') :
                                   themeColors.textSecondary + '20'
                 }]}>
                   <Icon
@@ -159,7 +260,7 @@ const StandingTab = ({
                   />
                 </View>
                 <Text style={[styles.balanceText, { color: getBalanceTextColor() }]}>
-                  {isPositive ? '+' : isNegative ? '-' : ''}₹{Math.abs(balance).toFixed(2)}
+                  {isNegative ? '+' : isPositive ? '-' : ''}₹{Math.abs(balance).toFixed(2)}
                 </Text>
               </View>
             </View>
@@ -175,7 +276,7 @@ const StandingTab = ({
 
                 {/* Status badge - only show for positive balances (when others owe the user) */}
                 <View style={styles.statusActions}>
-                  {isPositive && (
+                  {isNegative && (
                     <View style={[styles.paymentStatusBadge, {
                       backgroundColor: isCompleted ? themeColors.success + '20' : themeColors.warning + '20'
                     }]}>
@@ -187,17 +288,33 @@ const StandingTab = ({
                     </View>
                   )}
 
-                  {/* Show action button only for pending payments where the user is owed money */}
-                  {isPositive && isPending && paymentRecord && (
+                  {/* Show action buttons */}
+                  {isPending && (
                     <TouchableOpacity
-                      style={[styles.actionButton, { backgroundColor: themeColors.success }]}
-                      onPress={() => handleUpdatePaymentStatus(paymentRecord.id, 'completed')}
+                      style={[styles.actionButton, {
+                        backgroundColor: isNegative ? themeColors.success : themeColors.primary.default
+                      }]}
+                      onPress={() => {
+                        if (isNegative && paymentRecord) {
+                          // This will also update any corresponding split payments
+                          handleUpdatePaymentStatus(paymentRecord.id, 'completed');
+                        } else {
+                          openSettlementModal({
+                            id: userId,
+                            name: user.name,
+                            avatar: user.avatar,
+                            balance: balance
+                          });
+                        }
+                      }}
                       disabled={updatingPayment}
                     >
                       {updatingPayment ? (
                         <ActivityIndicator size="small" color="white" />
                       ) : (
-                        <Text style={styles.actionButtonText}>Mark as Received</Text>
+                        <Text style={styles.actionButtonText}>
+                          {isNegative ? 'Mark as Received' : 'View Settlement'}
+                        </Text>
                       )}
                     </TouchableOpacity>
                   )}
@@ -207,7 +324,135 @@ const StandingTab = ({
           </Animated.View>
         );
       }).filter(Boolean)}
-    </ScrollView>
+      </ScrollView>
+
+      {/* Settlement Details Modal */}
+      <Modal
+        visible={settlementModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={closeSettlementModal}
+      >
+      <View style={[styles.modalContainer, { backgroundColor: isDarkMode ? 'rgba(0,0,0,0.8)' : 'rgba(0,0,0,0.5)' }]}>
+        <Animated.View
+          entering={FadeIn.duration(300)}
+          style={[styles.settlementModalContent, { backgroundColor: themeColors.surface }]}
+        >
+          {/* Modal Header */}
+          <View style={[styles.settlementModalHeader, { borderBottomColor: themeColors.border }]}>
+            <TouchableOpacity onPress={closeSettlementModal} style={styles.closeButton}>
+              <Icon name="close" size={24} color={themeColors.text} />
+            </TouchableOpacity>
+            <Text style={[styles.settlementModalTitle, { color: themeColors.text }]}>
+              Settlement Details
+            </Text>
+            <View style={{ width: 24 }} />
+          </View>
+
+          {/* User Info */}
+          {selectedUser && (
+            <View style={styles.settlementUserInfo}>
+              {selectedUser.avatar ? (
+                <Image source={{ uri: selectedUser.avatar }} style={styles.settlementUserAvatar} />
+              ) : (
+                <View style={[styles.settlementUserAvatarPlaceholder, { backgroundColor: themeColors.primary.default }]}>
+                  <Text style={styles.settlementUserAvatarText}>
+                    {selectedUser.name.charAt(0).toUpperCase()}
+                  </Text>
+                </View>
+              )}
+
+              <View style={styles.settlementUserDetails}>
+                <Text style={[styles.settlementUserName, { color: themeColors.text }]}>
+                  {selectedUser.name}
+                </Text>
+
+                <View style={[styles.settlementBalanceBadge, {
+                  backgroundColor: selectedUser.balance > 0 ? themeColors.danger + '20' : themeColors.success + '20'
+                }]}>
+                  <Text style={[styles.settlementBalanceText, {
+                    color: selectedUser.balance > 0 ? themeColors.danger : themeColors.success
+                  }]}>
+                    {selectedUser.balance > 0 ? 'You owe' : 'Owes you'} ₹{Math.abs(selectedUser.balance).toFixed(2)}
+                  </Text>
+                </View>
+              </View>
+            </View>
+          )}
+
+          {/* Settlement Instructions */}
+          <View style={styles.settlementInstructions}>
+            <Text style={[styles.settlementInstructionsTitle, { color: themeColors.text }]}>
+              Optimal Settlement Plan
+            </Text>
+
+            <View style={[styles.settlementCard, { backgroundColor: themeColors.background }]}>
+              <Icon
+                name={selectedUser?.balance > 0 ? "arrow-up-outline" : "arrow-down-outline"}
+                size={24}
+                color={selectedUser?.balance > 0 ? themeColors.danger : themeColors.success}
+                style={styles.settlementCardIcon}
+              />
+
+              <Text style={[styles.settlementCardText, { color: themeColors.text }]}>
+                {selectedUser?.balance > 0
+                  ? `You should pay ₹${Math.abs(selectedUser?.balance).toFixed(2)} to ${selectedUser?.name}`
+                  : `${selectedUser?.name} should pay ₹${Math.abs(selectedUser?.balance).toFixed(2)} to you`
+                }
+              </Text>
+            </View>
+
+            <Text style={[styles.settlementNote, { color: themeColors.textSecondary }]}>
+              This is the most efficient way to settle the balance between you and {selectedUser?.name}.
+            </Text>
+          </View>
+
+          {/* Action Buttons */}
+          <View style={styles.settlementActions}>
+            <TouchableOpacity
+              style={[styles.settlementActionButton, { backgroundColor: themeColors.primary.default }]}
+              onPress={closeSettlementModal}
+            >
+              <Text style={styles.settlementActionButtonText}>Close</Text>
+            </TouchableOpacity>
+
+            {selectedUser?.balance > 0 && (
+              <TouchableOpacity
+                style={[styles.settlementActionButton, { backgroundColor: themeColors.success }]}
+                onPress={() => {
+                  // Here you would implement the payment confirmation logic
+                  closeSettlementModal();
+                }}
+              >
+                <Text style={styles.settlementActionButtonText}>Mark as Paid</Text>
+              </TouchableOpacity>
+            )}
+
+            {selectedUser?.balance < 0 && (
+              <TouchableOpacity
+                style={[styles.settlementActionButton, { backgroundColor: themeColors.success }]}
+                onPress={() => {
+                  // Find the payment record for this user
+                  const paymentRecord = paymentRecords.find(p =>
+                    p.fromUser === selectedUser.id && p.toUser === userProfile.id
+                  );
+
+                  if (paymentRecord) {
+                    // This will also update any corresponding split payments
+                    handleUpdatePaymentStatus(paymentRecord.id, 'completed');
+                  }
+
+                  closeSettlementModal();
+                }}
+              >
+                <Text style={styles.settlementActionButtonText}>Mark as Received</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </Animated.View>
+      </View>
+    </Modal>
+    </View>
   );
 };
 

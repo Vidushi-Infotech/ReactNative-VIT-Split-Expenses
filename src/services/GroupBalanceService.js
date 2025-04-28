@@ -12,6 +12,7 @@ import {
   addDoc
 } from 'firebase/firestore';
 import { getFirestoreDb, isFirebaseInitialized } from '../config/firebase';
+import expenseSplitCalculator from '../utils/expenseSplitCalculator';
 
 /**
  * Service for handling group balance calculations and storage
@@ -342,35 +343,39 @@ class GroupBalanceService {
         amount
       });
 
-      // Calculate amount per participant
-      const participantCount = participants.length;
-      if (participantCount === 0) {
-        console.log('GroupBalanceService - No participants in expense, skipping balance update');
-        return true;
-      }
+      // Format participants for the expense split calculator
+      const expenseParticipants = participants.map(participantId => {
+        // Set amount paid to 0 by default
+        let amountPaid = 0;
 
-      const amountPerPerson = amount / participantCount;
-      console.log('GroupBalanceService - Amount per person:', amountPerPerson);
-
-      // Update balances for each participant
-      const updatePromises = [];
-
-      for (const participantId of participants) {
-        // Skip if the participant is the payer
+        // If this participant is the payer, they paid the full amount
         if (participantId === paidBy) {
-          console.log('GroupBalanceService - Skipping payer:', participantId);
-          continue;
+          amountPaid = parseFloat(amount);
         }
 
-        console.log('GroupBalanceService - Updating balance for participant:', participantId);
+        return {
+          id: participantId,
+          name: participantId, // We don't have names here, just use ID
+          amountPaid: amountPaid,
+          isParticipating: true
+        };
+      });
 
-        // Each participant owes money to the payer
-        // So the money flows from participant to payer
+      // Calculate expense split using the new calculator
+      const splitResult = expenseSplitCalculator.calculateExpenseSplit(expenseParticipants);
+
+      // Update balances based on the settlements
+      const updatePromises = [];
+
+      for (const settlement of splitResult.settlements) {
+        console.log('GroupBalanceService - Processing settlement:', settlement.description);
+
+        // Update balance based on the settlement
         const updatePromise = this.updateBalance(
           groupId,
-          participantId, // from (participant owes money)
-          paidBy,        // to (payer is owed money)
-          amountPerPerson
+          settlement.fromId, // from (participant who owes money)
+          settlement.toId,   // to (participant who is owed money)
+          settlement.amount
         );
 
         updatePromises.push(updatePromise);

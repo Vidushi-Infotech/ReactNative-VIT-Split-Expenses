@@ -1,6 +1,7 @@
 import { collection, addDoc, getDocs, query, where, doc, getDoc, updateDoc, arrayUnion, arrayRemove, setDoc } from 'firebase/firestore';
 import { getFirestoreDb, isFirebaseInitialized } from '../config/firebase';
 import GroupBalanceService from './GroupBalanceService';
+import expenseSplitCalculator from '../utils/expenseSplitCalculator';
 
 /**
  * Service for handling expense-related operations with Firebase
@@ -128,7 +129,7 @@ class ExpenseService {
         });
       }
 
-      // Calculate balances based on expenses
+      // Process each expense to calculate balances
       expenses.forEach(expense => {
         const paidBy = expense.paidBy;
         const participants = expense.participants;
@@ -138,34 +139,36 @@ class ExpenseService {
           return; // Skip invalid expenses
         }
 
-        // Check if the payer is also included in participants
-        const payerIsParticipant = participants.includes(paidBy);
-
-        // Calculate amount per person
-        const amountPerPerson = amount / participants.length;
-
-        // Initialize paidBy in balances if not exists
-        if (!balances[paidBy]) {
-          balances[paidBy] = 0;
-        }
-
-        // Add the full amount to the person who paid
-        balances[paidBy] += amount;
-
-        // Subtract each participant's share
-        participants.forEach(participantId => {
+        // Format participants for the expense split calculator
+        const expenseParticipants = participants.map(participantId => {
           // Initialize participant in balances if not exists
           if (!balances[participantId]) {
             balances[participantId] = 0;
           }
 
-          balances[participantId] -= amountPerPerson;
+          // Set amount paid to 0 by default
+          let amountPaid = 0;
+
+          // If this participant is the payer, they paid the full amount
+          if (participantId === paidBy) {
+            amountPaid = amount;
+          }
+
+          return {
+            id: participantId,
+            name: participantId, // We don't have names here, just use ID
+            amountPaid: amountPaid,
+            isParticipating: true
+          };
         });
 
-        // If the payer is not in participants, they should also be charged their share
-        if (!payerIsParticipant) {
-          balances[paidBy] -= amountPerPerson;
-        }
+        // Calculate expense split using the new calculator
+        const splitResult = expenseSplitCalculator.calculateExpenseSplit(expenseParticipants);
+
+        // Update balances based on the split result
+        splitResult.participants.forEach(participant => {
+          balances[participant.id] += participant.balance;
+        });
       });
 
       // Round balances to 2 decimal places
@@ -206,32 +209,45 @@ class ExpenseService {
 
       const { groupId, participants, amount, paidBy } = expenseData;
 
-      // Calculate amount per person
-      const amountPerPerson = parseFloat(amount) / participants.length;
+      // Format participants for the expense split calculator
+      const expenseParticipants = participants.map(participantId => {
+        // Set amount paid to 0 by default
+        let amountPaid = 0;
 
-      // Create a split payment record for each participant except the payer
+        // If this participant is the payer, they paid the full amount
+        if (participantId === paidBy) {
+          amountPaid = parseFloat(amount);
+        }
+
+        return {
+          id: participantId,
+          name: participantId, // We don't have names here, just use ID
+          amountPaid: amountPaid,
+          isParticipating: true
+        };
+      });
+
+      // Calculate expense split using the new calculator
+      const splitResult = expenseSplitCalculator.calculateExpenseSplit(expenseParticipants);
+
+      // Create a split payment record for each settlement
       const createPromises = [];
 
-      for (const participantId of participants) {
-        // Skip the payer as they don't owe themselves money
-        if (participantId === paidBy) continue;
-
-        // Create a unique ID for the split payment
-        const splitPaymentId = `${expenseId}_${participantId}`;
-
+      for (const settlement of splitResult.settlements) {
         // Create the split payment document
         const splitPaymentData = {
           expenseId,
           groupId,
-          fromUser: participantId, // The participant who owes money
-          toUser: paidBy, // The person who paid and is owed money
-          amount: amountPerPerson,
+          fromUser: settlement.fromId, // The participant who owes money
+          toUser: settlement.toId, // The person who is owed money
+          amount: settlement.amount,
           status: 'pending', // Default status is pending
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
+          description: settlement.description
         };
 
-        // Add to collection using addDoc instead of setDoc with custom ID
+        // Add to collection
         const addPromise = addDoc(collection(db, 'SplitPayments'), splitPaymentData);
         createPromises.push(addPromise);
       }
@@ -239,7 +255,7 @@ class ExpenseService {
       // Wait for all documents to be created
       await Promise.all(createPromises);
 
-      console.log(`Created ${participants.length - 1} split payment records for expense ${expenseId}`);
+      console.log(`Created ${splitResult.settlements.length} split payment records for expense ${expenseId}`);
       return true;
     } catch (error) {
       console.error('Error creating split payment records:', error);

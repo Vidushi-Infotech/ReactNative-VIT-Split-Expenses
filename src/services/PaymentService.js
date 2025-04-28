@@ -2,6 +2,7 @@ import { collection, addDoc, getDocs, query, where, doc, getDoc, updateDoc, orde
 import { getFirestoreDb, isFirebaseInitialized } from '../config/firebase';
 import ExpenseService from './ExpenseService';
 import GroupBalanceService from './GroupBalanceService';
+import expenseSplitCalculator from '../utils/expenseSplitCalculator';
 
 /**
  * Service for handling payment-related operations with Firebase
@@ -186,9 +187,6 @@ class PaymentService {
         return [];
       }
 
-      // Get balances for the group
-      const balances = await ExpenseService.calculateGroupBalances(groupId);
-
       // Get all users
       const usersSnapshot = await getDocs(collection(db, 'Users'));
       const users = {};
@@ -199,84 +197,102 @@ class PaymentService {
       // Get existing payments
       const existingPayments = await this.getPaymentsByGroupId(groupId);
 
+      // Get all expenses for the group
+      const expenses = await ExpenseService.getExpensesByGroupId(groupId);
+
+      // Get all group members
+      const groupDoc = await getDoc(doc(db, 'Groups', groupId));
+      if (!groupDoc.exists()) {
+        console.error('Group not found:', groupId);
+        return [];
+      }
+
+      const groupData = groupDoc.data();
+      const members = groupData.members || [];
+
+      // Create a map of all participants with their paid amounts
+      const participants = {};
+
+      // Initialize all members with zero amounts
+      members.forEach(memberId => {
+        participants[memberId] = {
+          id: memberId,
+          name: users[memberId]?.name || 'Unknown User',
+          amountPaid: 0,
+          isParticipating: true
+        };
+      });
+
+      // Add the current user if not already in the list
+      if (!participants[currentUserProfile.id]) {
+        participants[currentUserProfile.id] = {
+          id: currentUserProfile.id,
+          name: currentUserProfile.name || 'Me',
+          amountPaid: 0,
+          isParticipating: true
+        };
+      }
+
+      // Calculate total paid amounts for each participant from all expenses
+      expenses.forEach(expense => {
+        const paidBy = expense.paidBy;
+        const amount = parseFloat(expense.amount);
+
+        // Add the amount to the payer's total
+        if (participants[paidBy]) {
+          participants[paidBy].amountPaid += amount;
+        }
+      });
+
+      // Convert participants map to array
+      const participantsArray = Object.values(participants);
+
+      // Calculate expense split using the new calculator
+      const splitResult = expenseSplitCalculator.calculateExpenseSplit(participantsArray);
+
+      // Filter settlements that involve the current user
+      const currentUserSettlements = splitResult.settlements.filter(settlement =>
+        settlement.fromId === currentUserProfile.id || settlement.toId === currentUserProfile.id
+      );
+
       const paymentRecords = [];
 
-      // Process balances to create payment records
-      Object.entries(balances).forEach(([userId, balance]) => {
-        // Skip the current user and users with zero balance
-        if (userId === currentUserProfile.id || balance === 0) {
-          return;
-        }
+      // Process settlements to create payment records
+      currentUserSettlements.forEach(settlement => {
+        const isReceiving = settlement.toId === currentUserProfile.id;
+        const otherUserId = isReceiving ? settlement.fromId : settlement.toId;
+        const user = users[otherUserId] || { id: otherUserId, name: 'Unknown User' };
 
-        const user = users[userId] || { id: userId, name: 'Unknown User' };
+        // Check if there's already a payment record for this
+        const existingPayment = existingPayments.find(p =>
+          p.fromUser === settlement.fromId &&
+          p.toUser === settlement.toId &&
+          p.groupId === groupId
+        );
 
-        // If balance is negative, the user owes money to the current user
-        if (balance < 0) {
-          // The other user owes money to the current user
-          const amount = Math.abs(balance);
-
-          // Check if there's already a payment record for this
-          const existingPayment = existingPayments.find(p =>
-            p.fromUser === userId &&
-            p.toUser === currentUserProfile.id &&
-            p.groupId === groupId
-          );
-
-          if (existingPayment) {
-            paymentRecords.push({
-              ...existingPayment,
-              amount: amount, // Update amount in case it changed
-              user: user,
-              type: 'receive', // Current user receives money
-            });
-          } else {
-            // Create a new payment record
-            paymentRecords.push({
-              id: `${groupId}_${userId}_${currentUserProfile.id}`,
-              groupId: groupId,
-              fromUser: userId,
-              toUser: currentUserProfile.id,
-              amount: amount,
-              status: 'pending',
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
-              user: user,
-              type: 'receive', // Current user receives money
-            });
-          }
+        if (existingPayment) {
+          paymentRecords.push({
+            ...existingPayment,
+            amount: settlement.amount, // Update amount in case it changed
+            user: user,
+            type: isReceiving ? 'receive' : 'pay',
+            description: settlement.description
+          });
         } else {
-          // The current user owes money to the other user
-          const amount = balance;
-
-          // Check if there's already a payment record for this
-          const existingPayment = existingPayments.find(p =>
-            p.fromUser === currentUserProfile.id &&
-            p.toUser === userId &&
-            p.groupId === groupId
-          );
-
-          if (existingPayment) {
-            paymentRecords.push({
-              ...existingPayment,
-              amount: amount, // Update amount in case it changed
-              user: user,
-              type: 'pay', // Current user pays money
-            });
-          } else {
-            // Create a new payment record
-            paymentRecords.push({
-              id: `${groupId}_${currentUserProfile.id}_${userId}`,
-              groupId: groupId,
-              fromUser: currentUserProfile.id,
-              toUser: userId,
-              amount: amount,
-              status: 'pending',
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
-              user: user,
-              type: 'pay', // Current user pays money
-            });
-          }
+          // Create a new payment record
+          paymentRecords.push({
+            id: `${groupId}_${settlement.fromId}_${settlement.toId}`,
+            groupId: groupId,
+            fromUser: settlement.fromId,
+            toUser: settlement.toId,
+            amount: settlement.amount,
+            status: 'pending',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            user: user,
+            type: isReceiving ? 'receive' : 'pay',
+            description: settlement.description
+          });
         }
       });
 
@@ -643,8 +659,35 @@ class PaymentService {
           // Add the new split payment to Firestore
           const newSplitPaymentRef = await addDoc(collection(db, 'SplitPayments'), newSplitPaymentData);
 
+          // Create a partial payment record for the amount that was paid
+          const partialPaymentData = {
+            groupId: payment.groupId,
+            expenseId: payment.expenseId,
+            fromUser: payment.fromUser,
+            toUser: payment.toUser,
+            amount: remainingAmount, // The amount that was paid
+            status: 'completed',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            date: new Date().toISOString(),
+            // Copy user details if they exist
+            ...(payment.fromUserDetails ? { fromUserDetails: payment.fromUserDetails } : {}),
+            ...(payment.toUserDetails ? { toUserDetails: payment.toUserDetails } : {}),
+            // Only include expenseDetails if it exists
+            ...(payment.expenseDetails ? { expenseDetails: payment.expenseDetails } : {})
+          };
+
+          // Add the partial payment to Firestore
+          const partialPaymentRef = await addDoc(collection(db, 'SplitPayments'), partialPaymentData);
+
           // Mark the original payment as completed
-          await this.updateSplitPaymentStatus(payment.id, 'completed');
+          await updateDoc(doc(db, 'SplitPayments', payment.id), {
+            status: 'completed',
+            updatedAt: new Date().toISOString(),
+            isPartiallyPaid: true,
+            partialPaymentId: partialPaymentRef.id,
+            remainingPaymentId: newSplitPaymentRef.id
+          });
 
           updatedPayments.push(payment.id);
           partialPayments.push(newSplitPaymentRef.id);
@@ -658,6 +701,28 @@ class PaymentService {
       console.log(`Marked ${updatedPayments.length} payments as received, total amount: ${amount}`);
       if (partialPayments.length > 0) {
         console.log(`Created ${partialPayments.length} new partial payment records`);
+      }
+
+      // Update the payment record status
+      const paymentId = `${groupId}_${fromUserId}_${toUserId}`;
+      const paymentDoc = await getDoc(doc(db, 'Payments', paymentId));
+
+      if (paymentDoc.exists()) {
+        const paymentData = paymentDoc.data();
+        const totalAmount = paymentData.amount || 0;
+
+        // If the full amount is paid, mark the payment as completed
+        // Otherwise, update the amount to reflect the partial payment
+        if (amount >= totalAmount) {
+          await this.updatePaymentStatus(paymentId, 'completed');
+        } else {
+          await updateDoc(doc(db, 'Payments', paymentId), {
+            partiallyPaid: true,
+            paidAmount: amount,
+            remainingAmount: totalAmount - amount,
+            updatedAt: new Date().toISOString()
+          });
+        }
       }
 
       // Update group balances to reflect the payment

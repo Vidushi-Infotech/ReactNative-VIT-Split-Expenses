@@ -14,7 +14,11 @@ const PaymentsTab = ({
   handleUpdateSplitPaymentStatus,
   updatingPayment,
   refreshing,
-  handleRefresh
+  handleRefresh,
+  balances,
+  paymentRecords,
+  getUserById,
+  handleUpdatePaymentStatus
 }) => {
   const { colors: themeColors } = useTheme();
 
@@ -57,6 +61,10 @@ const PaymentsTab = ({
         handleUpdateSplitPaymentStatus={handleUpdateSplitPaymentStatus}
         updatingPayment={updatingPayment}
         handleRefresh={handleRefresh}
+        balances={balances}
+        paymentRecords={paymentRecords}
+        getUserById={getUserById}
+        handleUpdatePaymentStatus={handleUpdatePaymentStatus}
       />
 
       {/* Section Title for Expense Splits */}
@@ -73,20 +81,101 @@ const PaymentsTab = ({
           description="There are no individual expense splits in this group."
         />
       ) : (
-        splitPayments.map((splitPayment, index) => {
-          const isCompleted = splitPayment.status === 'completed';
-          const isPending = splitPayment.status === 'pending';
-          const isCurrentUserPayer = splitPayment.toUser === userProfile.id;
-          const isCurrentUserParticipant = splitPayment.fromUser === userProfile.id;
+        // First, filter and deduplicate the split payments
+        (() => {
+          // Create a map to track unique expense-user combinations
+          const uniquePaymentMap = new Map();
 
-          // Get user details
-          const fromUser = splitPayment.fromUserDetails;
-          const toUser = splitPayment.toUserDetails;
+          // Use the same approach as in StandingTab to generate payment items from balances
+          const filteredPayments = [];
 
-          // Only show split payments where the current user is involved
-          if (!isCurrentUserPayer && !isCurrentUserParticipant) {
-            return null;
-          }
+          // Get the current user's balance
+          const currentUserBalance = balances[userProfile?.id] || 0;
+
+          // For each user (except current user)
+          Object.entries(balances).forEach(([userId, balance]) => {
+            if (userId !== userProfile?.id) {
+              const user = getUserById(userId);
+
+              // In the context of group expenses:
+              // If other user's balance is negative, they owe money to the group (current user receives)
+              // If other user's balance is positive, they are owed money by the group (current user pays)
+              const isNegative = balance < 0; // Other user owes money (current user receives)
+              const isPositive = balance > 0; // Other user is owed money (current user pays)
+
+              // Find the corresponding payment record for this user
+              const paymentRecord = paymentRecords.find(p => {
+                if (isNegative) {
+                  // If other user's balance is negative, they owe money to the current user
+                  return p.fromUser === userId && p.toUser === userProfile.id && p.type === 'receive';
+                } else if (isPositive) {
+                  // If other user's balance is positive, current user owes money to them
+                  return p.fromUser === userProfile.id && p.toUser === userId && p.type === 'pay';
+                }
+                return false;
+              });
+
+              if (paymentRecord) {
+                // Create a payment object that matches the structure expected by the component
+                const payment = {
+                  id: paymentRecord.id,
+                  groupId: paymentRecord.groupId,
+                  fromUser: isNegative ? userId : userProfile.id,
+                  toUser: isNegative ? userProfile.id : userId,
+                  amount: Math.abs(balance),
+                  status: paymentRecord.status || 'pending',
+                  createdAt: paymentRecord.createdAt || new Date().toISOString(),
+                  fromUserDetails: isNegative ? user : userProfile,
+                  toUserDetails: isNegative ? userProfile : user,
+                  // Add any other fields needed
+                };
+
+                // Add to filtered payments
+                filteredPayments.push(payment);
+
+                // Add to map to avoid duplicates
+                const paymentKey = `${payment.fromUser}_${payment.toUser}`;
+                uniquePaymentMap.set(paymentKey, payment);
+              }
+            }
+          });
+
+          // Also include any split payments that aren't already covered by the balance-based payments
+          splitPayments.forEach(payment => {
+            const isCurrentUserPayer = payment.toUser === userProfile.id;
+            const isCurrentUserParticipant = payment.fromUser === userProfile.id;
+
+            // Skip if current user is not involved
+            if (!isCurrentUserPayer && !isCurrentUserParticipant) {
+              return;
+            }
+
+            // Create a unique key for this payment
+            const paymentKey = `${payment.fromUser}_${payment.toUser}`;
+
+            // Only add if we don't already have a payment for this user pair
+            if (!uniquePaymentMap.has(paymentKey)) {
+              filteredPayments.push(payment);
+              uniquePaymentMap.set(paymentKey, payment);
+            }
+          });
+
+          // Sort by date (newest first)
+          filteredPayments.sort((a, b) => {
+            const dateA = new Date(a.createdAt || a.date || 0);
+            const dateB = new Date(b.createdAt || b.date || 0);
+            return dateB - dateA;
+          });
+
+          return filteredPayments.map((splitPayment, index) => {
+            const isCompleted = splitPayment.status === 'completed';
+            const isPending = splitPayment.status === 'pending';
+            const isCurrentUserPayer = splitPayment.toUser === userProfile.id;
+            const isCurrentUserParticipant = splitPayment.fromUser === userProfile.id;
+
+            // Get user details
+            const fromUser = splitPayment.fromUserDetails;
+            const toUser = splitPayment.toUserDetails;
 
           return (
             <Animated.View
@@ -223,7 +312,16 @@ const PaymentsTab = ({
                     {isPending && isCurrentUserParticipant && (
                       <TouchableOpacity
                         style={[styles.actionButton, { backgroundColor: themeColors.success }]}
-                        onPress={() => handleUpdateSplitPaymentStatus(splitPayment.id, 'completed')}
+                        onPress={() => {
+                          // Check if this is a payment record or split payment
+                          if (splitPayment.id.includes('_')) {
+                            // This is a payment record (from balances)
+                            handleUpdatePaymentStatus(splitPayment.id, 'completed');
+                          } else {
+                            // This is a split payment
+                            handleUpdateSplitPaymentStatus(splitPayment.id, 'completed');
+                          }
+                        }}
                         disabled={updatingPayment}
                       >
                         {updatingPayment ? (
@@ -238,7 +336,16 @@ const PaymentsTab = ({
                     {isPending && isCurrentUserPayer && (
                       <TouchableOpacity
                         style={[styles.actionButton, { backgroundColor: themeColors.success }]}
-                        onPress={() => handleUpdateSplitPaymentStatus(splitPayment.id, 'completed')}
+                        onPress={() => {
+                          // Check if this is a payment record or split payment
+                          if (splitPayment.id.includes('_')) {
+                            // This is a payment record (from balances)
+                            handleUpdatePaymentStatus(splitPayment.id, 'completed');
+                          } else {
+                            // This is a split payment
+                            handleUpdateSplitPaymentStatus(splitPayment.id, 'completed');
+                          }
+                        }}
                         disabled={updatingPayment}
                       >
                         {updatingPayment ? (
@@ -253,7 +360,8 @@ const PaymentsTab = ({
               </View>
             </Animated.View>
           );
-        }).filter(Boolean)
+          });
+        })()
       )}
     </ScrollView>
   );

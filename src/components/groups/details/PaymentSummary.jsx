@@ -33,7 +33,11 @@ const PaymentSummary = ({
   userProfile,
   handleUpdateSplitPaymentStatus,
   updatingPayment,
-  handleRefresh
+  handleRefresh,
+  balances,
+  paymentRecords,
+  getUserById,
+  handleUpdatePaymentStatus
 }) => {
   const { colors: themeColors, isDarkMode } = useTheme();
 
@@ -59,7 +63,7 @@ const PaymentSummary = ({
       await calculateTotals();
     };
     fetchData();
-  }, [splitPayments]);
+  }, [splitPayments, balances, paymentRecords]);
 
   // Reset selected user tab when modal opens
   useEffect(() => {
@@ -78,140 +82,177 @@ const PaymentSummary = ({
   };
 
   const calculateTotals = async () => {
-    let toReceive = 0;
-    let toPay = 0;
-    const receivables = [];
-    const payables = [];
-
-    // First, collect all expense IDs we need to fetch
-    const expenseIds = new Set();
-    splitPayments.forEach(payment => {
-      if (payment.status !== 'completed' && payment.expenseId) {
-        expenseIds.add(payment.expenseId);
-      }
-    });
-
-    // Fetch all expense details in one go
-    const expenseDetails = {};
     try {
-      if (!isFirebaseInitialized()) {
-        console.error('Firebase is not initialized. Cannot fetch expense details.');
-        throw new Error('Firebase is not initialized');
-      }
+      // Use the same calculation logic as in StandingTab
+      let toReceive = 0;
+      let toPay = 0;
+      const receivables = [];
+      const payables = [];
 
-      const db = getFirestoreDb();
-      if (!db) {
-        console.error('Failed to get Firestore instance');
-        throw new Error('Failed to get Firestore instance');
-      }
+      // Get the current user's balance
+      const currentUserBalance = balances[userProfile?.id] || 0;
 
-      for (const expenseId of expenseIds) {
-        const expenseDoc = await getDoc(doc(db, 'Expenses', expenseId));
-        if (expenseDoc.exists()) {
-          expenseDetails[expenseId] = {
-            id: expenseId,
-            ...expenseDoc.data()
-          };
+      // For each user (except current user)
+      Object.entries(balances).forEach(([userId, balance]) => {
+        if (userId !== userProfile?.id) {
+          const user = getUserById(userId);
+
+          // In the context of group expenses:
+          // If other user's balance is negative, they owe money to the group (current user receives)
+          // If other user's balance is positive, they are owed money by the group (current user pays)
+          const isNegative = balance < 0; // Other user owes money (current user receives)
+          const isPositive = balance > 0; // Other user is owed money (current user pays)
+
+          // Find the corresponding payment record for this user
+          const paymentRecord = paymentRecords.find(p => {
+            if (isNegative) {
+              // If other user's balance is negative, they owe money to the current user
+              return p.fromUser === userId && p.toUser === userProfile.id && p.type === 'receive';
+            } else if (isPositive) {
+              // If other user's balance is positive, current user owes money to them
+              return p.fromUser === userProfile.id && p.toUser === userId && p.type === 'pay';
+            }
+            return false;
+          });
+
+          if (isNegative) {
+            // Other user owes money to the current user (To Receive)
+            const amount = Math.abs(balance);
+            toReceive += amount;
+
+            // Get all split payments for this user
+            const userSplitPayments = splitPayments.filter(payment =>
+              payment.fromUser === userId &&
+              payment.toUser === userProfile.id &&
+              payment.status !== 'completed'
+            );
+
+            // Group payments by expense ID to avoid duplicates
+            const paymentsByExpense = {};
+
+            // Process all split payments
+            userSplitPayments.forEach(payment => {
+              const expenseId = payment.expenseId;
+
+              // If we already have a payment for this expense, skip it
+              if (paymentsByExpense[expenseId]) {
+                return;
+              }
+
+              // Find the corresponding expense in the payment record
+              const paymentRecord = paymentRecords.find(p =>
+                p.fromUser === userId &&
+                p.toUser === userProfile.id &&
+                p.expenseId === expenseId
+              );
+
+              // Store the payment with enhanced details
+              paymentsByExpense[expenseId] = {
+                ...payment,
+                splitAmount: payment.amount,
+                expenseDetails: {
+                  ...(payment.expenseDetails || {}),
+                  ...(paymentRecord?.expenseDetails || {})
+                }
+              };
+            });
+
+            // Convert the grouped payments back to an array
+            const enhancedPayments = Object.values(paymentsByExpense);
+
+            // Check if there's a payment record and if it's pending
+            const isPending = !paymentRecord || paymentRecord.status === 'pending';
+
+            // Only add to receivables if the payment is pending
+            if (isPending) {
+              receivables.push({
+                userId: userId,
+                userName: user.name || 'Unknown User',
+                userAvatar: user.avatar,
+                amount: amount,
+                payments: enhancedPayments.length > 0 ? enhancedPayments : (paymentRecord ? [paymentRecord] : []),
+                balance: balance,
+                status: paymentRecord?.status || 'pending'
+              });
+            }
+          } else if (isPositive) {
+            // Current user owes money to the other user (To Pay)
+            const amount = balance;
+            toPay += amount;
+
+            payables.push({
+              userId: userId,
+              toUser: userId,
+              toUserName: user.name || 'Unknown User',
+              toUserAvatar: user.avatar,
+              amount: amount,
+              payments: paymentRecord ? [paymentRecord] : [],
+              status: paymentRecord?.status || 'pending',
+              date: paymentRecord?.createdAt || new Date().toISOString(),
+              balance: balance
+            });
+          }
         }
+      });
+
+      // Adjust based on current user's balance
+      if (currentUserBalance > 0) {
+        // Current user is owed money by the group
+        toReceive = currentUserBalance;
+        toPay = 0;
+      } else if (currentUserBalance < 0) {
+        // Current user owes money to the group
+        toReceive = 0;
+        toPay = Math.abs(currentUserBalance);
       }
-      console.log('Fetched expense details:', Object.keys(expenseDetails).length);
+
+      // Sort receivables by amount (highest first)
+      receivables.sort((a, b) => b.amount - a.amount);
+
+      // Sort payables by date (newest first)
+      payables.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+
+      console.log('Payment Summary - Calculated totals:', { toReceive, toPay });
+      console.log('Payment Summary - Receivables:', receivables.length);
+      console.log('Payment Summary - Payables:', payables.length);
+
+      setTotalToReceive(toReceive);
+      setTotalToPay(toPay);
+      setPendingReceivables(receivables);
+      setPendingPayables(payables);
     } catch (error) {
-      console.error('Error fetching expense details:', error);
+      console.error('Error calculating totals:', error);
     }
-
-    splitPayments.forEach(payment => {
-      // Skip completed payments
-      if (payment.status === 'completed') return;
-
-      // Get expense details if available
-      const expense = payment.expenseId ? expenseDetails[payment.expenseId] : null;
-
-      // Current user is owed money
-      if (payment.toUser === userProfile.id) {
-        toReceive += payment.amount || 0;
-
-        // Group by user for the receivables
-        const existingUserIndex = receivables.findIndex(r => r.userId === payment.fromUser);
-
-        if (existingUserIndex >= 0) {
-          // Add to existing user's total
-          receivables[existingUserIndex].amount += payment.amount || 0;
-          receivables[existingUserIndex].payments.push({
-            ...payment,
-            expenseDetails: expense
-          });
-        } else {
-          // Create new user entry
-          receivables.push({
-            userId: payment.fromUser,
-            userName: payment.fromUserDetails?.name || 'Unknown User',
-            userAvatar: payment.fromUserDetails?.avatar,
-            amount: payment.amount || 0,
-            payments: [{
-              ...payment,
-              expenseDetails: expense
-            }]
-          });
-        }
-      }
-
-      // Current user owes money
-      if (payment.fromUser === userProfile.id) {
-        toPay += payment.amount || 0;
-
-        // Add to payables list
-        payables.push({
-          id: payment.id,
-          toUser: payment.toUser,
-          toUserName: payment.toUserDetails?.name || 'Unknown User',
-          toUserAvatar: payment.toUserDetails?.avatar,
-          amount: payment.amount || 0,
-          expenseId: payment.expenseId,
-          expenseDetails: expense,
-          status: payment.status,
-          date: payment.date || payment.createdAt
-        });
-      }
-    });
-
-    // Sort receivables by amount (highest first)
-    receivables.sort((a, b) => b.amount - a.amount);
-
-    // Sort payables by date (newest first)
-    payables.sort((a, b) => new Date(b.date) - new Date(a.date));
-
-    setTotalToReceive(toReceive);
-    setTotalToPay(toPay);
-    setPendingReceivables(receivables);
-    setPendingPayables(payables);
   };
 
   const handleReceiveAll = async (userId) => {
     try {
-      // Find all pending payments from this user
-      const userPayments = pendingReceivables.find(r => r.userId === userId)?.payments || [];
-
-      if (userPayments.length === 0) return;
-
-      // Get the first payment to get the groupId
-      const firstPayment = userPayments[0];
-      if (!firstPayment) {
-        setError('No payments found');
+      // Find the receivable for this user
+      const receivable = pendingReceivables.find(r => r.userId === userId);
+      if (!receivable) {
+        setError('No receivable found for this user');
         return;
       }
 
-      // Calculate total amount
-      const totalAmount = userPayments.reduce((sum, payment) => sum + (payment.amount || 0), 0);
+      // Find the payment record for this user
+      const paymentRecord = paymentRecords.find(p =>
+        p.fromUser === userId && p.toUser === userProfile.id && p.type === 'receive'
+      );
 
-      // We can't set updatingPayment directly as it's a prop
-      // Instead, we'll just continue with the operation
+      if (!paymentRecord) {
+        setError('No payment record found for this user');
+        return;
+      }
 
-      // Use the new service method to mark all as received
+      // Get the amount to be received
+      const amountToReceive = receivable.amount;
+
+      // Use the markCustomAmountAsReceived service to handle full payments
       const success = await PaymentService.markCustomAmountAsReceived(
-        firstPayment.groupId,
+        paymentRecord.groupId,
         userId,                // fromUser (who owes money)
         userProfile.id,        // toUser (current user who is owed money)
-        totalAmount
+        amountToReceive
       );
 
       if (!success) {
@@ -220,30 +261,21 @@ const PaymentSummary = ({
       }
 
       // Get user details for notification
-      const userName = pendingReceivables.find(r => r.userId === userId)?.userName || 'Unknown User';
-
-      // Create a notification for the payment received
-      try {
-        // Ensure amount is a number
-        const numericAmount = parseFloat(totalAmount);
-
-        await NotificationService.createPaymentReceivedNotification(
-          userId,                // userId (who made the payment)
-          userProfile.id,        // receiverId (current user who received the payment)
-          userProfile.name,      // receiverName
-          numericAmount,         // amount (as a number)
-          firstPayment.groupId,  // groupId
-          firstPayment.id        // paymentId
-        );
-      } catch (notifError) {
-        console.error('Error creating notification:', notifError);
-        // Continue even if notification fails
-      }
+      const userName = receivable.userName || 'Unknown User';
 
       // Close modal
       setModalVisible(false);
       setSelectedPayment(null);
       setError('');
+
+      // Update the local state to reflect the payment
+      // This will immediately update the UI without waiting for a refresh
+      setPendingReceivables(prevReceivables =>
+        prevReceivables.filter(r => r.userId !== userId)
+      );
+
+      // Update the total to receive amount
+      setTotalToReceive(prevTotal => Math.max(0, prevTotal - amountToReceive));
 
       // Refresh the payments list
       await refreshData();
@@ -251,7 +283,7 @@ const PaymentSummary = ({
       // Show success message
       Alert.alert(
         'Payment Received',
-        `You have marked ₹${totalAmount.toFixed(2)} as received from ${userName}.`,
+        `You have marked ₹${amountToReceive.toFixed(2)} as received from ${userName}.`,
         [{ text: 'OK' }]
       );
     } catch (error) {
@@ -276,19 +308,19 @@ const PaymentSummary = ({
         return;
       }
 
-      // Get the first payment to get the groupId
-      const firstPayment = selectedPayment.payments[0];
-      if (!firstPayment) {
-        setError('No payments found');
+      // Find the payment record for this user
+      const paymentRecord = paymentRecords.find(p =>
+        p.fromUser === selectedPayment.userId && p.toUser === userProfile.id && p.type === 'receive'
+      );
+
+      if (!paymentRecord) {
+        setError('No payment record found for this user');
         return;
       }
 
-      // We can't set updatingPayment directly as it's a prop
-      // Instead, we'll just continue with the operation
-
-      // Use the new service method to mark custom amount as received
+      // Use the markCustomAmountAsReceived service to handle partial payments
       const success = await PaymentService.markCustomAmountAsReceived(
-        firstPayment.groupId,
+        paymentRecord.groupId,
         selectedPayment.userId,  // fromUser (who owes money)
         userProfile.id,          // toUser (current user who is owed money)
         amount
@@ -302,29 +334,36 @@ const PaymentSummary = ({
       // Get user details for notification
       let fromUserName = selectedPayment.userName || 'Unknown User';
 
-      // Create a notification for the payment received
-      try {
-        // Ensure amount is a number
-        const numericAmount = parseFloat(amount);
-
-        await NotificationService.createPaymentReceivedNotification(
-          selectedPayment.userId,  // userId (who made the payment)
-          userProfile.id,          // receiverId (current user who received the payment)
-          userProfile.name,        // receiverName
-          numericAmount,           // amount (as a number)
-          firstPayment.groupId,    // groupId
-          firstPayment.id          // paymentId
-        );
-      } catch (notifError) {
-        console.error('Error creating notification:', notifError);
-        // Continue even if notification fails
-      }
-
       // Close modal
       setModalVisible(false);
       setSelectedPayment(null);
       setCustomAmount('');
       setError('');
+
+      // Update the local state to reflect the payment
+      // This will immediately update the UI without waiting for a refresh
+      if (amount === selectedPayment.amount) {
+        // If full amount is received, remove the receivable
+        setPendingReceivables(prevReceivables =>
+          prevReceivables.filter(r => r.userId !== selectedPayment.userId)
+        );
+      } else {
+        // If partial amount is received, update the amount
+        setPendingReceivables(prevReceivables =>
+          prevReceivables.map(r => {
+            if (r.userId === selectedPayment.userId) {
+              return {
+                ...r,
+                amount: r.amount - amount
+              };
+            }
+            return r;
+          })
+        );
+      }
+
+      // Update the total to receive amount
+      setTotalToReceive(prevTotal => Math.max(0, prevTotal - amount));
 
       // Refresh the payments list
       await refreshData();
@@ -379,6 +418,11 @@ const PaymentSummary = ({
               <Text style={[styles.summaryAmount, { color: themeColors.success }]}>
                 ₹{totalToReceive.toFixed(2)}
               </Text>
+              {pendingReceivables.length > 0 && (
+                <Text style={[styles.summarySubtext, { color: themeColors.textSecondary }]}>
+                  from {pendingReceivables.length} {pendingReceivables.length === 1 ? 'person' : 'people'}
+                </Text>
+              )}
             </View>
           </View>
 
@@ -420,6 +464,11 @@ const PaymentSummary = ({
               <Text style={[styles.summaryAmount, { color: themeColors.danger }]}>
                 ₹{totalToPay.toFixed(2)}
               </Text>
+              {pendingPayables.length > 0 && (
+                <Text style={[styles.summarySubtext, { color: themeColors.textSecondary }]}>
+                  to {pendingPayables.length} {pendingPayables.length === 1 ? 'person' : 'people'}
+                </Text>
+              )}
             </View>
           </View>
 
@@ -500,18 +549,20 @@ const PaymentSummary = ({
                 </View>
 
                 {/* Button Section */}
-                <TouchableOpacity
-                  style={[styles.receiveButton, {
-                    backgroundColor: themeColors.success,
-                    shadowColor: themeColors.success,
-                    shadowOffset: { width: 0, height: 2 },
-                    shadowOpacity: 0.2,
-                    shadowRadius: 2,
-                    elevation: 2
-                  }]}
-                  onPress={() => openReceiveModal(receivable)}
-                  disabled={updatingPayment}
-                >
+                {/* Only show Receive button if status is pending */}
+                {(receivable.status === 'pending' || !receivable.status) && (
+                  <TouchableOpacity
+                    style={[styles.receiveButton, {
+                      backgroundColor: themeColors.success,
+                      shadowColor: themeColors.success,
+                      shadowOffset: { width: 0, height: 2 },
+                      shadowOpacity: 0.2,
+                      shadowRadius: 2,
+                      elevation: 2
+                    }]}
+                    onPress={() => openReceiveModal(receivable)}
+                    disabled={updatingPayment}
+                  >
                   {updatingPayment ? (
                     <ActivityIndicator size="small" color="white" />
                   ) : (
@@ -520,7 +571,8 @@ const PaymentSummary = ({
                       <Text style={styles.buttonText}>Receive</Text>
                     </>
                   )}
-                </TouchableOpacity>
+                  </TouchableOpacity>
+                )}
               </View>
             </View>
           ))}
@@ -744,82 +796,148 @@ const PaymentSummary = ({
                         </Text>
                       </View>
                     </View>
-                    <TouchableOpacity
-                      style={[styles.newModalReceiveButton, {
-                        backgroundColor: themeColors.success,
-                      }]}
-                      onPress={() => {
-                        setReceiveDetailsModalVisible(false);
-                        setTimeout(() => openReceiveModal(receivable), 300);
-                      }}
-                      disabled={updatingPayment}
-                    >
+                    {/* Only show Receive button if status is pending */}
+                    {(receivable.status === 'pending' || !receivable.status) && (
+                      <TouchableOpacity
+                        style={[styles.newModalReceiveButton, {
+                          backgroundColor: themeColors.success,
+                        }]}
+                        onPress={() => {
+                          setReceiveDetailsModalVisible(false);
+                          setTimeout(() => openReceiveModal(receivable), 300);
+                        }}
+                        disabled={updatingPayment}
+                      >
                       {updatingPayment ? (
                         <ActivityIndicator size="small" color="white" />
                       ) : (
                         <Text style={styles.newModalButtonText}>Receive</Text>
                       )}
-                    </TouchableOpacity>
+                      </TouchableOpacity>
+                    )}
                   </View>
 
                   {/* Expense List */}
                   <View style={styles.newModalExpenseList}>
-                    <Text style={[styles.newModalSectionTitle, { color: themeColors.text }]}>
-                      Expense Details ({receivable.payments.length})
-                    </Text>
+                    {/* Calculate unique expense count */}
+                    {(() => {
+                      // Get unique expense IDs
+                      const uniqueExpenseIds = new Set();
+                      receivable.payments.forEach(payment => {
+                        if (payment.expenseId) {
+                          uniqueExpenseIds.add(payment.expenseId);
+                        }
+                      });
 
-                    {receivable.payments.map((payment) => (
-                      <View
-                        key={payment.id}
-                        style={[styles.newModalExpenseItem, {
-                          borderBottomColor: themeColors.border
-                        }]}
-                      >
-                        <View style={styles.newModalExpenseRow}>
-                          <View style={styles.newModalExpenseInfo}>
-                            <Text style={[styles.newModalExpenseTitle, { color: themeColors.text }]}>
-                              {payment.expenseDetails?.description || 'Expense'}
-                            </Text>
-                            <Text style={[styles.newModalExpenseDate, { color: themeColors.textSecondary }]}>
-                              {new Date(payment.date || payment.createdAt).toLocaleDateString()}
-                            </Text>
+                      return (
+                        <Text style={[styles.newModalSectionTitle, { color: themeColors.text }]}>
+                          Expense Details ({uniqueExpenseIds.size}) - Total: ₹{receivable.amount.toFixed(2)}
+                        </Text>
+                      );
+                    })()}
+
+                    {/* Create a map to deduplicate expenses by ID */}
+                    {(() => {
+                      // Create a map of expenses by ID to avoid duplicates
+                      const expenseMap = {};
+
+                      // Process all payments to get unique expenses
+                      receivable.payments.forEach(payment => {
+                        const expenseId = payment.expenseId;
+
+                        // Skip if we already have this expense
+                        if (expenseMap[expenseId]) {
+                          return;
+                        }
+
+                        // Get expense details
+                        let expenseDetails = payment.expenseDetails;
+
+                        // If we don't have expense details, try to find them in the payment record
+                        if (!expenseDetails && expenseId) {
+                          // Find the corresponding expense in the payment record
+                          const paymentRecord = paymentRecords.find(p =>
+                            p.fromUser === receivable.userId &&
+                            p.toUser === userProfile.id &&
+                            p.expenseId === expenseId
+                          );
+
+                          if (paymentRecord && paymentRecord.expenseDetails) {
+                            expenseDetails = paymentRecord.expenseDetails;
+                          }
+                        }
+
+                        // Store the payment with its details
+                        expenseMap[expenseId] = {
+                          ...payment,
+                          expenseDetails
+                        };
+                      });
+
+                      // Convert the map to an array and render
+                      return Object.values(expenseMap).map(payment => {
+                        const expenseId = payment.expenseId;
+                        const expenseDetails = payment.expenseDetails;
+
+                        return (
+                          <View
+                            key={payment.id || `${expenseId}_${receivable.userId}`}
+                            style={[styles.newModalExpenseItem, {
+                              borderBottomColor: themeColors.border
+                            }]}
+                          >
+                          <View style={styles.newModalExpenseRow}>
+                            <View style={styles.newModalExpenseInfo}>
+                              <Text style={[styles.newModalExpenseTitle, { color: themeColors.text }]}>
+                                {expenseDetails?.description || 'Expense'} {expenseDetails?.amount ? `(Total: ₹${parseFloat(expenseDetails.amount).toFixed(2)})` : ''}
+                              </Text>
+                              <Text style={[styles.newModalExpenseDate, { color: themeColors.textSecondary }]}>
+                                {new Date(payment.date || payment.createdAt || expenseDetails?.date || new Date()).toLocaleDateString()}
+                              </Text>
+                            </View>
+                            <View style={{ alignItems: 'flex-end' }}>
+                              <Text style={[styles.newModalExpenseAmount, { color: themeColors.success }]}>
+                                ₹{(payment.splitAmount || payment.amount || receivable.amount / receivable.payments.length).toFixed(2)}
+                              </Text>
+                              <Text style={[styles.newModalExpenseSubtext, { color: themeColors.textSecondary }]}>
+                                Your share
+                              </Text>
+                            </View>
                           </View>
-                          <Text style={[styles.newModalExpenseAmount, { color: themeColors.success }]}>
-                            ₹{payment.amount.toFixed(2)}
-                          </Text>
+
+                          {expenseDetails && (
+                            <View style={styles.newModalExpenseTags}>
+                              {expenseDetails.category && (
+                                <View style={[styles.newModalExpenseTag, { backgroundColor: themeColors.primary.default + '15' }]}>
+                                  <Icon
+                                    name={getCategoryIcon(expenseDetails.category)}
+                                    size={12}
+                                    color={themeColors.primary.default}
+                                  />
+                                  <Text style={[styles.newModalExpenseTagText, { color: themeColors.primary.default }]}>
+                                    {expenseDetails.category}
+                                  </Text>
+                                </View>
+                              )}
+
+                              {(expenseDetails.paidByName || expenseDetails.paidBy) && (
+                                <View style={[styles.newModalExpenseTag, { backgroundColor: themeColors.textSecondary + '15' }]}>
+                                  <Icon
+                                    name="person-outline"
+                                    size={12}
+                                    color={themeColors.textSecondary}
+                                  />
+                                  <Text style={[styles.newModalExpenseTagText, { color: themeColors.textSecondary }]}>
+                                    {expenseDetails.paidByName || (expenseDetails.paidBy === userProfile.id ? 'Me' : 'Unknown')}
+                                  </Text>
+                                </View>
+                              )}
+                            </View>
+                          )}
                         </View>
-
-                        {payment.expenseDetails && (
-                          <View style={styles.newModalExpenseTags}>
-                            {payment.expenseDetails.category && (
-                              <View style={[styles.newModalExpenseTag, { backgroundColor: themeColors.primary.default + '15' }]}>
-                                <Icon
-                                  name={getCategoryIcon(payment.expenseDetails.category)}
-                                  size={12}
-                                  color={themeColors.primary.default}
-                                />
-                                <Text style={[styles.newModalExpenseTagText, { color: themeColors.primary.default }]}>
-                                  {payment.expenseDetails.category}
-                                </Text>
-                              </View>
-                            )}
-
-                            {payment.expenseDetails.paidByName && (
-                              <View style={[styles.newModalExpenseTag, { backgroundColor: themeColors.textSecondary + '15' }]}>
-                                <Icon
-                                  name="person-outline"
-                                  size={12}
-                                  color={themeColors.textSecondary}
-                                />
-                                <Text style={[styles.newModalExpenseTagText, { color: themeColors.textSecondary }]}>
-                                  {payment.expenseDetails.paidByName}
-                                </Text>
-                              </View>
-                            )}
-                          </View>
-                        )}
-                      </View>
-                    ))}
+                        );
+                      });
+                    })()}
                   </View>
                 </View>
               )}
@@ -924,7 +1042,7 @@ const PaymentSummary = ({
                             {payment.expenseDetails?.description || 'Expense'}
                           </Text>
                           <Text style={[styles.newModalExpenseDate, { color: themeColors.textSecondary }]}>
-                            {new Date(payment.date).toLocaleDateString()}
+                            {new Date(payment.date || payment.createdAt || new Date()).toLocaleDateString()}
                           </Text>
                         </View>
                         <Text style={[styles.newModalExpenseAmount, { color: themeColors.danger }]}>
@@ -947,7 +1065,7 @@ const PaymentSummary = ({
                             </View>
                           )}
 
-                          {payment.expenseDetails.paidByName && (
+                          {(payment.expenseDetails.paidByName || payment.expenseDetails.paidBy) && (
                             <View style={[styles.newModalExpenseTag, { backgroundColor: themeColors.textSecondary + '15' }]}>
                               <Icon
                                 name="person-outline"
@@ -955,7 +1073,7 @@ const PaymentSummary = ({
                                 color={themeColors.textSecondary}
                               />
                               <Text style={[styles.newModalExpenseTagText, { color: themeColors.textSecondary }]}>
-                                {payment.expenseDetails.paidByName}
+                                {payment.expenseDetails.paidByName || (payment.expenseDetails.paidBy === userProfile.id ? 'Me' : 'Unknown')}
                               </Text>
                             </View>
                           )}
@@ -1030,6 +1148,10 @@ const styles = StyleSheet.create({
   summaryAmount: {
     fontSize: 18,
     fontWeight: 'bold',
+  },
+  summarySubtext: {
+    fontSize: 12,
+    marginTop: 2,
   },
   summaryIndicator: {
     width: 24,
@@ -1793,6 +1915,10 @@ const styles = StyleSheet.create({
   newModalExpenseAmount: {
     fontSize: 14,
     fontWeight: 'bold',
+  },
+  newModalExpenseSubtext: {
+    fontSize: 10,
+    marginTop: 2,
   },
   newModalExpenseTags: {
     flexDirection: 'row',

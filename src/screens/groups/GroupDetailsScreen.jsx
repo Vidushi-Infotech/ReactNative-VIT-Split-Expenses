@@ -152,6 +152,23 @@ const GroupDetailsScreen = () => {
       // Update payment status in Firebase
       await PaymentService.updatePaymentStatus(paymentId, newStatus);
 
+      // Find and update corresponding split payments
+      // This ensures that when a payment is marked as received in Standing Tab,
+      // it also updates the corresponding split payments in Payment Tab
+      if (newStatus === 'completed' && payment.fromUser && payment.toUser) {
+        // Find all split payments from this user to the current user
+        const matchingSplitPayments = splitPayments.filter(sp =>
+          sp.fromUser === payment.fromUser &&
+          sp.toUser === payment.toUser &&
+          sp.status === 'pending'
+        );
+
+        // Update all matching split payments
+        for (const splitPayment of matchingSplitPayments) {
+          await PaymentService.updateSplitPaymentStatus(splitPayment.id, newStatus);
+        }
+      }
+
       // If the payment is being marked as completed, send a notification to the payer
       if (newStatus === 'completed' && payment.fromUser && payment.fromUser !== userProfile.id) {
         try {
@@ -187,8 +204,27 @@ const GroupDetailsScreen = () => {
     try {
       setUpdatingPayment(true);
 
+      // Get the split payment details
+      const splitPayment = splitPayments.find(sp => sp.id === splitPaymentId);
+      if (!splitPayment) {
+        throw new Error('Split payment not found');
+      }
+
       // Update split payment status in Firebase
       await PaymentService.updateSplitPaymentStatus(splitPaymentId, newStatus);
+
+      // Find and update corresponding payment record
+      // This ensures that when a split payment is marked as completed in Payment Tab,
+      // it also updates the corresponding payment record in Standing Tab
+      if (newStatus === 'completed' && splitPayment.fromUser && splitPayment.toUser) {
+        // Find the payment record between these users
+        const paymentId = `${splitPayment.groupId}_${splitPayment.fromUser}_${splitPayment.toUser}`;
+        const matchingPayment = paymentRecords.find(p => p.id === paymentId);
+
+        if (matchingPayment) {
+          await PaymentService.updatePaymentStatus(paymentId, newStatus);
+        }
+      }
 
       // Refresh data to get updated split payments
       await fetchGroupData();
@@ -386,6 +422,10 @@ const GroupDetailsScreen = () => {
               updatingPayment={updatingPayment}
               refreshing={refreshing}
               handleRefresh={handleRefresh}
+              balances={balances}
+              paymentRecords={paymentRecords}
+              getUserById={getUserById}
+              handleUpdatePaymentStatus={handleUpdatePaymentStatus}
             />
           )}
         </Animated.ScrollView>

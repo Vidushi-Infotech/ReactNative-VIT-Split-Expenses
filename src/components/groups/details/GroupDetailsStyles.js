@@ -485,6 +485,162 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
 
+  // Balance Summary Cards
+  balanceSummaryContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: spacing.lg,
+  },
+  balanceSummaryCard: {
+    flex: 1,
+    borderRadius: 16,
+    padding: spacing.lg,
+    marginHorizontal: spacing.xs,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  balanceSummaryIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  balanceSummaryLabel: {
+    fontSize: 12,
+    marginBottom: spacing.xs,
+  },
+  balanceSummaryAmount: {
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+
+  // Settlement Modal Styles
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  settlementModalContent: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  settlementModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.lg,
+    borderBottomWidth: 1,
+  },
+  settlementModalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    flex: 1,
+  },
+  closeButton: {
+    padding: spacing.xs,
+  },
+  settlementUserInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.lg,
+  },
+  settlementUserAvatar: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    marginRight: spacing.lg,
+  },
+  settlementUserAvatarPlaceholder: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: spacing.lg,
+  },
+  settlementUserAvatarText: {
+    color: 'white',
+    fontSize: 24,
+    fontWeight: 'bold',
+  },
+  settlementUserDetails: {
+    flex: 1,
+  },
+  settlementUserName: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: spacing.sm,
+  },
+  settlementBalanceBadge: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: 16,
+    alignSelf: 'flex-start',
+  },
+  settlementBalanceText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  settlementInstructions: {
+    padding: spacing.lg,
+  },
+  settlementInstructionsTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: spacing.md,
+  },
+  settlementCard: {
+    padding: spacing.lg,
+    borderRadius: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  settlementCardIcon: {
+    marginRight: spacing.md,
+  },
+  settlementCardText: {
+    fontSize: 16,
+    flex: 1,
+  },
+  settlementNote: {
+    fontSize: 14,
+    fontStyle: 'italic',
+    marginTop: spacing.sm,
+  },
+  settlementActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    padding: spacing.lg,
+    paddingTop: 0,
+  },
+  settlementActionButton: {
+    flex: 1,
+    paddingVertical: spacing.md,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginHorizontal: spacing.xs,
+  },
+  settlementActionButtonText: {
+    color: 'white',
+    fontWeight: '600',
+    fontSize: 16,
+  },
+
   // Header gradient
   headerGradient: {
     position: 'absolute',
