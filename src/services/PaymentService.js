@@ -1,5 +1,5 @@
 import { collection, addDoc, getDocs, query, where, doc, getDoc, updateDoc, orderBy } from 'firebase/firestore';
-import { db } from '../config/firebase';
+import { getFirestoreDb, isFirebaseInitialized } from '../config/firebase';
 import ExpenseService from './ExpenseService';
 import GroupBalanceService from './GroupBalanceService';
 
@@ -14,6 +14,17 @@ class PaymentService {
    */
   static async createPayment(paymentData) {
     try {
+      if (!isFirebaseInitialized()) {
+        console.error('Firebase is not initialized. Cannot create payment.');
+        throw new Error('Firebase is not initialized');
+      }
+
+      const db = getFirestoreDb();
+      if (!db) {
+        console.error('Failed to get Firestore instance');
+        throw new Error('Failed to get Firestore instance');
+      }
+
       // Add the payment to Firestore
       const docRef = await addDoc(collection(db, 'Payments'), {
         ...paymentData,
@@ -37,6 +48,17 @@ class PaymentService {
    */
   static async getPaymentsByGroupId(groupId) {
     try {
+      if (!isFirebaseInitialized()) {
+        console.error('Firebase is not initialized. Cannot get payments for group.');
+        throw new Error('Firebase is not initialized');
+      }
+
+      const db = getFirestoreDb();
+      if (!db) {
+        console.error('Failed to get Firestore instance');
+        throw new Error('Failed to get Firestore instance');
+      }
+
       // Query payments for the group
       const q = query(
         collection(db, 'Payments'),
@@ -71,6 +93,17 @@ class PaymentService {
    */
   static async updatePaymentStatus(paymentId, status) {
     try {
+      if (!isFirebaseInitialized()) {
+        console.error('Firebase is not initialized. Cannot update payment status.');
+        throw new Error('Firebase is not initialized');
+      }
+
+      const db = getFirestoreDb();
+      if (!db) {
+        console.error('Failed to get Firestore instance');
+        throw new Error('Failed to get Firestore instance');
+      }
+
       // Check if payment exists in Firestore
       const paymentDoc = await getDoc(doc(db, 'Payments', paymentId));
 
@@ -139,6 +172,17 @@ class PaymentService {
   static async generatePaymentRecords(groupId, currentUserProfile) {
     try {
       if (!groupId || !currentUserProfile) {
+        return [];
+      }
+
+      if (!isFirebaseInitialized()) {
+        console.error('Firebase is not initialized. Cannot generate payment records.');
+        return [];
+      }
+
+      const db = getFirestoreDb();
+      if (!db) {
+        console.error('Failed to get Firestore instance');
         return [];
       }
 
@@ -254,6 +298,17 @@ class PaymentService {
         return [];
       }
 
+      if (!isFirebaseInitialized()) {
+        console.error('Firebase is not initialized. Cannot get split payments for group.');
+        return [];
+      }
+
+      const db = getFirestoreDb();
+      if (!db) {
+        console.error('Failed to get Firestore instance');
+        return [];
+      }
+
       // Query split payments for the group
       const q = query(
         collection(db, 'SplitPayments'),
@@ -285,6 +340,17 @@ class PaymentService {
   static async getSplitPaymentsByExpenseId(expenseId) {
     try {
       if (!expenseId) {
+        return [];
+      }
+
+      if (!isFirebaseInitialized()) {
+        console.error('Firebase is not initialized. Cannot get split payments for expense.');
+        return [];
+      }
+
+      const db = getFirestoreDb();
+      if (!db) {
+        console.error('Failed to get Firestore instance');
         return [];
       }
 
@@ -324,6 +390,17 @@ class PaymentService {
         return [];
       }
 
+      if (!isFirebaseInitialized()) {
+        console.error('Firebase is not initialized. Cannot get split payments for user in group.');
+        return [];
+      }
+
+      const db = getFirestoreDb();
+      if (!db) {
+        console.error('Failed to get Firestore instance');
+        return [];
+      }
+
       // Determine which field to query based on role
       const fieldName = role === 'payer' ? 'toUser' : 'fromUser';
 
@@ -360,6 +437,17 @@ class PaymentService {
   static async updateSplitPaymentStatus(splitPaymentId, status) {
     try {
       if (!splitPaymentId) {
+        return false;
+      }
+
+      if (!isFirebaseInitialized()) {
+        console.error('Firebase is not initialized. Cannot update split payment status.');
+        return false;
+      }
+
+      const db = getFirestoreDb();
+      if (!db) {
+        console.error('Failed to get Firestore instance');
         return false;
       }
 
@@ -414,6 +502,17 @@ class PaymentService {
         return false;
       }
 
+      if (!isFirebaseInitialized()) {
+        console.error('Firebase is not initialized. Cannot update split payment status for user in expense.');
+        return false;
+      }
+
+      const db = getFirestoreDb();
+      if (!db) {
+        console.error('Failed to get Firestore instance');
+        return false;
+      }
+
       // Get all split payments for this expense where the user is the payer
       const q = query(
         collection(db, 'SplitPayments'),
@@ -456,6 +555,17 @@ class PaymentService {
     try {
       if (!groupId || !fromUserId || !toUserId || !amount) {
         console.error('Missing required parameters for markCustomAmountAsReceived');
+        return false;
+      }
+
+      if (!isFirebaseInitialized()) {
+        console.error('Firebase is not initialized. Cannot mark custom amount as received.');
+        return false;
+      }
+
+      const db = getFirestoreDb();
+      if (!db) {
+        console.error('Failed to get Firestore instance');
         return false;
       }
 

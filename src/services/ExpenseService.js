@@ -1,5 +1,5 @@
 import { collection, addDoc, getDocs, query, where, doc, getDoc, updateDoc, arrayUnion, arrayRemove, setDoc } from 'firebase/firestore';
-import { db } from '../config/firebase';
+import { getFirestoreDb, isFirebaseInitialized } from '../config/firebase';
 import GroupBalanceService from './GroupBalanceService';
 
 /**
@@ -14,6 +14,17 @@ class ExpenseService {
   static async createExpense(expenseData) {
     try {
       console.log('ExpenseService - Creating expense with data:', expenseData);
+
+      if (!isFirebaseInitialized()) {
+        console.error('Firebase is not initialized. Cannot create expense.');
+        throw new Error('Firebase is not initialized');
+      }
+
+      const db = getFirestoreDb();
+      if (!db) {
+        console.error('Failed to get Firestore instance');
+        throw new Error('Failed to get Firestore instance');
+      }
 
       // Add the expense to Firestore
       const docRef = await addDoc(collection(db, 'Expenses'), {
@@ -52,6 +63,17 @@ class ExpenseService {
    */
   static async getExpensesByGroupId(groupId) {
     try {
+      if (!isFirebaseInitialized()) {
+        console.error('Firebase is not initialized. Cannot get expenses for group.');
+        throw new Error('Firebase is not initialized');
+      }
+
+      const db = getFirestoreDb();
+      if (!db) {
+        console.error('Failed to get Firestore instance');
+        throw new Error('Failed to get Firestore instance');
+      }
+
       // Query expenses for the group
       const q = query(
         collection(db, 'Expenses'),
@@ -168,6 +190,17 @@ class ExpenseService {
     try {
       if (!expenseId || !expenseData || !expenseData.participants || !expenseData.amount) {
         console.error('Missing required data for creating split payment records');
+        return false;
+      }
+
+      if (!isFirebaseInitialized()) {
+        console.error('Firebase is not initialized. Cannot create split payment records.');
+        return false;
+      }
+
+      const db = getFirestoreDb();
+      if (!db) {
+        console.error('Failed to get Firestore instance');
         return false;
       }
 

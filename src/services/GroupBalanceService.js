@@ -11,7 +11,7 @@ import {
   serverTimestamp,
   addDoc
 } from 'firebase/firestore';
-import { db } from '../config/firebase';
+import { getFirestoreDb, isFirebaseInitialized } from '../config/firebase';
 
 /**
  * Service for handling group balance calculations and storage
@@ -41,6 +41,17 @@ class GroupBalanceService {
     try {
       if (!groupId || !userId || !otherUserId) {
         throw new Error('Missing required parameters');
+      }
+
+      if (!isFirebaseInitialized()) {
+        console.error('Firebase is not initialized. Cannot get or create balance record.');
+        throw new Error('Firebase is not initialized');
+      }
+
+      const db = getFirestoreDb();
+      if (!db) {
+        console.error('Failed to get Firestore instance');
+        throw new Error('Failed to get Firestore instance');
       }
 
       const docId = this.getBalanceDocId(groupId, userId, otherUserId);
@@ -96,6 +107,17 @@ class GroupBalanceService {
 
       // Get or create balance records for both users
       await this.getOrCreateBalanceRecord(groupId, fromUserId, toUserId);
+
+      if (!isFirebaseInitialized()) {
+        console.error('Firebase is not initialized. Cannot update balance.');
+        return false;
+      }
+
+      const db = getFirestoreDb();
+      if (!db) {
+        console.error('Failed to get Firestore instance');
+        return false;
+      }
 
       const docId = this.getBalanceDocId(groupId, fromUserId, toUserId);
       const docRef = doc(db, 'GroupUserBalances', docId);
@@ -155,6 +177,17 @@ class GroupBalanceService {
 
       console.log('GroupBalanceService - Fetching balance records for:', { groupId, userId });
 
+      if (!isFirebaseInitialized()) {
+        console.error('Firebase is not initialized. Cannot get balance records for user in group.');
+        return [];
+      }
+
+      const db = getFirestoreDb();
+      if (!db) {
+        console.error('Failed to get Firestore instance');
+        return [];
+      }
+
       // The issue might be with the query - we need to find records where the user is either
       // the userId or otherUserId. Let's modify the query to find all records related to this user.
 
@@ -199,6 +232,17 @@ class GroupBalanceService {
         return [];
       }
 
+      if (!isFirebaseInitialized()) {
+        console.error('Firebase is not initialized. Cannot get balance records for group.');
+        return [];
+      }
+
+      const db = getFirestoreDb();
+      if (!db) {
+        console.error('Failed to get Firestore instance');
+        return [];
+      }
+
       // Query balance records for the group
       const q = query(
         collection(db, 'GroupUserBalances'),
@@ -232,6 +276,17 @@ class GroupBalanceService {
   static async getBalanceBetweenUsers(groupId, userId1, userId2) {
     try {
       if (!groupId || !userId1 || !userId2) {
+        return null;
+      }
+
+      if (!isFirebaseInitialized()) {
+        console.error('Firebase is not initialized. Cannot get balance between users.');
+        return null;
+      }
+
+      const db = getFirestoreDb();
+      if (!db) {
+        console.error('Failed to get Firestore instance');
         return null;
       }
 

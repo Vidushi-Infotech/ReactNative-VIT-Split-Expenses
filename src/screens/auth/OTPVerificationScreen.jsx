@@ -7,7 +7,7 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import Animated, { FadeInUp } from 'react-native-reanimated';
 import { spacing, fontSizes, borderRadius } from '../../theme/theme';
 import { collection, getDocs, query, where, setDoc, doc } from 'firebase/firestore';
-import { db } from '../../config/firebase';
+import { getFirestoreDb, isFirebaseInitialized } from '../../config/firebase';
 import { extractCountryCodeAndNumber } from '../../utils/phoneUtils';
 
 const OTPVerificationScreen = ({ navigation, route }) => {
@@ -91,6 +91,17 @@ const OTPVerificationScreen = ({ navigation, route }) => {
           // Extract country code and phone number using the utility function
           // This will correctly identify country codes like "+91" for India
           const { countryCode, phoneNumber: phoneNumberOnly } = extractCountryCodeAndNumber(phoneNumber);
+
+          if (!isFirebaseInitialized()) {
+            console.error('Firebase is not initialized. Cannot check if phone number exists.');
+            throw new Error('Firebase is not initialized');
+          }
+
+          const db = getFirestoreDb();
+          if (!db) {
+            console.error('Failed to get Firestore instance');
+            throw new Error('Failed to get Firestore instance');
+          }
 
           // Check if the phone number already exists in Firestore
           const usersRef = collection(db, 'Users');

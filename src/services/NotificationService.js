@@ -1,6 +1,6 @@
 import { Platform, PermissionsAndroid } from 'react-native';
 import { collection, addDoc, query, where, getDocs, orderBy, limit, updateDoc, doc, Timestamp, serverTimestamp, writeBatch } from 'firebase/firestore';
-import { db } from '../config/firebase';
+import { getFirestoreDb, isFirebaseInitialized as isFirebaseInitializedFunc } from '../config/firebase';
 import { getApp } from '@react-native-firebase/app';
 
 // Conditionally import Firebase modules
@@ -172,6 +172,17 @@ class NotificationService {
     try {
       if (!userId || !token) return false;
 
+      if (!isFirebaseInitializedFunc()) {
+        console.error('Firebase is not initialized. Cannot save FCM token.');
+        return false;
+      }
+
+      const db = getFirestoreDb();
+      if (!db) {
+        console.error('Failed to get Firestore instance');
+        return false;
+      }
+
       // Check if token already exists
       const tokensRef = collection(db, 'UserTokens');
       const q = query(tokensRef, where('userId', '==', userId), where('token', '==', token));
@@ -248,6 +259,17 @@ class NotificationService {
     try {
       if (!userId) return [];
 
+      if (!isFirebaseInitializedFunc()) {
+        console.error('Firebase is not initialized. Cannot get notifications.');
+        return [];
+      }
+
+      const db = getFirestoreDb();
+      if (!db) {
+        console.error('Failed to get Firestore instance');
+        return [];
+      }
+
       const notificationsRef = collection(db, 'Notifications');
       let notifications = [];
 
@@ -323,6 +345,17 @@ class NotificationService {
     try {
       if (!notificationId) return false;
 
+      if (!isFirebaseInitializedFunc()) {
+        console.error('Firebase is not initialized. Cannot mark notification as read.');
+        return false;
+      }
+
+      const db = getFirestoreDb();
+      if (!db) {
+        console.error('Failed to get Firestore instance');
+        return false;
+      }
+
       const notificationRef = doc(db, 'Notifications', notificationId);
       await updateDoc(notificationRef, {
         read: true,
@@ -344,6 +377,17 @@ class NotificationService {
   static async markAllAsRead(userId) {
     try {
       if (!userId) return false;
+
+      if (!isFirebaseInitializedFunc()) {
+        console.error('Firebase is not initialized. Cannot mark all notifications as read.');
+        return false;
+      }
+
+      const db = getFirestoreDb();
+      if (!db) {
+        console.error('Failed to get Firestore instance');
+        return false;
+      }
 
       // Try with the compound query first (may require index)
       try {
@@ -423,6 +467,17 @@ class NotificationService {
     try {
       if (!notification || !notification.userId) return null;
 
+      if (!isFirebaseInitializedFunc()) {
+        console.error('Firebase is not initialized. Cannot create notification.');
+        return null;
+      }
+
+      const db = getFirestoreDb();
+      if (!db) {
+        console.error('Failed to get Firestore instance');
+        return null;
+      }
+
       const notificationData = {
         ...notification,
         read: false,
@@ -446,6 +501,17 @@ class NotificationService {
   static async getUnreadCount(userId) {
     try {
       if (!userId) return 0;
+
+      if (!isFirebaseInitializedFunc()) {
+        console.error('Firebase is not initialized. Cannot get unread count.');
+        return 0;
+      }
+
+      const db = getFirestoreDb();
+      if (!db) {
+        console.error('Failed to get Firestore instance');
+        return 0;
+      }
 
       const notificationsRef = collection(db, 'Notifications');
 

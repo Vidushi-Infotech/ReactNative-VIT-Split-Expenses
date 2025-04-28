@@ -6,7 +6,7 @@ import { spacing, fontSizes } from '../../../theme/theme.js';
 import PaymentService from '../../../services/PaymentService';
 import NotificationService from '../../../services/NotificationService';
 import { getDoc, doc } from 'firebase/firestore';
-import { db } from '../../../config/firebase';
+import { getFirestoreDb, isFirebaseInitialized } from '../../../config/firebase';
 
 // Helper function to get icon name based on expense category
 const getCategoryIcon = (category) => {
@@ -94,6 +94,17 @@ const PaymentSummary = ({
     // Fetch all expense details in one go
     const expenseDetails = {};
     try {
+      if (!isFirebaseInitialized()) {
+        console.error('Firebase is not initialized. Cannot fetch expense details.');
+        throw new Error('Firebase is not initialized');
+      }
+
+      const db = getFirestoreDb();
+      if (!db) {
+        console.error('Failed to get Firestore instance');
+        throw new Error('Failed to get Firestore instance');
+      }
+
       for (const expenseId of expenseIds) {
         const expenseDoc = await getDoc(doc(db, 'Expenses', expenseId));
         if (expenseDoc.exists()) {
