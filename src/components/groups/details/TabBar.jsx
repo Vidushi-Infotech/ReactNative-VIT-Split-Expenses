@@ -85,7 +85,7 @@ const TabBar = ({ tabs, activeTab, tabIndicatorPosition, handleTabChange }) => {
             styles.tabIndicator,
             {
               backgroundColor: themeColors.primary.default,
-              width: SCREEN_WIDTH / 3,
+              width: SCREEN_WIDTH / 2,
               height: 3
             },
             tabIndicatorStyle

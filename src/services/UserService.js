@@ -12,41 +12,60 @@ class UserService {
    */
   static async getUserByPhoneNumber(phoneNumber) {
     try {
+      console.log('UserService: getUserByPhoneNumber called with:', phoneNumber);
+
       if (!isFirebaseInitialized()) {
-        console.error('Firebase is not initialized. Cannot get user by phone number.');
+        console.error('UserService: Firebase is not initialized. Cannot get user by phone number.');
         return null;
       }
 
       const db = getFirestoreDb();
       if (!db) {
-        console.error('Failed to get Firestore instance');
+        console.error('UserService: Failed to get Firestore instance');
         return null;
       }
 
       // Clean the phone number (remove any non-digit characters)
       const cleanPhoneNumber = phoneNumber.replace(/\D/g, '');
+      console.log('UserService: Cleaned phone number:', cleanPhoneNumber);
 
       // Query Firestore to check if the phone number exists
+      console.log('UserService: Querying Firestore for phone number:', cleanPhoneNumber);
       const q = query(
         collection(db, 'Users'),
         where('phoneNumber', '==', cleanPhoneNumber)
       );
 
       const querySnapshot = await getDocs(q);
+      console.log('UserService: Query snapshot empty?', querySnapshot.empty);
 
       if (!querySnapshot.empty) {
         // User exists, return the user data
         const userData = querySnapshot.docs[0].data();
+        console.log('UserService: User found:', userData);
         return {
           id: querySnapshot.docs[0].id,
           ...userData,
         };
       }
 
+      // For testing purposes, let's create a mock user if we're in development mode
+      // This is just for testing the alert dialog
+      if (__DEV__ && cleanPhoneNumber === '1234567890') {
+        console.log('UserService: Creating mock user for testing');
+        return {
+          id: 'mock-user-id',
+          phoneNumber: cleanPhoneNumber,
+          name: 'Test User',
+          email: 'test@example.com'
+        };
+      }
+
+      console.log('UserService: User not found');
       // User not found
       return null;
     } catch (error) {
-      console.error('Error getting user by phone number:', error);
+      console.error('UserService: Error getting user by phone number:', error);
       return null; // Return null instead of throwing to prevent app crashes
     }
   }
@@ -180,6 +199,56 @@ class UserService {
       return users;
     } catch (error) {
       console.error('Error getting all users:', error);
+      return []; // Return empty array instead of throwing to prevent app crashes
+    }
+  }
+
+  /**
+   * Get users who have used a specific referral code
+   * @param {string} referralCode - The referral code to search for
+   * @returns {Promise<Array>} - Array of users who used the referral code
+   */
+  static async getUsersByReferralCode(referralCode) {
+    try {
+      console.log('UserService: getUsersByReferralCode called with:', referralCode);
+
+      if (!referralCode) {
+        console.error('UserService: No referral code provided');
+        return [];
+      }
+
+      if (!isFirebaseInitialized()) {
+        console.error('UserService: Firebase is not initialized. Cannot get users by referral code.');
+        return [];
+      }
+
+      const db = getFirestoreDb();
+      if (!db) {
+        console.error('UserService: Failed to get Firestore instance');
+        return [];
+      }
+
+      // Query Firestore to find users who used this referral code
+      console.log('UserService: Querying Firestore for users with referral code:', referralCode);
+      const q = query(
+        collection(db, 'Users'),
+        where('usedReferralCode', '==', referralCode)
+      );
+
+      const querySnapshot = await getDocs(q);
+      console.log('UserService: Found', querySnapshot.size, 'users with this referral code');
+
+      const users = [];
+      querySnapshot.forEach((document) => {
+        users.push({
+          id: document.id,
+          ...document.data(),
+        });
+      });
+
+      return users;
+    } catch (error) {
+      console.error('UserService: Error getting users by referral code:', error);
       return []; // Return empty array instead of throwing to prevent app crashes
     }
   }

@@ -5,6 +5,7 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 import { useTheme } from '../../../context/ThemeContext.jsx';
 import EmptyState from './EmptyState.jsx';
+import BalanceDetailsModal from './BalanceDetailsModal.jsx';
 import styles from './GroupDetailsStyles';
 
 const StandingTab = ({
@@ -20,6 +21,8 @@ const StandingTab = ({
   const { colors: themeColors, isDarkMode } = useTheme();
   const [selectedUser, setSelectedUser] = useState(null);
   const [settlementModalVisible, setSettlementModalVisible] = useState(false);
+  const [receiveDetailsVisible, setReceiveDetailsVisible] = useState(false);
+  const [payDetailsVisible, setPayDetailsVisible] = useState(false);
 
   // Format date
   const formatDate = (dateString) => {
@@ -42,10 +45,12 @@ const StandingTab = ({
     );
   }
 
-  // Calculate total balances
+  // Calculate total balances and counts
   const calculateTotals = () => {
     let totalToReceive = 0;
     let totalToPay = 0;
+    let receiveCount = 0;
+    let payCount = 0;
 
     // Get the current user's balance
     const currentUserBalance = balances[userProfile?.id] || 0;
@@ -58,28 +63,48 @@ const StandingTab = ({
         if (balance < 0) {
           // Other user owes money to the group, so current user might receive
           totalToReceive += Math.abs(balance);
+          receiveCount++;
         } else if (balance > 0) {
           // Other user is owed money by the group, so current user might pay
           totalToPay += balance;
+          payCount++;
         }
       }
     });
 
+    // Check if payment records indicate completed payments
+    if (paymentRecords && paymentRecords.length > 0) {
+      paymentRecords.forEach(record => {
+        // If payment is marked as completed, adjust the totals
+        if (record.status === 'completed') {
+          if (record.fromUser === userProfile?.id) {
+            // Current user has paid, reduce the totalToPay
+            totalToPay = Math.max(0, totalToPay - record.amount);
+            // Note: We don't adjust payCount here as we still want to show the person in the list
+          } else if (record.toUser === userProfile?.id) {
+            // Current user has received, reduce the totalToReceive
+            totalToReceive = Math.max(0, totalToReceive - record.amount);
+            // Note: We don't adjust receiveCount here as we still want to show the person in the list
+          }
+        }
+      });
+    }
+
     // Adjust based on current user's balance
     if (currentUserBalance > 0) {
       // Current user is owed money by the group
-      totalToReceive = currentUserBalance;
-      totalToPay = 0;
+      // We keep the calculated totalToPay, but adjust totalToReceive
+      totalToReceive = Math.max(totalToReceive, currentUserBalance);
     } else if (currentUserBalance < 0) {
       // Current user owes money to the group
-      totalToReceive = 0;
-      totalToPay = Math.abs(currentUserBalance);
+      // We keep the calculated totalToReceive, but adjust totalToPay
+      totalToPay = Math.max(totalToPay, Math.abs(currentUserBalance));
     }
 
-    return { totalToReceive, totalToPay };
+    return { totalToReceive, totalToPay, receiveCount, payCount };
   };
 
-  const { totalToReceive, totalToPay } = calculateTotals();
+  const { totalToReceive, totalToPay, receiveCount, payCount } = calculateTotals();
 
   // Handle opening the settlement modal
   const openSettlementModal = (user) => {
@@ -110,35 +135,79 @@ const StandingTab = ({
       >
         {/* Balance Summary Cards */}
         <View style={styles.balanceSummaryContainer}>
-          <Animated.View
-            entering={FadeInDown.delay(100).duration(400)}
-            style={[styles.balanceSummaryCard, { backgroundColor: themeColors.surface }]}
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={() => {
+              // Open the receivable details modal
+              if (totalToReceive > 0) {
+                setReceiveDetailsVisible(true);
+              }
+            }}
           >
-            <View style={[styles.balanceSummaryIconContainer, { backgroundColor: themeColors.success + '20' }]}>
-              <Icon name="arrow-down" size={20} color={themeColors.success} />
-            </View>
-            <Text style={[styles.balanceSummaryLabel, { color: themeColors.textSecondary }]}>
-              To Receive
-            </Text>
-            <Text style={[styles.balanceSummaryAmount, { color: themeColors.success }]}>
-              ₹{totalToReceive.toFixed(2)}
-            </Text>
-          </Animated.View>
+            <Animated.View
+              entering={FadeInDown.delay(100).duration(400)}
+              style={[styles.balanceSummaryCard, { backgroundColor: themeColors.surface }]}
+            >
+              <View style={[styles.balanceSummaryIconContainer, { backgroundColor: themeColors.success + '20' }]}>
+                <Icon name="arrow-down" size={20} color={themeColors.success} />
+              </View>
+              <View style={styles.balanceSummaryContent}>
+                <Text style={[styles.balanceSummaryLabel, { color: themeColors.textSecondary }]}>
+                  To Receive
+                </Text>
+                <Text style={[styles.balanceSummaryAmount, { color: themeColors.success }]}>
+                  ₹{totalToReceive.toFixed(2)}
+                </Text>
+                {totalToReceive > 0 && (
+                  <>
+                    <Text style={[styles.balanceSummaryCount, { color: themeColors.success }]}>
+                      {receiveCount} {receiveCount === 1 ? 'person' : 'people'}
+                    </Text>
+                    <Text style={[styles.balanceSummarySubtext, { color: themeColors.textSecondary }]}>
+                      Tap for details
+                    </Text>
+                  </>
+                )}
+              </View>
+            </Animated.View>
+          </TouchableOpacity>
 
-          <Animated.View
-            entering={FadeInDown.delay(200).duration(400)}
-            style={[styles.balanceSummaryCard, { backgroundColor: themeColors.surface }]}
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={() => {
+              // Open the payable details modal
+              if (totalToPay > 0) {
+                setPayDetailsVisible(true);
+              }
+            }}
           >
-            <View style={[styles.balanceSummaryIconContainer, { backgroundColor: themeColors.danger + '20' }]}>
-              <Icon name="arrow-up" size={20} color={themeColors.danger} />
-            </View>
-            <Text style={[styles.balanceSummaryLabel, { color: themeColors.textSecondary }]}>
-              To Pay
-            </Text>
-            <Text style={[styles.balanceSummaryAmount, { color: themeColors.danger }]}>
-              ₹{totalToPay.toFixed(2)}
-            </Text>
-          </Animated.View>
+            <Animated.View
+              entering={FadeInDown.delay(200).duration(400)}
+              style={[styles.balanceSummaryCard, { backgroundColor: themeColors.surface }]}
+            >
+              <View style={[styles.balanceSummaryIconContainer, { backgroundColor: themeColors.danger + '20' }]}>
+                <Icon name="arrow-up" size={20} color={themeColors.danger} />
+              </View>
+              <View style={styles.balanceSummaryContent}>
+                <Text style={[styles.balanceSummaryLabel, { color: themeColors.textSecondary }]}>
+                  To Pay
+                </Text>
+                <Text style={[styles.balanceSummaryAmount, { color: themeColors.danger }]}>
+                  ₹{totalToPay.toFixed(2)}
+                </Text>
+                {totalToPay > 0 && (
+                  <>
+                    <Text style={[styles.balanceSummaryCount, { color: themeColors.danger }]}>
+                      {payCount} {payCount === 1 ? 'person' : 'people'}
+                    </Text>
+                    <Text style={[styles.balanceSummarySubtext, { color: themeColors.textSecondary }]}>
+                      Tap for details
+                    </Text>
+                  </>
+                )}
+              </View>
+            </Animated.View>
+          </TouchableOpacity>
         </View>
 
         {/* Section Title */}
@@ -452,6 +521,28 @@ const StandingTab = ({
         </Animated.View>
       </View>
     </Modal>
+
+      {/* Receivable Details Modal */}
+      <BalanceDetailsModal
+        visible={receiveDetailsVisible}
+        onClose={() => setReceiveDetailsVisible(false)}
+        title="Receivable Details"
+        balances={balances}
+        userProfile={userProfile}
+        getUserById={getUserById}
+        type="receive"
+      />
+
+      {/* Payable Details Modal */}
+      <BalanceDetailsModal
+        visible={payDetailsVisible}
+        onClose={() => setPayDetailsVisible(false)}
+        title="Payment Due Details"
+        balances={balances}
+        userProfile={userProfile}
+        getUserById={getUserById}
+        type="pay"
+      />
     </View>
   );
 };

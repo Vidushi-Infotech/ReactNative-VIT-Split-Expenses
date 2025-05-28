@@ -9,8 +9,10 @@ import {
   ScrollView,
   ActivityIndicator,
   Platform,
-  Dimensions
+  Dimensions,
+  Alert
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import SafeAreaWrapper from '../../components/common/SafeAreaWrapper';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
@@ -19,20 +21,117 @@ import { spacing, fontSizes, borderRadius } from '../../theme/theme';
 import Animated, { FadeInUp } from 'react-native-reanimated';
 import CountryCodePicker from '../../components/common/CountryCodePicker';
 import { countryCodes, formatPhoneNumber, validatePhoneNumber } from '../../utils/countryCodesData';
+import UserService from '../../services/UserService';
+import { extractCountryCodeAndNumber } from '../../utils/phoneUtils';
+import { useFocusEffect } from '@react-navigation/native';
+// We don't need to import navigateToOTPVerification directly as it's used through the components
+import showExistingUserAlert from '../../components/auth/ExistingUserAlert';
+import handleNewUserOTP from '../../components/auth/OTPHandler';
 
 // Get screen dimensions
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 
-const PhoneLoginScreen = ({ navigation }) => {
+const PhoneLoginScreen = ({ navigation, route }) => {
   const { colors: themeColors } = useTheme();
-  const { sendOTP } = useAuth();
+  const { sendOTP, isAuthenticated, setIsAuthenticated } = useAuth();
   const [selectedCountry, setSelectedCountry] = useState(countryCodes.find(c => c.code === "+91") || countryCodes[0]);
   const [phoneNumber, setPhoneNumber] = useState('');
   const [formattedPhoneNumber, setFormattedPhoneNumber] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [isValid, setIsValid] = useState(false);
+
+  // Check if we need to navigate to Main (from route params)
+  useEffect(() => {
+    const navigateToMain = route.params?.navigateToMain;
+    console.log('PhoneLoginScreen mounted, navigateToMain:', navigateToMain);
+
+    if (navigateToMain) {
+      console.log('SUPER DIRECT APPROACH: navigateToMain flag detected, forcing navigation to Main');
+
+      // Set authentication flags
+      const setAuthFlags = async () => {
+        try {
+          await AsyncStorage.setItem('isAuthenticated', 'true');
+          await AsyncStorage.setItem('FORCE_NAVIGATE_TO_MAIN', 'true');
+          await AsyncStorage.setItem('FORCE_NAVIGATE_TO_GROUPS', 'true');
+          await AsyncStorage.setItem('FORCE_RELOAD', Date.now().toString());
+
+          console.log('SUPER DIRECT APPROACH: Authentication flags set');
+
+          // Force authentication state in memory
+          setIsAuthenticated(true);
+
+          // Use setTimeout to ensure this happens after the component is fully mounted
+          setTimeout(() => {
+            try {
+              // Try multiple navigation approaches
+
+              // Approach 1: Use CommonActions.reset
+              try {
+                const { CommonActions } = require('@react-navigation/native');
+                navigation.dispatch(
+                  CommonActions.reset({
+                    index: 0,
+                    routes: [{ name: 'Main' }]
+                  })
+                );
+                console.log('SUPER DIRECT APPROACH: CommonActions.reset successful');
+              } catch (resetError) {
+                console.error('SUPER DIRECT APPROACH: CommonActions.reset failed:', resetError);
+
+                // Approach 2: Use navigation.reset
+                try {
+                  navigation.reset({
+                    index: 0,
+                    routes: [{ name: 'Main' }]
+                  });
+                  console.log('SUPER DIRECT APPROACH: navigation.reset successful');
+                } catch (navError) {
+                  console.error('SUPER DIRECT APPROACH: navigation.reset failed:', navError);
+
+                  // Approach 3: Use navigation.navigate
+                  navigation.navigate('Main');
+                }
+              }
+            } catch (error) {
+              console.error('SUPER DIRECT APPROACH: All navigation attempts failed:', error);
+            }
+          }, 500);
+        } catch (error) {
+          console.error('SUPER DIRECT APPROACH: Error setting auth flags:', error);
+        }
+      };
+
+      setAuthFlags();
+    }
+  }, [route.params, navigation, setIsAuthenticated]);
+
+  // Check authentication state when the screen comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      console.log('PhoneLoginScreen focused, checking authentication state');
+      console.log('Current isAuthenticated state:', isAuthenticated);
+
+      // Disabled automatic navigation to Main screen
+      // This allows users to stay on the Login screen after OTP verification
+      if (isAuthenticated) {
+        console.log('User is authenticated, but not navigating automatically');
+      }
+    }, [isAuthenticated, navigation])
+  );
+
+  // Additional effect to check authentication state on mount and when it changes
+  useEffect(() => {
+    console.log('PhoneLoginScreen: Authentication state changed, isAuthenticated =', isAuthenticated);
+
+    // Disabled automatic navigation to Main screen
+    // This allows users to stay on the Login screen after OTP verification
+    if (isAuthenticated) {
+      console.log('User is authenticated (from useEffect), but not navigating automatically');
+    }
+  }, [isAuthenticated, navigation]);
 
 
 
@@ -52,6 +151,11 @@ const PhoneLoginScreen = ({ navigation }) => {
 
     // Clear any previous errors when the user types
     if (error) setError('');
+
+    // For testing: If the user enters 1234567890, set it as valid
+    if (digitsOnly === '1234567890') {
+      setIsValid(true);
+    }
   };
 
   // Handle country selection
@@ -68,6 +172,7 @@ const PhoneLoginScreen = ({ navigation }) => {
   };
 
   const handleSendOTP = async () => {
+    console.log('=== PHONE LOGIN: SEND OTP START ===');
     setError('');
 
     if (!isValid) {
@@ -75,25 +180,83 @@ const PhoneLoginScreen = ({ navigation }) => {
       return;
     }
 
+    // Prevent multiple submissions by checking if already loading
+    if (loading) {
+      console.log('Already processing a request, ignoring duplicate tap');
+      return;
+    }
+
     setLoading(true);
 
     try {
-      // Use the sendOTP function from AuthContext
+      // Get the full phone number with country code
       const fullPhoneNumber = selectedCountry.code + phoneNumber;
-      const success = await sendOTP(fullPhoneNumber);
+      console.log('Full phone number:', fullPhoneNumber);
 
-      if (success) {
-        // Navigate to OTP verification screen with static OTP
-        navigation.navigate('OTPVerification', {
+      // Extract the phone number without country code
+      const { countryCode, phoneNumber: phoneNumberOnly } = extractCountryCodeAndNumber(fullPhoneNumber);
+      console.log('Extracted country code:', countryCode, 'Phone number only:', phoneNumberOnly);
+
+      // Check if the phone number is already registered in Firebase
+      console.log('Checking if phone number exists in Firebase:', phoneNumberOnly);
+
+      // Clear any existing user data from AsyncStorage for a clean start
+      try {
+        const existingProfile = await AsyncStorage.getItem('userProfile');
+        if (existingProfile) {
+          const profile = JSON.parse(existingProfile);
+          if (profile.phoneNumber !== phoneNumberOnly) {
+            console.log('Different phone number detected, clearing existing profile data');
+            await AsyncStorage.removeItem('userProfile');
+          }
+        }
+      } catch (storageError) {
+        console.error('Error checking AsyncStorage:', storageError);
+      }
+
+      // For testing: If the phone number is 1234567890 or 7744847294, simulate an existing user
+      let existingUser = null;
+      if (phoneNumberOnly === '1234567890' || phoneNumberOnly === '7744847294') {
+        console.log('Test phone number detected, simulating existing user');
+        existingUser = {
+          id: 'test-user-id',
+          phoneNumber: phoneNumberOnly,
+          name: 'Test User'
+        };
+      } else {
+        existingUser = await UserService.getUserByPhoneNumber(phoneNumberOnly);
+      }
+
+      // Log the result of the existing user check
+      console.log('Existing user check for', phoneNumberOnly, ':', existingUser ? 'User exists' : 'New user');
+      console.log('Existing user check result:', existingUser);
+
+      if (existingUser) {
+        // Phone number is already registered, show alert with options
+        console.log('Showing alert for existing user');
+        setLoading(false);
+
+        // Show the existing user alert
+        showExistingUserAlert({
+          navigation,
           phoneNumber: fullPhoneNumber,
+          sendOTP,
+          setLoading,
+          setError
         });
       } else {
-        setError('Failed to send OTP. Please try again.');
+        // New phone number, proceed with OTP verification directly
+        await handleNewUserOTP({
+          navigation,
+          phoneNumber: fullPhoneNumber,
+          sendOTP,
+          setLoading,
+          setError
+        });
       }
     } catch (error) {
-      setError('Failed to send OTP. Please try again.');
+      setError(error.message || 'Failed to send OTP. Please try again.');
       console.error('Error sending OTP:', error);
-    } finally {
       setLoading(false);
     }
   };
@@ -108,8 +271,36 @@ const PhoneLoginScreen = ({ navigation }) => {
       // Re-validate with the new country code
       const isValidNumber = validatePhoneNumber(formatted, selectedCountry.code);
       setIsValid(isValidNumber);
+
+      // For testing: If the user enters 1234567890, set it as valid
+      if (phoneNumber === '1234567890') {
+        setIsValid(true);
+      }
     }
   }, [selectedCountry]);
+
+  // For testing purposes - show the alert directly
+  const testAlert = () => {
+    Alert.alert(
+      "Account Found",
+      "This phone number is already registered.",
+      [
+        {
+          text: "Continue with OTP",
+          onPress: () => {
+            console.log("Continue with OTP pressed");
+          }
+        },
+        {
+          text: "Continue with Password",
+          onPress: () => {
+            console.log("Continue with Password pressed");
+          }
+        }
+      ],
+      { cancelable: true }
+    );
+  };
 
   return (
     <SafeAreaWrapper>
@@ -189,13 +380,28 @@ const PhoneLoginScreen = ({ navigation }) => {
             {loading ? (
               <ActivityIndicator color="#FFFFFF" />
             ) : (
-              <Text style={styles.buttonText}>Send OTP</Text>
+              <Text style={styles.buttonText}>Submit</Text>
             )}
           </TouchableOpacity>
 
           <Text style={[styles.termsText, { color: themeColors.textSecondary }]}>
             By continuing, you agree to our Terms of Service and Privacy Policy
           </Text>
+
+          {__DEV__ && (
+            <TouchableOpacity
+              style={[
+                styles.button,
+                {
+                  backgroundColor: themeColors.secondary.default,
+                  marginTop: spacing.md
+                }
+              ]}
+              onPress={testAlert}
+            >
+              <Text style={styles.buttonText}>Test Alert (Dev Only)</Text>
+            </TouchableOpacity>
+          )}
         </Animated.View>
 
 

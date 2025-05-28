@@ -5,6 +5,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import GroupService from '../../services/GroupService';
 import SafeAreaWrapper from '../../components/common/SafeAreaWrapper';
+import GroupsStatistics from '../../components/groups/GroupsStatistics';
 import Animated, { FadeInDown, FadeInRight, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { getColorWithOpacity, shadows } from '../../theme/theme';
 
@@ -96,9 +97,20 @@ const GroupsScreen = ({ navigation }) => {
           <View style={styles.groupImageContainer}>
             <Image source={{ uri: item.image }} style={styles.groupImage} />
             <View style={[styles.groupImageOverlay, { backgroundColor: getColorWithOpacity(themeColors.primary.default, 0.3) }]} />
-            <View style={styles.groupMembersCount}>
-              <Icon name="people" size={12} color={themeColors.white} />
-              <Text style={styles.groupMembersCountText}>{item.members.length}</Text>
+            <View style={styles.groupCountsContainer}>
+              <View style={styles.groupMembersCount}>
+                <Icon name="person" size={12} color={themeColors.white} />
+                <Text style={styles.groupMembersCountText}>{item.members.length}</Text>
+              </View>
+
+              {item.groupMetadata && item.groupMetadata.type === 'group' && (
+                <View style={styles.groupCount}>
+                  <Icon name="people" size={12} color={themeColors.white} />
+                  <Text style={styles.groupMembersCountText}>
+                    {item.groupMetadata.groups ? item.groupMetadata.groups.length : 0}
+                  </Text>
+                </View>
+              )}
             </View>
           </View>
 
@@ -195,6 +207,12 @@ const GroupsScreen = ({ navigation }) => {
           </View>
         ) : (
           <>
+            {/* Statistics Component */}
+            <GroupsStatistics
+              groups={groups}
+              onRefresh={handleRefresh}
+            />
+
             <FlatList
               data={filteredGroups}
               renderItem={renderGroupItem}
@@ -326,10 +344,23 @@ const styles = StyleSheet.create({
     bottom: 0,
     opacity: 0.2,
   },
-  groupMembersCount: {
+  groupCountsContainer: {
     position: 'absolute',
     bottom: 4,
     right: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  groupMembersCount: {
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 4,
+  },
+  groupCount: {
     backgroundColor: 'rgba(0,0,0,0.6)',
     borderRadius: 10,
     paddingHorizontal: 6,

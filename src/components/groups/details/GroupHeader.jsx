@@ -156,9 +156,16 @@ const GroupHeader = ({ group, totalExpenses, expenseCount, getUserById, scrollY 
               size="sm"
             />
             <View style={styles.membersTextContainer}>
-              <Text style={[styles.membersText, { color: themeColors.textSecondary }]}>
-                {group.members.length} members
-              </Text>
+              <View style={styles.membersTextRow}>
+                <Text style={[styles.membersText, { color: themeColors.textSecondary }]}>
+                  {group.members.length} members
+                </Text>
+                {group.groupMetadata && group.groupMetadata.type === 'group' && group.groupMetadata.groups && group.groupMetadata.groups.length > 0 && (
+                  <Text style={[styles.groupsText, { color: themeColors.textSecondary }]}>
+                    • {group.groupMetadata.groups.length} groups
+                  </Text>
+                )}
+              </View>
               <Icon
                 name="chevron-forward"
                 size={16}

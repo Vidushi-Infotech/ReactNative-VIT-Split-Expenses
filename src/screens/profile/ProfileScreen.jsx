@@ -21,19 +21,47 @@ const ProfileScreen = () => {
   const [showEditProfileSheet, setShowEditProfileSheet] = useState(false);
 
   // Profile edit states
-  const [editName, setEditName] = useState('');
+  const [editFirstName, setEditFirstName] = useState('');
+  const [editLastName, setEditLastName] = useState('');
   const [editUsername, setEditUsername] = useState('');
+  const [editEmail, setEditEmail] = useState('');
+  const [editAddress, setEditAddress] = useState('');
+  // Location field is removed
+  const [editAltPhoneNumber, setEditAltPhoneNumber] = useState('');
   const [editProfileImage, setEditProfileImage] = useState(null);
   const [isUpdating, setIsUpdating] = useState(false);
   const [updateError, setUpdateError] = useState('');
 
+  // Field validation states
+  const [firstNameError, setFirstNameError] = useState(false);
+  const [emailError, setEmailError] = useState(false);
+  const [altPhoneNumberError, setAltPhoneNumberError] = useState(false);
+
   // Initialize edit form with current user data when bottom sheet opens
   useEffect(() => {
     if (showEditProfileSheet && userProfile) {
-      setEditName(userProfile.name || '');
+      // Split the name into first and last name if available
+      if (userProfile.name) {
+        const nameParts = userProfile.name.split(' ');
+        setEditFirstName(nameParts[0] || '');
+        setEditLastName(nameParts.slice(1).join(' ') || '');
+      } else {
+        setEditFirstName('');
+        setEditLastName('');
+      }
+
       setEditUsername(userProfile.username || '');
+      setEditEmail(userProfile.email || '');
+      setEditAddress(userProfile.address || '');
+      // Location field is removed
+      setEditAltPhoneNumber(userProfile.altPhoneNumber || '');
       setEditProfileImage(userProfile.avatar || null);
+
+      // Reset all error states
       setUpdateError('');
+      setFirstNameError(false);
+      setEmailError(false);
+      setAltPhoneNumberError(false);
     }
   }, [showEditProfileSheet, userProfile]);
 
@@ -173,10 +201,45 @@ const ProfileScreen = () => {
     }
   };
 
+  // Email validation regex
+  const isValidEmail = (email) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return !email || emailRegex.test(email);
+  };
+
+  // Phone number validation
+  const isValidPhoneNumber = (phone) => {
+    // Basic phone number validation - allows various formats
+    const phoneRegex = /^[+]?[(]?[0-9]{1,4}[)]?[-\s.]?[0-9]{1,4}[-\s.]?[0-9]{1,9}$/;
+    return !phone || phoneRegex.test(phone);
+  };
+
   // Handle profile update
   const handleUpdateProfile = async () => {
-    if (!editName.trim()) {
-      setUpdateError('Please enter your name');
+    // Reset all validation errors
+    setFirstNameError(false);
+    setEmailError(false);
+    setAltPhoneNumberError(false);
+    setUpdateError('');
+
+    // Validate first name
+    if (!editFirstName.trim()) {
+      setFirstNameError(true);
+      setUpdateError('Please enter your first name');
+      return;
+    }
+
+    // Validate email format if provided
+    if (editEmail.trim() && !isValidEmail(editEmail.trim())) {
+      setEmailError(true);
+      setUpdateError('Please enter a valid email address');
+      return;
+    }
+
+    // Validate alternate phone number if provided
+    if (editAltPhoneNumber.trim() && !isValidPhoneNumber(editAltPhoneNumber.trim())) {
+      setAltPhoneNumberError(true);
+      setUpdateError('Please enter a valid alternate phone number');
       return;
     }
 
@@ -184,10 +247,17 @@ const ProfileScreen = () => {
     setUpdateError('');
 
     try {
+      // Combine first and last name
+      const fullName = `${editFirstName.trim()} ${editLastName.trim()}`.trim();
+
       // Prepare profile data
       const profileData = {
-        name: editName.trim(),
+        name: fullName,
         username: editUsername.trim() || undefined,
+        email: editEmail.trim() || undefined,
+        address: editAddress.trim() || undefined,
+        // Location field is removed from the profile
+        altPhoneNumber: editAltPhoneNumber.trim() || undefined,
         avatar: editProfileImage,
       };
 
@@ -248,12 +318,18 @@ const ProfileScreen = () => {
           )}
 
           <Text style={[styles.name, { color: themeColors.text }]}>{userProfile?.name || 'User'}</Text>
+
           {userProfile?.username && (
             <Text style={[styles.username, { color: themeColors.textSecondary }]}>@{userProfile.username}</Text>
           )}
-          {userProfile?.phoneNumber && (
-            <Text style={[styles.phoneNumber, { color: themeColors.textSecondary }]}>{userProfile.phoneNumber}</Text>
+
+          {userProfile?.email && (
+            <Text style={[styles.profileDetail, { color: themeColors.textSecondary }]}>
+              <Icon name="mail-outline" size={14} color={themeColors.textSecondary} /> {userProfile.email}
+            </Text>
           )}
+
+          {/* Phone number, alternate phone number, address, and location are hidden from profile display */}
 
           <TouchableOpacity
             style={[styles.editButton, { backgroundColor: getColorWithOpacity(themeColors.primary.default, 0.1) }]}
@@ -295,9 +371,33 @@ const ProfileScreen = () => {
         )}
 
         {renderSettingItem(
+          'card-outline',
+          'Payment',
+          'UPI Integration',
+          null,
+          () => navigation.navigate('Payment')
+        )}
+
+        {renderSettingItem(
           'notifications-outline',
           'Notifications',
           'Manage notification settings'
+        )}
+
+        {renderSettingItem(
+          'key-outline',
+          'Password',
+          'Set or change your password',
+          null,
+          () => navigation.navigate('Password')
+        )}
+
+        {renderSettingItem(
+          'gift-outline',
+          'Referral System',
+          'Invite friends and earn rewards',
+          null,
+          () => navigation.navigate('Referral')
         )}
 
         {renderSettingItem(
@@ -513,17 +613,40 @@ const ProfileScreen = () => {
                 </View>
               </TouchableOpacity>
 
-              <Text style={[styles.inputLabel, { color: themeColors.text }]}>Name</Text>
+              <Text style={[styles.inputLabel, { color: themeColors.text }]}>First Name*</Text>
+              <TextInput
+                style={[styles.input, {
+                  backgroundColor: themeColors.background,
+                  color: themeColors.text,
+                  borderColor: firstNameError ? themeColors.danger : themeColors.border
+                }]}
+                placeholder="Enter your first name"
+                placeholderTextColor={themeColors.textSecondary}
+                value={editFirstName}
+                onChangeText={(text) => {
+                  setEditFirstName(text);
+                  if (text.trim()) {
+                    setFirstNameError(false);
+                  }
+                }}
+              />
+              {firstNameError && (
+                <Text style={[styles.fieldErrorText, { color: themeColors.danger }]}>
+                  First name is required
+                </Text>
+              )}
+
+              <Text style={[styles.inputLabel, { color: themeColors.text }]}>Last Name</Text>
               <TextInput
                 style={[styles.input, {
                   backgroundColor: themeColors.background,
                   color: themeColors.text,
                   borderColor: themeColors.border
                 }]}
-                placeholder="Enter your name"
+                placeholder="Enter your last name"
                 placeholderTextColor={themeColors.textSecondary}
-                value={editName}
-                onChangeText={setEditName}
+                value={editLastName}
+                onChangeText={setEditLastName}
               />
 
               <Text style={[styles.inputLabel, { color: themeColors.text }]}>Username</Text>
@@ -538,6 +661,73 @@ const ProfileScreen = () => {
                 value={editUsername}
                 onChangeText={setEditUsername}
               />
+
+              <Text style={[styles.inputLabel, { color: themeColors.text }]}>Email</Text>
+              <TextInput
+                style={[styles.input, {
+                  backgroundColor: themeColors.background,
+                  color: themeColors.text,
+                  borderColor: emailError ? themeColors.danger : themeColors.border
+                }]}
+                placeholder="Enter your email"
+                placeholderTextColor={themeColors.textSecondary}
+                value={editEmail}
+                onChangeText={(text) => {
+                  setEditEmail(text);
+                  if (!text.trim() || isValidEmail(text.trim())) {
+                    setEmailError(false);
+                  }
+                }}
+                keyboardType="email-address"
+                autoCapitalize="none"
+              />
+              {emailError && (
+                <Text style={[styles.fieldErrorText, { color: themeColors.danger }]}>
+                  Please enter a valid email address
+                </Text>
+              )}
+
+              <Text style={[styles.inputLabel, { color: themeColors.text }]}>Address</Text>
+              <TextInput
+                style={[styles.input, styles.multilineInput, {
+                  backgroundColor: themeColors.background,
+                  color: themeColors.text,
+                  borderColor: themeColors.border
+                }]}
+                placeholder="Enter your address"
+                placeholderTextColor={themeColors.textSecondary}
+                value={editAddress}
+                onChangeText={setEditAddress}
+                multiline={true}
+                numberOfLines={3}
+                textAlignVertical="top"
+              />
+
+              {/* Location field is hidden from both Profile and Edit Profile screens */}
+
+              <Text style={[styles.inputLabel, { color: themeColors.text }]}>Alternate Phone Number (Optional)</Text>
+              <TextInput
+                style={[styles.input, {
+                  backgroundColor: themeColors.background,
+                  color: themeColors.text,
+                  borderColor: altPhoneNumberError ? themeColors.danger : themeColors.border
+                }]}
+                placeholder="Enter alternate phone number"
+                placeholderTextColor={themeColors.textSecondary}
+                value={editAltPhoneNumber}
+                onChangeText={(text) => {
+                  setEditAltPhoneNumber(text);
+                  if (!text.trim() || isValidPhoneNumber(text.trim())) {
+                    setAltPhoneNumberError(false);
+                  }
+                }}
+                keyboardType="phone-pad"
+              />
+              {altPhoneNumberError && (
+                <Text style={[styles.fieldErrorText, { color: themeColors.danger }]}>
+                  Please enter a valid phone number
+                </Text>
+              )}
 
               <TouchableOpacity
                 style={[styles.updateButton, { backgroundColor: themeColors.primary.default }]}
@@ -582,6 +772,12 @@ const styles = StyleSheet.create({
   phoneNumber: {
     fontSize: 14,
     marginTop: 4,
+  },
+  profileDetail: {
+    fontSize: 14,
+    marginTop: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   letterAvatar: {
     width: 100,
@@ -809,6 +1005,11 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     fontSize: 16,
   },
+  multilineInput: {
+    height: 100,
+    paddingTop: 12,
+    textAlignVertical: 'top',
+  },
   updateButton: {
     height: 50,
     borderRadius: 8,
@@ -838,6 +1039,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginBottom: 16,
     textAlign: 'center',
+  },
+  fieldErrorText: {
+    fontSize: 12,
+    marginTop: -12,
+    marginBottom: 12,
+    marginLeft: 4,
   },
 });
 

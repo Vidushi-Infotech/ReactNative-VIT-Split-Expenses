@@ -14,6 +14,12 @@ import OnboardingScreen from '../screens/onboarding/OnboardingScreen';
 import PhoneLoginScreen from '../screens/auth/PhoneLoginScreen';
 import OTPVerificationScreen from '../screens/auth/OTPVerificationScreen';
 import ProfileSetupScreen from '../screens/auth/ProfileSetupScreen';
+import PasswordLoginScreen from '../screens/auth/PasswordLoginScreen';
+import PasswordCreationScreen from '../screens/auth/PasswordCreationScreen';
+import NavigateToMainScreen from '../screens/auth/NavigateToMainScreen';
+import AutoNavigateScreen from '../screens/auth/AutoNavigateScreen';
+import TransitionScreen from '../screens/auth/TransitionScreen';
+import EmergencyGroupsScreen from '../screens/emergency/EmergencyGroupsScreen';
 import GroupsScreen from '../screens/groups/GroupsScreen';
 import GroupDetailsScreen from '../screens/groups/GroupDetailsScreen';
 import GroupMembersScreen from '../screens/groups/GroupMembersScreen';
@@ -21,6 +27,9 @@ import CreateGroupScreen from '../screens/groups/CreateGroupScreen';
 import AddExpenseScreen from '../screens/expenses/AddExpenseScreen';
 import ExpenseDetailsScreen from '../screens/expenses/ExpenseDetailsScreen';
 import ProfileScreen from '../screens/profile/ProfileScreen';
+import ReferralScreen from '../screens/profile/ReferralScreen';
+import PasswordScreen from '../screens/profile/PasswordScreen';
+import PaymentScreen from '../screens/profile/PaymentScreen';
 import NotificationsScreen from '../screens/notifications/NotificationsScreen';
 import ContactsDebugScreen from '../screens/debug/ContactsDebugScreen';
 import DeviceContactsDebugScreen from '../screens/debug/DeviceContactsDebugScreen';
@@ -45,7 +54,12 @@ const AuthNavigator = () => {
     >
       <AuthStack.Screen name="Login" component={PhoneLoginScreen} />
       <AuthStack.Screen name="OTPVerification" component={OTPVerificationScreen} />
+      <AuthStack.Screen name="PasswordCreationScreen" component={PasswordCreationScreen} />
       <AuthStack.Screen name="ProfileSetup" component={ProfileSetupScreen} />
+      <AuthStack.Screen name="PasswordLogin" component={PasswordLoginScreen} />
+      <AuthStack.Screen name="NavigateToMain" component={NavigateToMainScreen} />
+      <AuthStack.Screen name="AutoNavigate" component={AutoNavigateScreen} />
+      <AuthStack.Screen name="EmergencyGroups" component={EmergencyGroupsScreen} />
     </AuthStack.Navigator>
   );
 };
@@ -93,8 +107,34 @@ const MainNavigator = () => {
 // Root Navigator
 const AppNavigator = () => {
   const [isFirstLaunch, setIsFirstLaunch] = useState(null);
+  const [forceReload, setForceReload] = useState(0);
   const { isAuthenticated, isLoading } = useAuth();
   const { isDarkMode, colors: themeColors } = useTheme();
+
+  // Check for FORCE_RELOAD flag
+  useEffect(() => {
+    const checkForceReload = async () => {
+      try {
+        const forceReloadTimestamp = await AsyncStorage.getItem('FORCE_RELOAD');
+        if (forceReloadTimestamp) {
+          console.log('AppNavigator: FORCE_RELOAD flag found with timestamp:', forceReloadTimestamp);
+          // Clear the flag
+          await AsyncStorage.removeItem('FORCE_RELOAD');
+          // Force a re-render
+          setForceReload(prev => prev + 1);
+        }
+      } catch (error) {
+        console.error('AppNavigator: Error checking FORCE_RELOAD flag:', error);
+      }
+    };
+
+    // Check for the flag on mount and every 500ms
+    checkForceReload();
+    const interval = setInterval(checkForceReload, 500);
+
+    // Clean up the interval when the component unmounts
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     // Check if it's the first launch
@@ -149,8 +189,12 @@ const AppNavigator = () => {
     return null;
   }
 
+  // Log the current state
+  console.log('AppNavigator: Rendering with isAuthenticated =', isAuthenticated, 'forceReload =', forceReload);
+
   return (
     <Stack.Navigator
+      key={`navigator-${forceReload}`}
       screenOptions={{
         headerShown: false,
         contentStyle: {
@@ -242,12 +286,52 @@ const AppNavigator = () => {
                 headerShown: false,
               }}
             />
+            <Stack.Screen
+              name="Referral"
+              component={ReferralScreen}
+              options={{
+                headerShown: false,
+              }}
+            />
+            <Stack.Screen
+              name="Password"
+              component={PasswordScreen}
+              options={{
+                headerShown: false,
+              }}
+            />
+            <Stack.Screen
+              name="Payment"
+              component={PaymentScreen}
+              options={{
+                headerShown: false,
+              }}
+            />
           </>
         )}
       </Stack.Navigator>
   );
 };
 
-export default function Navigation() {
+export default function Navigation({ initialRouteName }) {
+  console.log('Navigation: initialRouteName =', initialRouteName);
+
+  // If initialRouteName is provided, use it to determine the initial screen
+  if (initialRouteName) {
+    return (
+      <Stack.Navigator
+        screenOptions={{
+          headerShown: false,
+        }}
+        initialRouteName={initialRouteName}
+      >
+        <Stack.Screen name="Auth" component={AuthNavigator} />
+        <Stack.Screen name="Main" component={MainNavigator} />
+        <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+      </Stack.Navigator>
+    );
+  }
+
+  // Otherwise, use the default AppNavigator
   return <AppNavigator />;
 }

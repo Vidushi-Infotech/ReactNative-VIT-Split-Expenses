@@ -104,13 +104,90 @@ const ExpenseDetailsModal = ({ isVisible, onClose, expense }) => {
     });
   };
 
-  // Calculate amount per person
+  // Get split type display name
+  const getSplitTypeDisplay = () => {
+    const splitType = expense?.splitType || 'equal';
+    switch (splitType) {
+      case 'equal':
+        return 'Equal Split';
+      case 'unequal':
+        return 'Unequal Split';
+      case 'group':
+        return 'Group Split';
+      default:
+        return 'Equal Split';
+    }
+  };
+
+  // Get split type icon
+  const getSplitTypeIcon = () => {
+    const splitType = expense?.splitType || 'equal';
+    switch (splitType) {
+      case 'equal':
+        return 'reorder-four-outline';
+      case 'unequal':
+        return 'options-outline';
+      case 'group':
+        return 'people-outline';
+      default:
+        return 'reorder-four-outline';
+    }
+  };
+
+  // Calculate amount per person based on split type
   const getAmountPerPerson = () => {
     if (!expense || !expense.amount || !expense.participants || expense.participants.length === 0) {
       return 0;
     }
 
+    // Default to equal split
     return expense.amount / expense.participants.length;
+  };
+
+  // Get participant share based on split type
+  const getParticipantShare = (participantId) => {
+    if (!expense || !expense.amount || !expense.participants || expense.participants.length === 0) {
+      return 0;
+    }
+
+    const splitType = expense.splitType || 'equal';
+
+    if (splitType === 'unequal') {
+      // For unequal split, first try to use the custom amounts if available
+      if (expense.customAmounts && expense.customAmounts[participantId] !== undefined) {
+        return expense.customAmounts[participantId];
+      }
+      // Fall back to calculating from percentages if amounts not available
+      else if (expense.customSplits && expense.customSplits[participantId] !== undefined) {
+        const percentage = expense.customSplits[participantId];
+        return (expense.amount * percentage) / 100;
+      }
+    } else if (splitType === 'group') {
+      // For group split (not fully implemented yet, fallback to equal)
+      return expense.amount / expense.participants.length;
+    }
+
+    // Default: Equal split
+    return expense.amount / expense.participants.length;
+  };
+
+  // Get participant percentage for unequal splits
+  const getParticipantPercentage = (participantId) => {
+    if (!expense || expense.splitType !== 'unequal' || !expense.customSplits) {
+      return 0;
+    }
+
+    return expense.customSplits[participantId] || 0;
+  };
+
+  // Get exact custom amount for unequal splits
+  const getParticipantCustomAmount = (participantId) => {
+    if (!expense || expense.splitType !== 'unequal' || !expense.customAmounts) {
+      return null;
+    }
+
+    return expense.customAmounts[participantId] !== undefined ?
+      expense.customAmounts[participantId] : null;
   };
 
   // Get category icon
@@ -281,13 +358,34 @@ const ExpenseDetailsModal = ({ isVisible, onClose, expense }) => {
               </View>
 
               <View style={styles.splitDetailsContainer}>
+                {/* Split Type Badge */}
+                <View style={[styles.splitTypeBadge, { backgroundColor: themeColors.primary.light + '20' }]}>
+                  <Icon
+                    name={getSplitTypeIcon()}
+                    size={20}
+                    color={themeColors.primary.default}
+                  />
+                  <Text style={[styles.splitTypeText, { color: themeColors.primary.default }]}>
+                    {getSplitTypeDisplay()}
+                  </Text>
+                </View>
+
+                {/* Split Description */}
                 <Text style={[styles.splitInfo, { color: themeColors.text }]}>
-                  Split equally among {participants.length || expense.participants?.length || 0} people
+                  {expense.splitType === 'unequal'
+                    ? 'Split based on custom percentages'
+                    : expense.splitType === 'group'
+                      ? 'Split by group'
+                      : `Split equally among ${participants.length || expense.participants?.length || 0} people`
+                  }
                 </Text>
 
-                <Text style={[styles.amountPerPerson, { color: themeColors.warning }]}>
-                  ₹{getAmountPerPerson().toFixed(2)} per person
-                </Text>
+                {/* Only show per person amount for equal splits */}
+                {(!expense.splitType || expense.splitType === 'equal') && (
+                  <Text style={[styles.amountPerPerson, { color: themeColors.warning }]}>
+                    ₹{getAmountPerPerson().toFixed(2)} per person
+                  </Text>
+                )}
               </View>
             </View>
 
@@ -323,8 +421,18 @@ const ExpenseDetailsModal = ({ isVisible, onClose, expense }) => {
 
                       <View style={[styles.amountBadge, { backgroundColor: isDarkMode ? 'rgba(245, 54, 92, 0.2)' : 'rgba(245, 54, 92, 0.1)' }]}>
                         <Text style={[styles.participantAmount, { color: themeColors.danger }]}>
-                          -₹{getAmountPerPerson().toFixed(2)}
+                          -₹{getParticipantShare(participant.id).toFixed(2)}
                         </Text>
+                        {expense.splitType === 'unequal' && (
+                          <View>
+                            <Text style={[styles.participantCustomAmount, { color: themeColors.danger }]}>
+                              Share: ₹{getParticipantShare(participant.id).toFixed(2)}
+                            </Text>
+                            <Text style={[styles.participantPercentage, { color: themeColors.danger }]}>
+                              ({getParticipantPercentage(participant.id).toFixed(2)}%)
+                            </Text>
+                          </View>
+                        )}
                       </View>
                     </View>
                   ))
@@ -345,8 +453,18 @@ const ExpenseDetailsModal = ({ isVisible, onClose, expense }) => {
 
                       <View style={[styles.amountBadge, { backgroundColor: isDarkMode ? 'rgba(245, 54, 92, 0.2)' : 'rgba(245, 54, 92, 0.1)' }]}>
                         <Text style={[styles.participantAmount, { color: themeColors.danger }]}>
-                          -₹{getAmountPerPerson().toFixed(2)}
+                          -₹{getParticipantShare(participantId).toFixed(2)}
                         </Text>
+                        {expense.splitType === 'unequal' && (
+                          <View>
+                            <Text style={[styles.participantCustomAmount, { color: themeColors.danger }]}>
+                              Share: ₹{getParticipantShare(participantId).toFixed(2)}
+                            </Text>
+                            <Text style={[styles.participantPercentage, { color: themeColors.danger }]}>
+                              ({getParticipantPercentage(participantId).toFixed(2)}%)
+                            </Text>
+                          </View>
+                        )}
                       </View>
                     </View>
                   ))
@@ -553,14 +671,39 @@ const styles = StyleSheet.create({
     backgroundColor: Platform.OS === 'ios' ? 'rgba(0,0,0,0.02)' : 'rgba(0,0,0,0.01)',
     padding: spacing.md,
     borderRadius: borderRadius.lg,
+    alignItems: 'center',
+  },
+  splitTypeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: 20,
+    marginBottom: spacing.md,
+  },
+  splitTypeText: {
+    fontSize: fontSizes.sm,
+    fontWeight: '600',
+    marginLeft: spacing.xs,
   },
   splitInfo: {
     fontSize: fontSizes.md,
     marginBottom: spacing.md,
+    textAlign: 'center',
   },
   amountPerPerson: {
     fontSize: fontSizes.lg,
     fontWeight: '700',
+  },
+  participantPercentage: {
+    fontSize: fontSizes.xs,
+    marginTop: 2,
+    textAlign: 'center',
+  },
+  participantCustomAmount: {
+    fontSize: fontSizes.sm,
+    marginTop: 4,
+    fontWeight: '500',
   },
   participantsList: {
     marginTop: spacing.md,

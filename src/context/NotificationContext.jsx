@@ -47,7 +47,21 @@ export const NotificationProvider = ({ children }) => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const navigation = useNavigation();
+
+  // Try to get navigation, but handle the case when it's not available
+  let navigation;
+  try {
+    navigation = useNavigation();
+  } catch (error) {
+    console.warn('Navigation not available in NotificationProvider:', error.message);
+    navigation = {
+      navigate: (screen, params) => {
+        console.warn(`Navigation attempted to ${screen} with params:`, params);
+        console.warn('Navigation is not available in this context');
+      }
+    };
+  }
+
   const appState = React.useRef(AppState.currentState);
 
   // Initialize notifications

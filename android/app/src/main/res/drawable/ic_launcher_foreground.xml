@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="512"
+    android:viewportHeight="512">
+
+    <!-- Split Coin Design -->
+    <path
+        android:fillColor="#7E57C2"
+        android:pathData="M256,56 A200,200 0 1,1 256,456 A200,200 0 1,1 256,56" />
+
+    <!-- Left Half of Coin -->
+    <path
+        android:fillColor="#4527A0"
+        android:pathData="M256,56 A200,200 0 0,0 256,456 L256,256 Z" />
+
+    <!-- Dollar Sign -->
+    <path
+        android:pathData="M290,170C290,153.431 276.569,140 260,140H230C213.431,140 200,153.431 200,170V170C200,186.569 213.431,200 230,200H260C276.569,200 290,213.431 290,230V290C290,306.569 276.569,320 260,320H230C213.431,320 200,306.569 200,290V290"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="24"
+        android:strokeLineCap="round" />
+
+    <!-- Vertical Line of Dollar Sign -->
+    <path
+        android:pathData="M245,120 L245,340"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="24"
+        android:strokeLineCap="round" />
+
+    <!-- Split Line -->
+    <path
+        android:pathData="M256,120 L256,140 M256,160 L256,180 M256,200 L256,220 M256,240 L256,260 M256,280 L256,300 M256,320 L256,340 M256,360 L256,380"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="8"
+        android:strokeLineCap="round" />
+
+    <!-- Small Circles representing people -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M180,380 m-20,0 a20,20 0 1,0 40,0 a20,20 0 1,0 -40,0" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M256,380 m-20,0 a20,20 0 1,0 40,0 a20,20 0 1,0 -40,0" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M332,380 m-20,0 a20,20 0 1,0 40,0 a20,20 0 1,0 -40,0" />
+</vector>

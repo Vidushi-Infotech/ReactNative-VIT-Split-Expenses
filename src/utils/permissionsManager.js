@@ -140,26 +140,26 @@ export const isPermissionGranted = (status) => {
 export const PERMISSION_DESCRIPTIONS = {
   camera: {
     title: 'Camera Permission',
-    message: 'VitSplit needs access to your camera to take profile pictures.',
+    message: 'CostSync needs access to your camera to take profile pictures.',
   },
   photoLibrary: {
     title: 'Photo Library Permission',
-    message: 'VitSplit needs access to your photo library to select profile pictures.',
+    message: 'CostSync needs access to your photo library to select profile pictures.',
   },
   contacts: {
     title: 'Contacts Permission',
-    message: 'VitSplit needs access to your contacts to help you find and add friends to split expenses with.',
+    message: 'CostSync needs access to your contacts to help you find and add friends to split expenses with.',
   },
   location: {
     title: 'Location Permission',
-    message: 'VitSplit needs access to your location to find nearby places for expense tracking.',
+    message: 'CostSync needs access to your location to find nearby places for expense tracking.',
   },
   sms: {
     title: 'SMS Permission',
-    message: 'VitSplit needs access to your SMS messages for verification purposes.',
+    message: 'CostSync needs access to your SMS messages for verification purposes.',
   },
   notification: {
     title: 'Notification Permission',
-    message: 'VitSplit needs permission to send you notifications about new expenses, payments, and group activities.',
+    message: 'CostSync needs permission to send you notifications about new expenses, payments, and group activities.',
   },
 };

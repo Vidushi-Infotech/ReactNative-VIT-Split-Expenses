@@ -138,11 +138,70 @@ const ExpenseDetailsScreen = () => {
     }
   };
 
-  // Calculate amount per person
+  // Get split type display name
+  const getSplitTypeDisplay = () => {
+    const splitType = expense.splitType || 'equal';
+    switch (splitType) {
+      case 'equal':
+        return 'Equal Split';
+      case 'unequal':
+        return 'Unequal Split';
+      case 'group':
+        return 'Group Split';
+      default:
+        return 'Equal Split';
+    }
+  };
+
+  // Get split type icon
+  const getSplitTypeIcon = () => {
+    const splitType = expense.splitType || 'equal';
+    switch (splitType) {
+      case 'equal':
+        return 'reorder-four-outline';
+      case 'unequal':
+        return 'options-outline';
+      case 'group':
+        return 'people-outline';
+      default:
+        return 'reorder-four-outline';
+    }
+  };
+
+  // Calculate amount per person based on split type
   const getAmountPerPerson = () => {
     if (!expense || !expense.amount || !expense.participants || expense.participants.length === 0) {
       return 0;
     }
+
+    // Default to equal split
+    return expense.amount / expense.participants.length;
+  };
+
+  // Get participant share based on split type
+  const getParticipantShare = (participantId) => {
+    if (!expense || !expense.amount || !expense.participants || expense.participants.length === 0) {
+      return 0;
+    }
+
+    const splitType = expense.splitType || 'equal';
+
+    if (splitType === 'unequal') {
+      // For unequal split, first try to use the custom amounts if available
+      if (expense.customAmounts && expense.customAmounts[participantId] !== undefined) {
+        return expense.customAmounts[participantId];
+      }
+      // Fall back to calculating from percentages if amounts not available
+      else if (expense.customSplits && expense.customSplits[participantId] !== undefined) {
+        const percentage = expense.customSplits[participantId];
+        return (expense.amount * percentage) / 100;
+      }
+    } else if (splitType === 'group') {
+      // For group split (not fully implemented yet, fallback to equal)
+      return expense.amount / expense.participants.length;
+    }
+
+    // Default: Equal split
     return expense.amount / expense.participants.length;
   };
 
@@ -152,16 +211,35 @@ const ExpenseDetailsScreen = () => {
       return 0;
     }
 
-    const amountPerPerson = expense.amount / expense.participants.length;
+    const share = getParticipantShare(participantId);
 
     // If this participant is the payer
     if (participantId === expense.paidBy) {
       // Calculate how much they paid minus their share
-      return expense.amount - amountPerPerson;
+      return expense.amount - share;
     } else {
       // They owe their share
-      return -amountPerPerson;
+      return -share;
     }
+  };
+
+  // Get participant percentage for unequal splits
+  const getParticipantPercentage = (participantId) => {
+    if (!expense || expense.splitType !== 'unequal' || !expense.customSplits) {
+      return 0;
+    }
+
+    return expense.customSplits[participantId] || 0;
+  };
+
+  // Get exact custom amount for unequal splits
+  const getParticipantCustomAmount = (participantId) => {
+    if (!expense || expense.splitType !== 'unequal' || !expense.customAmounts) {
+      return null;
+    }
+
+    return expense.customAmounts[participantId] !== undefined ?
+      expense.customAmounts[participantId] : null;
   };
 
   if (!expense) {
@@ -323,13 +401,34 @@ const ExpenseDetailsScreen = () => {
             </View>
 
             <View style={styles.splitDetailsContainer}>
+              {/* Split Type Badge */}
+              <View style={[styles.splitTypeBadge, { backgroundColor: themeColors.primary.light + '20' }]}>
+                <Icon
+                  name={getSplitTypeIcon()}
+                  size={20}
+                  color={themeColors.primary.default}
+                />
+                <Text style={[styles.splitTypeText, { color: themeColors.primary.default }]}>
+                  {getSplitTypeDisplay()}
+                </Text>
+              </View>
+
+              {/* Split Description */}
               <Text style={[styles.splitInfo, { color: themeColors.text }]}>
-                Split equally among {participants.length || expense.participants?.length || 0} people
+                {expense.splitType === 'unequal'
+                  ? 'Split based on custom percentages'
+                  : expense.splitType === 'group'
+                    ? 'Split by group'
+                    : `Split equally among ${participants.length || expense.participants?.length || 0} people`
+                }
               </Text>
 
-              <Text style={[styles.amountPerPerson, { color: themeColors.warning }]}>
-                ₹{getAmountPerPerson().toFixed(2)} per person
-              </Text>
+              {/* Only show per person amount for equal splits */}
+              {(!expense.splitType || expense.splitType === 'equal') && (
+                <Text style={[styles.amountPerPerson, { color: themeColors.warning }]}>
+                  ₹{getAmountPerPerson().toFixed(2)} per person
+                </Text>
+              )}
 
               <View style={styles.splitSummaryContainer}>
                 <View style={[styles.splitSummaryCard, { backgroundColor: themeColors.primary.light + '15' }]}>
@@ -353,12 +452,16 @@ const ExpenseDetailsScreen = () => {
                 </View>
 
                 <View style={[styles.splitSummaryCard, { backgroundColor: themeColors.warning + '15' }]}>
-                  <Icon name="person-outline" size={20} color={themeColors.warning} />
+                  <Icon
+                    name={expense.splitType === 'unequal' ? 'options-outline' : 'person-outline'}
+                    size={20}
+                    color={themeColors.warning}
+                  />
                   <Text style={[styles.splitSummaryTitle, { color: themeColors.textSecondary }]}>
-                    Per Person
+                    {expense.splitType === 'unequal' ? 'Split Type' : 'Per Person'}
                   </Text>
                   <Text style={[styles.splitSummaryValue, { color: themeColors.text }]}>
-                    ₹{getAmountPerPerson().toFixed(2)}
+                    {expense.splitType === 'unequal' ? 'Custom' : `₹${getAmountPerPerson().toFixed(2)}`}
                   </Text>
                 </View>
               </View>
@@ -398,14 +501,34 @@ const ExpenseDetailsScreen = () => {
                     {participant.id === expense.paidBy ? (
                       <View style={[styles.amountBadge, { backgroundColor: isDarkMode ? 'rgba(39, 174, 96, 0.2)' : 'rgba(39, 174, 96, 0.1)' }]}>
                         <Text style={[styles.participantAmount, { color: themeColors.success }]}>
-                          +₹{(expense.amount - getAmountPerPerson()).toFixed(2)}
+                          +₹{(expense.amount - getParticipantShare(participant.id)).toFixed(2)}
                         </Text>
+                        {expense.splitType === 'unequal' && (
+                          <View>
+                            <Text style={[styles.participantCustomAmount, { color: themeColors.success }]}>
+                              Share: ₹{getParticipantShare(participant.id).toFixed(2)}
+                            </Text>
+                            <Text style={[styles.participantPercentage, { color: themeColors.success }]}>
+                              ({getParticipantPercentage(participant.id).toFixed(2)}%)
+                            </Text>
+                          </View>
+                        )}
                       </View>
                     ) : (
                       <View style={[styles.amountBadge, { backgroundColor: isDarkMode ? 'rgba(245, 54, 92, 0.2)' : 'rgba(245, 54, 92, 0.1)' }]}>
                         <Text style={[styles.participantAmount, { color: themeColors.danger }]}>
-                          -₹{getAmountPerPerson().toFixed(2)}
+                          -₹{getParticipantShare(participant.id).toFixed(2)}
                         </Text>
+                        {expense.splitType === 'unequal' && (
+                          <View>
+                            <Text style={[styles.participantCustomAmount, { color: themeColors.danger }]}>
+                              Share: ₹{getParticipantShare(participant.id).toFixed(2)}
+                            </Text>
+                            <Text style={[styles.participantPercentage, { color: themeColors.danger }]}>
+                              ({getParticipantPercentage(participant.id).toFixed(2)}%)
+                            </Text>
+                          </View>
+                        )}
                       </View>
                     )}
                   </View>
@@ -586,13 +709,36 @@ const styles = StyleSheet.create({
   splitDetailsContainer: {
     alignItems: 'center',
   },
+  splitTypeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: 20,
+    marginBottom: spacing.md,
+  },
+  splitTypeText: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: spacing.xs,
+  },
   splitInfo: {
     fontSize: 16,
     marginBottom: spacing.sm,
+    textAlign: 'center',
   },
   amountPerPerson: {
     fontSize: 20,
     fontWeight: 'bold',
+  },
+  participantPercentage: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  participantCustomAmount: {
+    fontSize: 13,
+    marginTop: 4,
+    fontWeight: '500',
   },
   participantsList: {
     marginTop: spacing.sm,

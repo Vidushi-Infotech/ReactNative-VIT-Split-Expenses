@@ -24,7 +24,6 @@ import ErrorState from '../../components/groups/details/ErrorState.jsx';
 import GroupHeader from '../../components/groups/details/GroupHeader.jsx';
 import TabBar from '../../components/groups/details/TabBar.jsx';
 import ExpensesTab from '../../components/groups/details/ExpensesTab.jsx';
-import StandingTab from '../../components/groups/details/StandingTab.jsx';
 import PaymentsTab from '../../components/groups/details/PaymentsTab.jsx';
 import AddExpenseButton from '../../components/groups/details/AddExpenseButton.jsx';
 
@@ -243,7 +242,6 @@ const GroupDetailsScreen = () => {
 
   const tabs = [
     { key: 'expenses', title: 'Expenses', icon: 'receipt-outline' },
-    { key: 'standing', title: 'Standing', icon: 'stats-chart-outline' },
     { key: 'payments', title: 'Payments', icon: 'cash-outline' },
   ];
 
@@ -254,7 +252,7 @@ const GroupDetailsScreen = () => {
   // Handle tab change with animation
   const handleTabChange = (tabKey, index) => {
     setActiveTab(tabKey);
-    tabIndicatorPosition.value = withTiming(index * (SCREEN_WIDTH / 3), { duration: 300 });
+    tabIndicatorPosition.value = withTiming(index * (SCREEN_WIDTH / 2), { duration: 300 });
   };
 
   // Animated styles for sticky tabs
@@ -398,19 +396,6 @@ const GroupDetailsScreen = () => {
               getUserById={getUserById}
               onExpensePress={handleExpensePress}
               handleAddExpense={handleAddExpense}
-            />
-          )}
-
-          {activeTab === 'standing' && (
-            <StandingTab
-              balances={balances}
-              paymentRecords={paymentRecords}
-              userProfile={userProfile}
-              getUserById={getUserById}
-              handleUpdatePaymentStatus={handleUpdatePaymentStatus}
-              updatingPayment={updatingPayment}
-              refreshing={refreshing}
-              handleRefresh={handleRefresh}
             />
           )}
 

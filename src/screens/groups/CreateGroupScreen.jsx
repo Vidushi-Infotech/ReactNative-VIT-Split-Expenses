@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Platform,
   TextInput,
+  Modal,
 } from 'react-native';
 import {useNavigation} from '@react-navigation/native';
 import {useTheme} from '../../context/ThemeContext';
@@ -43,6 +44,13 @@ const CreateGroupScreen = () => {
   const [loading, setLoading] = useState(false);
   const [deviceContacts, setDeviceContacts] = useState([]);
   const [isLoadingDeviceContacts, setIsLoadingDeviceContacts] = useState(false);
+
+  // New state variables for the member type selection
+  const [memberType, setMemberType] = useState('individual'); // 'individual' or 'group'
+  const [selectedContact, setSelectedContact] = useState(null); // For group mode
+  const [additionalMembersCount, setAdditionalMembersCount] = useState(''); // For group mode
+  const [groupModalVisible, setGroupModalVisible] = useState(false); // For group mode modal
+  const [groupMembers, setGroupMembers] = useState([]); // For storing group members
 
   const navigation = useNavigation();
   const {colors: themeColors} = useTheme();
@@ -270,13 +278,47 @@ const CreateGroupScreen = () => {
   const filteredContacts = getFilteredContacts();
 
   const handleSelectUser = user => {
-    if (selectedUsers.some(selectedUser => selectedUser.id === user.id)) {
-      setSelectedUsers(
-        selectedUsers.filter(selectedUser => selectedUser.id !== user.id),
-      );
+    if (memberType === 'individual') {
+      // Individual mode - toggle selection
+      if (selectedUsers.some(selectedUser => selectedUser.id === user.id)) {
+        setSelectedUsers(
+          selectedUsers.filter(selectedUser => selectedUser.id !== user.id),
+        );
+      } else {
+        setSelectedUsers([...selectedUsers, user]);
+      }
     } else {
-      setSelectedUsers([...selectedUsers, user]);
+      // Group mode - open modal for adding additional members
+      setSelectedContact(user);
+      setAdditionalMembersCount('');
+      setGroupModalVisible(true);
     }
+  };
+
+  const handleAddGroup = () => {
+    if (!selectedContact) return;
+
+    // Validate additional members count
+    const count = parseInt(additionalMembersCount);
+
+    if (isNaN(count) || count <= 0) {
+      Alert.alert('Error', 'Please enter a valid number of additional members (at least 1)');
+      return;
+    }
+
+    // Add the group to groupMembers
+    setGroupMembers([
+      ...groupMembers,
+      {
+        contact: selectedContact,
+        additionalMembersCount: count
+      }
+    ]);
+
+    // Close the modal
+    setGroupModalVisible(false);
+    setSelectedContact(null);
+    setAdditionalMembersCount('');
   };
 
 
@@ -300,19 +342,45 @@ const CreateGroupScreen = () => {
   };
 
   const handleCreateGroup = async () => {
-    if (!groupName.trim() || selectedUsers.length === 0) {
-      Alert.alert(
-        'Error',
-        'Please enter a group name and add at least one member.',
-      );
-      return;
+    // Validate based on member type
+    if (memberType === 'individual') {
+      if (!groupName.trim() || selectedUsers.length === 0) {
+        Alert.alert(
+          'Error',
+          'Please enter a group name and add at least one member.',
+        );
+        return;
+      }
+    } else { // Group mode
+      if (!groupName.trim() || groupMembers.length === 0) {
+        Alert.alert(
+          'Error',
+          'Please enter a group name and add at least one group.',
+        );
+        return;
+      }
     }
 
     setLoading(true);
 
     try {
-      // Get app users from selected users (all selected users should be app users now)
-      const appUserIds = selectedUsers.map(user => user.id);
+      let appUserIds = [];
+      let invitedContacts = [];
+
+      if (memberType === 'individual') {
+        // Individual mode - just use selected users
+        appUserIds = selectedUsers.map(user => user.id);
+      } else {
+        // Group mode - collect all app users from groups
+        groupMembers.forEach(group => {
+          // Add the main contact (who is an app user)
+          appUserIds.push(group.contact.id);
+
+          // Store the additional members count in the group metadata
+          // These members don't need to join the app and don't have phone numbers
+          // The group member (contact) will manage payments for their additional members, not the main account holder
+        });
+      }
 
       // Prepare group data
       const groupData = {
@@ -320,8 +388,18 @@ const CreateGroupScreen = () => {
         image: groupImage,
         createdBy: userProfile.id,
         members: [userProfile.id, ...appUserIds],
-        // No invited contacts since we only allow adding app users
         invitedContacts: [],
+        // Add group metadata for additional members
+        groupMetadata: memberType === 'group' ? {
+          type: 'group',
+          groups: groupMembers.map(group => ({
+            contactId: group.contact.id,
+            contactName: group.contact.name,
+            additionalMembersCount: group.additionalMembersCount
+          }))
+        } : {
+          type: 'individual'
+        }
       };
 
       // Create the group in Firestore
@@ -415,6 +493,73 @@ const CreateGroupScreen = () => {
             Add Members
           </Text>
 
+          {/* Member Type Selection */}
+          <View style={styles.memberTypeContainer}>
+            <TouchableOpacity
+              style={[
+                styles.memberTypeButton,
+                memberType === 'individual' && {
+                  backgroundColor: themeColors.primary.light + '30',
+                  borderColor: themeColors.primary.default,
+                },
+              ]}
+              onPress={() => setMemberType('individual')}>
+              <Icon
+                name="person-outline"
+                size={20}
+                color={
+                  memberType === 'individual'
+                    ? themeColors.primary.default
+                    : themeColors.textSecondary
+                }
+              />
+              <Text
+                style={[
+                  styles.memberTypeText,
+                  {
+                    color:
+                      memberType === 'individual'
+                        ? themeColors.primary.default
+                        : themeColors.textSecondary,
+                  },
+                ]}>
+                Individual
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.memberTypeButton,
+                memberType === 'group' && {
+                  backgroundColor: themeColors.primary.light + '30',
+                  borderColor: themeColors.primary.default,
+                },
+              ]}
+              onPress={() => setMemberType('group')}>
+              <Icon
+                name="people-outline"
+                size={20}
+                color={
+                  memberType === 'group'
+                    ? themeColors.primary.default
+                    : themeColors.textSecondary
+                }
+              />
+              <Text
+                style={[
+                  styles.memberTypeText,
+                  {
+                    color:
+                      memberType === 'group'
+                        ? themeColors.primary.default
+                        : themeColors.textSecondary,
+                  },
+                ]}>
+                Group
+              </Text>
+            </TouchableOpacity>
+          </View>
+
           <Input
             placeholder="Search by phone number"
             value={searchQuery}
@@ -428,6 +573,57 @@ const CreateGroupScreen = () => {
               />
             }
           />
+
+          {memberType === 'group' && groupMembers.length > 0 && (
+            <View style={styles.groupMembersContainer}>
+              <Text style={[styles.groupMembersTitle, {color: themeColors.textSecondary}]}>
+                Group Members
+              </Text>
+              {groupMembers.map((group, index) => (
+                <View key={`group-${index}`} style={[styles.groupItem, {backgroundColor: themeColors.surface}]}>
+                  <View style={styles.groupItemHeader}>
+                    <Avatar
+                      source={group.contact.avatar}
+                      name={group.contact.name}
+                      size="sm"
+                    />
+                    <Text style={[styles.groupItemName, {color: themeColors.text}]}>
+                      {group.contact.name}'s Group
+                    </Text>
+                    <TouchableOpacity
+                      onPress={() => {
+                        // Remove this group
+                        setGroupMembers(groupMembers.filter((_, i) => i !== index));
+                      }}>
+                      <Icon name="close-circle" size={20} color={themeColors.danger} />
+                    </TouchableOpacity>
+                  </View>
+                  <View style={styles.groupItemMembers}>
+                    <View style={styles.groupItemMembersInfo}>
+                      <Icon
+                        name="person-outline"
+                        size={14}
+                        color={themeColors.textSecondary}
+                      />
+                      <Text style={[styles.groupItemMembersText, {color: themeColors.textSecondary}]}>
+                        {group.additionalMembersCount + 1}
+                      </Text>
+                    </View>
+                    <View style={styles.groupItemMembersInfo}>
+                      <Icon
+                        name="people-outline"
+                        size={14}
+                        color={themeColors.textSecondary}
+                      />
+                      <Text style={[styles.groupItemMembersText, {color: themeColors.textSecondary}]}>
+                        {group.additionalMembersCount}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              ))}
+            </View>
+          )}
         </Animated.View>
 
         {selectedUsers.length > 0 && (
@@ -594,13 +790,211 @@ const CreateGroupScreen = () => {
           />
         </Animated.View>
       </ScrollView>
+
+      {/* Group Modal */}
+      <Modal
+        visible={groupModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setGroupModalVisible(false)}>
+        <View style={[styles.modalContainer, { backgroundColor: 'rgba(0,0,0,0.5)' }]}>
+          <View style={[styles.modalContent, { backgroundColor: themeColors.surface }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: themeColors.text }]}>
+                Add Group Members
+              </Text>
+              <TouchableOpacity onPress={() => setGroupModalVisible(false)}>
+                <Icon name="close" size={24} color={themeColors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            {selectedContact && (
+              <View style={styles.selectedContactContainer}>
+                <Avatar
+                  source={selectedContact.avatar}
+                  name={selectedContact.name}
+                  size="md"
+                />
+                <View style={styles.selectedContactInfo}>
+                  <Text style={[styles.selectedContactName, { color: themeColors.text }]}>
+                    {selectedContact.name}
+                  </Text>
+                  <Text style={[styles.selectedContactPhone, { color: themeColors.textSecondary }]}>
+                    {selectedContact.phoneNumber}
+                  </Text>
+                </View>
+              </View>
+            )}
+
+            <Text style={[styles.modalLabel, { color: themeColors.textSecondary }]}>
+              Number of additional members in this group
+            </Text>
+            <TextInput
+              style={[
+                styles.additionalNumbersInput,
+                {
+                  color: themeColors.text,
+                  backgroundColor: themeColors.background,
+                  borderColor: themeColors.border
+                }
+              ]}
+              value={additionalMembersCount}
+              onChangeText={setAdditionalMembersCount}
+              placeholder="e.g. 3"
+              placeholderTextColor={themeColors.placeholder}
+              keyboardType="number-pad"
+            />
+
+            <View style={styles.spacer} />
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, { backgroundColor: themeColors.background }]}
+                onPress={() => setGroupModalVisible(false)}>
+                <Text style={[styles.modalButtonText, { color: themeColors.textSecondary }]}>
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, { backgroundColor: themeColors.primary.default }]}
+                onPress={handleAddGroup}>
+                <Text style={[styles.modalButtonText, { color: themeColors.white }]}>
+                  Add Group
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaWrapper>
   );
 };
 
 const styles = StyleSheet.create({
+  memberTypeContainer: {
+    flexDirection: 'row',
+    marginBottom: spacing.md,
+    justifyContent: 'space-between',
+  },
+  memberTypeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    flex: 0.48,
+  },
+  memberTypeText: {
+    marginLeft: spacing.xs,
+    fontWeight: '500',
+  },
+  groupMembersContainer: {
+    marginTop: spacing.md,
+    marginBottom: spacing.md,
+  },
+  groupMembersTitle: {
+    fontSize: fontSizes.sm,
+    marginBottom: spacing.sm,
+  },
+  groupItem: {
+    borderRadius: 8,
+    padding: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  groupItemHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  groupItemName: {
+    flex: 1,
+    marginLeft: spacing.md,
+    fontWeight: '500',
+  },
+  groupItemMembers: {
+    marginTop: spacing.sm,
+    marginLeft: 40, // Align with the name
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  groupItemMembersInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: spacing.md,
+  },
+  groupItemMembersText: {
+    fontSize: fontSizes.sm,
+    marginLeft: spacing.xs,
+  },
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    padding: spacing.lg,
+    paddingBottom: Platform.OS === 'ios' ? 34 : spacing.lg, // Account for bottom safe area on iOS
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.lg,
+  },
+  modalTitle: {
+    fontSize: fontSizes.lg,
+    fontWeight: '600',
+  },
+  selectedContactContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.lg,
+    padding: spacing.md,
+    borderRadius: 8,
+    backgroundColor: 'rgba(0,0,0,0.05)',
+  },
+  selectedContactInfo: {
+    marginLeft: spacing.md,
+    flex: 1,
+  },
+  selectedContactName: {
+    fontWeight: '600',
+    fontSize: fontSizes.md,
+  },
+  selectedContactPhone: {
+    fontSize: fontSizes.sm,
+  },
+  modalLabel: {
+    fontSize: fontSizes.sm,
+    marginBottom: spacing.sm,
+  },
+  additionalNumbersInput: {
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: spacing.md,
+    fontSize: fontSizes.md,
+    textAlign: 'center',
+  },
 
-
+  spacer: {
+    height: spacing.xl, // Add a larger space
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  modalButton: {
+    flex: 0.48,
+    borderRadius: 8,
+    padding: spacing.md,
+    alignItems: 'center',
+  },
+  modalButtonText: {
+    fontWeight: '600',
+  },
   loadingContainer: {
     padding: spacing.lg,
     alignItems: 'center',

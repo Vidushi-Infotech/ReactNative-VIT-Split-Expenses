@@ -2,6 +2,7 @@ import { collection, addDoc, getDocs, query, where, doc, getDoc, updateDoc, arra
 import { getFirestoreDb, isFirebaseInitialized } from '../config/firebase';
 import GroupBalanceService from './GroupBalanceService';
 import expenseSplitCalculator from '../utils/expenseSplitCalculator';
+import retryOperation from '../utils/firestoreRetry';
 
 /**
  * Service for handling expense-related operations with Firebase
@@ -75,29 +76,36 @@ class ExpenseService {
         throw new Error('Failed to get Firestore instance');
       }
 
-      // Query expenses for the group
-      const q = query(
-        collection(db, 'Expenses'),
-        where('groupId', '==', groupId)
-      );
+      // Use retry operation for Firestore query
+      return await retryOperation(async () => {
+        console.log('Fetching expenses for group:', groupId);
 
-      const querySnapshot = await getDocs(q);
-      const expenses = [];
+        // Query expenses for the group
+        const q = query(
+          collection(db, 'Expenses'),
+          where('groupId', '==', groupId)
+        );
 
-      querySnapshot.forEach((doc) => {
-        expenses.push({
-          id: doc.id,
-          ...doc.data(),
+        const querySnapshot = await getDocs(q);
+        const expenses = [];
+
+        querySnapshot.forEach((doc) => {
+          expenses.push({
+            id: doc.id,
+            ...doc.data(),
+          });
         });
-      });
 
-      // Sort expenses by date (newest first)
-      expenses.sort((a, b) => new Date(b.date) - new Date(a.date));
+        // Sort expenses by date (newest first)
+        expenses.sort((a, b) => new Date(b.date) - new Date(a.date));
 
-      return expenses;
+        console.log(`Successfully fetched ${expenses.length} expenses for group ${groupId}`);
+        return expenses;
+      }, 5, 2000); // 5 retries with 2 second initial delay
     } catch (error) {
-      console.error('Error getting expenses for group:', error);
-      throw error;
+      console.error('Error getting expenses for group after retries:', error);
+      // Return empty array instead of throwing to prevent app crashes
+      return [];
     }
   }
 
@@ -227,8 +235,16 @@ class ExpenseService {
         };
       });
 
-      // Calculate expense split using the new calculator
-      const splitResult = expenseSplitCalculator.calculateExpenseSplit(expenseParticipants);
+      // Get split type and custom splits from expense data
+      const splitType = expenseData.splitType || 'equal';
+      const customSplits = expenseData.customSplits || null;
+
+      // Calculate expense split using the new calculator with split type and custom splits
+      const splitResult = expenseSplitCalculator.calculateExpenseSplit(
+        expenseParticipants,
+        splitType,
+        customSplits
+      );
 
       // Create a split payment record for each settlement
       const createPromises = [];

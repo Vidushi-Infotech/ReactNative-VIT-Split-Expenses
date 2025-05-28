@@ -8,7 +8,7 @@ const { width } = Dimensions.get('window');
 const onboardingData = [
   {
     id: '1',
-    title: 'Welcome to VitSplit',
+    title: 'Welcome to CostSync',
     description: 'The easiest way to split expenses with friends and family.',
     image: { uri: 'https://img.freepik.com/free-vector/friends-giving-high-five_23-2148363170.jpg' },
   },

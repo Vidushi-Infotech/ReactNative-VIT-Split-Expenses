@@ -10,7 +10,7 @@ import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
 import usePermissions from '../../hooks/usePermissions';
 
 const ProfileSetupScreen = ({ navigation, route }) => {
-  const { phoneNumber } = route.params;
+  const { phoneNumber, referralCode = '', referredBy = '', emergency = false, superEmergency = false } = route.params;
   const { isDarkMode, colors: themeColors } = useTheme();
   const { setupProfile } = useAuth();
   const [error, setError] = useState('');
@@ -18,7 +18,15 @@ const ProfileSetupScreen = ({ navigation, route }) => {
   const [name, setName] = useState('');
   const [username, setUsername] = useState('');
   const [profileImage, setProfileImage] = useState(null);
+  const [referralCodeInput, setReferralCodeInput] = useState(referralCode);
+  const [referredByInput, setReferredByInput] = useState(referredBy);
   const [loading, setLoading] = useState(false);
+
+  // Log navigation state for debugging
+  console.log('ProfileSetupScreen loaded with params:', route.params);
+  console.log('emergency flag:', emergency);
+  console.log('superEmergency flag:', superEmergency);
+  console.log('Current navigation state:', navigation.getState());
 
   const handleProfileSetup = async () => {
     setError('');
@@ -40,16 +48,93 @@ const ProfileSetupScreen = ({ navigation, route }) => {
         updatedAt: new Date().toISOString(),
       };
 
+      // Add referral information if provided
+      if (referralCodeInput && referralCodeInput.trim()) {
+        profileData.usedReferralCode = referralCodeInput.trim();
+      }
+
+      if (referredByInput && referredByInput.trim()) {
+        profileData.referredBy = referredByInput.trim();
+      }
+
       // Log the profile data being sent
       console.log('Sending profile data to Firestore:', profileData);
+
+      // Clear registration flags
+      try {
+        await AsyncStorage.removeItem('isRegistering');
+        await AsyncStorage.removeItem('navigatingToPasswordCreation');
+        console.log('Cleared registration flags');
+      } catch (flagError) {
+        console.error('Error clearing registration flags:', flagError);
+      }
 
       // Use the setupProfile function from AuthContext
       const success = await setupProfile(profileData);
 
       if (!success) {
         setError('Failed to create profile. Please try again.');
+      } else {
+        console.log('Profile setup successful, completing registration flow');
+
+        // Set authentication flags for successful registration completion
+        await AsyncStorage.setItem('isAuthenticated', 'true');
+        console.log('Set isAuthenticated flag in AsyncStorage');
+
+        // Clear all registration flags
+        await AsyncStorage.removeItem('isRegistering');
+        await AsyncStorage.removeItem('currentRegistrationStep');
+        console.log('Cleared registration flags');
+
+        // CRITICAL FIX: Remove the block on main navigation now that registration is complete
+        await AsyncStorage.removeItem('BLOCK_MAIN_NAVIGATION');
+        console.log('Removed BLOCK_MAIN_NAVIGATION flag');
+
+        // Set navigation flags to ensure proper navigation to Main screen
+        await AsyncStorage.setItem('FORCE_NAVIGATE_TO_MAIN', 'true');
+        await AsyncStorage.setItem('FORCE_NAVIGATE_TO_GROUPS', 'true');
+        console.log('Set force navigation flags');
+
+        // CRITICAL FIX: Use multiple navigation approaches for reliability
+        console.log('CRITICAL FIX: Using multiple navigation approaches to Main');
+
+        try {
+          // First try simple navigation.navigate
+          navigation.navigate('Main');
+          console.log('Navigation to Main completed via navigate');
+        } catch (navError) {
+          console.error('Error using navigation.navigate:', navError);
+
+          // Try to get the root navigation if possible
+          try {
+            const rootNavigation = navigation.getParent();
+            if (rootNavigation) {
+              rootNavigation.navigate('Main');
+              console.log('Navigation to Main completed via root navigation');
+            } else {
+              throw new Error('Root navigation not available');
+            }
+          } catch (rootError) {
+            console.error('Error using root navigation:', rootError);
+
+            // Last resort: Use CommonActions
+            try {
+              const { CommonActions } = require('@react-navigation/native');
+              navigation.dispatch(
+                CommonActions.reset({
+                  index: 0,
+                  routes: [
+                    { name: 'Main' }
+                  ]
+                })
+              );
+              console.log('Navigation to Main completed via CommonActions');
+            } catch (resetError) {
+              console.error('All navigation attempts failed:', resetError);
+            }
+          }
+        }
       }
-      // The AuthContext will handle the login automatically
     } catch (error) {
       setError('Failed to create profile. Please try again.');
       console.error('Error setting up profile:', error);
@@ -194,7 +279,7 @@ const ProfileSetupScreen = ({ navigation, route }) => {
         >
           <Text style={[styles.title, { color: themeColors.text }]}>Complete Your Profile</Text>
           <Text style={[styles.subtitle, { color: themeColors.textSecondary }]}>
-            Set up your profile to get started with VitSplit
+            Set up your profile to get started with CostSync
           </Text>
         </Animated.View>
 
@@ -273,6 +358,50 @@ const ProfileSetupScreen = ({ navigation, route }) => {
               <Text style={[styles.phoneText, { color: themeColors.textSecondary }]}>
                 {phoneNumber}
               </Text>
+            </View>
+          </View>
+
+          {/* Referral Information */}
+          <View style={styles.referralSection}>
+            <Text style={[styles.sectionTitle, { color: themeColors.text }]}>
+              Referral Information (Optional)
+            </Text>
+
+            <View style={styles.inputContainer}>
+              <Text style={[styles.label, { color: themeColors.text }]}>Referral Code</Text>
+              <TextInput
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: themeColors.surface,
+                    borderColor: themeColors.border,
+                    color: themeColors.text
+                  }
+                ]}
+                placeholder="Enter referral code (if any)"
+                placeholderTextColor={themeColors.textSecondary}
+                value={referralCodeInput}
+                onChangeText={setReferralCodeInput}
+                autoCapitalize="none"
+              />
+            </View>
+
+            <View style={styles.inputContainer}>
+              <Text style={[styles.label, { color: themeColors.text }]}>Referred By</Text>
+              <TextInput
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: themeColors.surface,
+                    borderColor: themeColors.border,
+                    color: themeColors.text
+                  }
+                ]}
+                placeholder="Enter name of person who referred you"
+                placeholderTextColor={themeColors.textSecondary}
+                value={referredByInput}
+                onChangeText={setReferredByInput}
+              />
             </View>
           </View>
 
@@ -407,6 +536,16 @@ const styles = StyleSheet.create({
     fontSize: fontSizes.sm,
     marginBottom: spacing.md,
     textAlign: 'center',
+    width: '100%',
+  },
+  referralSection: {
+    width: '100%',
+    marginBottom: spacing.xl,
+  },
+  sectionTitle: {
+    fontSize: fontSizes.lg,
+    fontWeight: '500',
+    marginBottom: spacing.lg,
     width: '100%',
   },
 });

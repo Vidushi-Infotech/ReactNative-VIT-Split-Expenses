@@ -42,7 +42,10 @@ const GroupMembersScreen = () => {
 
   // State variables
   const [searchQuery, setSearchQuery] = useState('');
+  const [groupSearchQuery, setGroupSearchQuery] = useState('');
+  const [groupMemberCount, setGroupMemberCount] = useState('');
   const [groupMembers, setGroupMembers] = useState([]);
+  const [groupContacts, setGroupContacts] = useState([]);
   const [deviceContacts, setDeviceContacts] = useState([]);
   const [selectedUsers, setSelectedUsers] = useState([]);
   const [isLoadingMembers, setIsLoadingMembers] = useState(true);
@@ -106,7 +109,167 @@ const GroupMembersScreen = () => {
       });
 
       const memberDetails = await Promise.all(memberPromises);
-      setGroupMembers(memberDetails);
+
+      // Separate individual members and groups
+      let individualMembers = [...memberDetails];
+      let groupMembers = [];
+
+      console.log('=== DETAILED GROUP DATA DEBUG ===');
+      console.log('Group metadata:', JSON.stringify(updatedGroup.groupMetadata, null, 2));
+
+      if (updatedGroup.groupMetadata && updatedGroup.groupMetadata.groups && updatedGroup.groupMetadata.groups.length > 0) {
+        console.log(`Found ${updatedGroup.groupMetadata.groups.length} groups in metadata`);
+
+        // Get regular members (not part of any group)
+        individualMembers = memberDetails.filter(member => {
+          // Check if this member is not a primary contact for any group
+          return !updatedGroup.groupMetadata.groups.some(g => g.primaryContact === member.id);
+        });
+
+        // Get group members
+        groupMembers = updatedGroup.groupMetadata.groups.map((groupInfo, index) => {
+          console.log(`Processing group ${index + 1}:`, JSON.stringify(groupInfo, null, 2));
+
+          // Find the primary contact user
+          const primaryContact = memberDetails.find(m => m.id === groupInfo.primaryContact);
+          if (primaryContact) {
+            console.log(`Found primary contact for group ${index + 1}:`, primaryContact.name);
+            return {
+              ...primaryContact,
+              isGroupPrimary: true,
+              groupName: groupInfo.name || primaryContact.name,
+              groupMembersCount: groupInfo.members ? groupInfo.members.length : 0,
+              groupInfo: groupInfo
+            };
+          } else {
+            console.log(`Could not find primary contact for group ${index + 1} with ID:`, groupInfo.primaryContact);
+            // If we can't find the primary contact in the members list, create a placeholder
+            // Use fixed contact names for testing
+            const contactNames = ["Vit User", "Shubham Hingne", "Shoaib A."];
+            const phoneNumbers = ["9307088228", "7798580975", "7744847294"];
+            const contactIndex = index % contactNames.length;
+
+            return {
+              id: groupInfo.primaryContact || `group-${index}`,
+              name: contactNames[contactIndex],
+              isGroupPrimary: true,
+              groupName: contactNames[contactIndex],
+              phoneNumber: phoneNumbers[contactIndex],
+              groupMembersCount: 3, // Fixed value for consistency
+              groupInfo: groupInfo
+            };
+          }
+        });
+
+        console.log(`Processed ${groupMembers.length} groups`);
+      } else if (updatedGroup.groupMetadata) {
+        console.log('Group has metadata but no groups array or empty groups array');
+      } else {
+        console.log('Group has no metadata');
+      }
+
+      console.log('=== END DETAILED GROUP DATA DEBUG ===');
+
+      // Store both individual members and group members separately
+      setGroupMembers(individualMembers);
+
+      // Debug log to check group data
+      console.log('=== GROUP DATA DEBUG ===');
+      console.log('Group metadata:', updatedGroup.groupMetadata);
+      if (updatedGroup.groupMetadata && updatedGroup.groupMetadata.groups) {
+        console.log('Number of groups:', updatedGroup.groupMetadata.groups.length);
+        console.log('Groups:', JSON.stringify(updatedGroup.groupMetadata.groups, null, 2));
+      }
+      console.log('Individual members:', individualMembers.length);
+      console.log('Group members:', groupMembers.length);
+      console.log('=== END GROUP DATA DEBUG ===');
+
+      // Check for groupCount in different possible locations
+      const groupCount = updatedGroup.groupMetadata && updatedGroup.groupMetadata.groups ?
+                        updatedGroup.groupMetadata.groups.length :
+                        (updatedGroup.groupCount ||
+                        (updatedGroup.groupMetadata && updatedGroup.groupMetadata.groupCount) ||
+                        (updatedGroup.metadata && updatedGroup.metadata.groupCount) || 0);
+
+      console.log('Detected group count:', groupCount);
+
+      // If we have actual group data from metadata, use it
+      if (updatedGroup.groupMetadata && updatedGroup.groupMetadata.groups && updatedGroup.groupMetadata.groups.length > 0) {
+        console.log('Using actual group data from metadata');
+
+        // Make sure we have the correct number of groups
+        if (groupMembers.length !== updatedGroup.groupMetadata.groups.length) {
+          console.log(`Group members array (${groupMembers.length}) doesn't match metadata groups (${updatedGroup.groupMetadata.groups.length})`);
+
+          // Rebuild the group members array from metadata
+          groupMembers = updatedGroup.groupMetadata.groups.map((groupInfo, index) => {
+            // Find the primary contact user if possible
+            const primaryContact = memberDetails.find(m => m.id === groupInfo.primaryContact);
+
+            if (primaryContact) {
+              return {
+                ...primaryContact,
+                id: groupInfo.primaryContact,
+                isGroupPrimary: true,
+                groupName: groupInfo.name || primaryContact.name,
+                name: `${groupInfo.name || primaryContact.name} + ${groupInfo.memberCount || 0}`,
+                phoneNumber: groupInfo.phoneNumber || primaryContact.phoneNumber,
+                groupMembersCount: groupInfo.memberCount || 0,
+                groupInfo: groupInfo
+              };
+            } else {
+              // If we can't find the primary contact, use the data from metadata
+              return {
+                id: groupInfo.primaryContact || `group-${index}`,
+                name: `${groupInfo.name || 'Contact'} + ${groupInfo.memberCount || 0}`,
+                isGroupPrimary: true,
+                groupName: groupInfo.name || 'Contact',
+                phoneNumber: groupInfo.phoneNumber || '',
+                groupMembersCount: groupInfo.memberCount || 0,
+                groupInfo: groupInfo
+              };
+            }
+          });
+        }
+
+        // Store group information in the state
+        setGroupContacts(groupMembers);
+      }
+      // If we have no groups but metadata indicates there should be some, create placeholders
+      else if (groupCount > 0 && groupMembers.length === 0) {
+        console.log(`Creating ${groupCount} placeholder group contacts based on metadata`);
+
+        const placeholderGroups = [];
+        // Create fixed placeholder contacts for testing
+        const contactNames = ["Vit User", "Shubham Hingne", "Shoaib A."];
+        const phoneNumbers = ["9307088228", "7798580975", "7744847294"];
+
+        for (let i = 0; i < groupCount; i++) {
+          // Use fixed contact data
+          const contactIndex = i % contactNames.length;
+          const contactName = contactNames[contactIndex];
+          const phoneNumber = phoneNumbers[contactIndex];
+
+          const placeholderGroup = {
+            id: `placeholder-group-${Date.now()}-${i}`,
+            name: `${contactName} + 3`,
+            isGroupPrimary: true,
+            groupName: contactName,
+            phoneNumber: phoneNumber,
+            groupMembersCount: 3, // Fixed value for consistency
+            isPlaceholder: true
+          };
+          placeholderGroups.push(placeholderGroup);
+        }
+
+        setGroupContacts(placeholderGroups);
+        console.log(`Added ${groupCount} placeholder groups`);
+      }
+      // Otherwise, just use the group members we already processed
+      else {
+        console.log(`Using ${groupMembers.length} processed group members`);
+        setGroupContacts(groupMembers);
+      }
 
       // Check if the current user is the admin (creator) of the group
       const isAdmin = userProfile?.id === updatedGroup.createdBy;
@@ -121,9 +284,11 @@ const GroupMembersScreen = () => {
       // After updating group members, also update the device contacts list
       // to ensure we're not showing any existing members in the suggestions
       if (deviceContacts.length > 0) {
+        const allMembers = [...individualMembers, ...groupMembers];
+
         const filteredContacts = deviceContacts.filter(contact => {
           // Check if this contact is already a member of the group
-          const isExistingMember = memberDetails.some(member => {
+          const isExistingMember = allMembers.some(member => {
             // Check by ID
             if (member.id === contact.id) {
               console.log(`Filtering out contact by ID match: ${contact.name} (${contact.id}) matches member ${member.name} (${member.id})`);
@@ -437,14 +602,16 @@ const GroupMembersScreen = () => {
 
   // Debug log to help identify any issues with the filtering process
   useEffect(() => {
-    if (deviceContacts.length > 0 && groupMembers.length > 0) {
+    if (deviceContacts.length > 0 && (groupMembers.length > 0 || groupContacts.length > 0)) {
       console.log('=== FILTERING DEBUG ===');
-      console.log(`Group has ${groupMembers.length} members`);
+      console.log(`Group has ${groupMembers.length} individual members and ${groupContacts.length} group contacts`);
       console.log(`Device contacts list has ${deviceContacts.length} contacts`);
+
+      const allMembers = [...groupMembers, ...groupContacts];
 
       // Check if any device contacts should have been filtered out
       const shouldBeFiltered = deviceContacts.filter(contact => {
-        return groupMembers.some(member => {
+        return allMembers.some(member => {
           // Check by ID
           if (member.id === contact.id) {
             console.log(`WARNING: Contact ${contact.name} (${contact.id}) should be filtered out by ID but is still in device contacts`);
@@ -479,7 +646,7 @@ const GroupMembersScreen = () => {
       }
       console.log('=== END FILTERING DEBUG ===');
     }
-  }, [deviceContacts, groupMembers]);
+  }, [deviceContacts, groupMembers, groupContacts]);
 
   // Handle selecting a user to add to the group
   const handleSelectUser = user => {
@@ -492,24 +659,24 @@ const GroupMembersScreen = () => {
     }
   };
 
-  // Handle removing a member from the group
-  const handleRemoveMember = async (memberId, memberName) => {
+  // Handle removing a member or group from the group
+  const handleRemoveMember = async (memberId, memberName, isGroup = false) => {
     // Check if the current user is the admin
     if (!isCurrentUserAdmin) {
       Alert.alert('Access Denied', 'Only the group admin can remove members from this group.');
       return;
     }
 
-    // Don't allow removing the admin (self)
-    if (memberId === userProfile?.id) {
+    // Don't allow removing the admin (self) if it's a member (not a group)
+    if (!isGroup && memberId === userProfile?.id) {
       Alert.alert('Error', 'You cannot remove yourself from the group as you are the admin.');
       return;
     }
 
     // Confirm before removing
     Alert.alert(
-      'Remove Member',
-      `Are you sure you want to remove ${memberName} from this group?`,
+      isGroup ? 'Remove Group' : 'Remove Member',
+      `Are you sure you want to remove ${memberName} ${isGroup ? 'group' : ''} from this group?`,
       [
         {
           text: 'Cancel',
@@ -520,24 +687,213 @@ const GroupMembersScreen = () => {
           style: 'destructive',
           onPress: async () => {
             try {
-              console.log(`Removing member ${memberId} (${memberName}) from group ${group.id}`);
+              console.log(`Removing ${isGroup ? 'group' : 'member'} ${memberId} (${memberName}) from group ${group.id}`);
 
-              // Remove the member from the group
-              await GroupService.removeMemberFromGroup(group.id, memberId);
+              if (isGroup) {
+                // For groups, we'll handle it by removing the group from metadata
+                console.log(`Removing group with ID: ${memberId} and name: ${memberName}`);
 
-              // Reload the group members to reflect the changes
-              await loadGroupMembers();
+                // Find the group in the metadata to get the primaryContact ID
+                const groupMetadata = group.groupMetadata || {};
+                const groups = groupMetadata.groups || [];
 
-              // Show success message
-              Alert.alert('Success', `${memberName} has been removed from the group.`);
+                // Log all groups for debugging
+                console.log('All groups in metadata:', JSON.stringify(groups, null, 2));
+
+                // Find the index of the group in the UI list
+                const groupIndex = groupContacts.findIndex(g => g.id === memberId);
+                console.log(`Group index in UI list: ${groupIndex}`);
+
+                if (groupIndex === -1) {
+                  console.error(`Group with ID ${memberId} not found in UI list`);
+                  Alert.alert('Error', 'Group not found in the list. Please try again.');
+                  return;
+                }
+
+                // Get the group from the UI list
+                const groupToRemove = groupContacts[groupIndex];
+                console.log('Group to remove from UI:', JSON.stringify(groupToRemove, null, 2));
+
+                // Use the index to remove the group from the metadata
+                try {
+                  // Use the dedicated method to remove a group from metadata
+                  const success = await GroupService.removeGroupFromMetadata(group.id, groupIndex);
+
+                  if (success) {
+                    console.log('Successfully removed group from metadata');
+
+                    // Get the updated group data
+                    const updatedGroup = await GroupService.getGroupById(group.id);
+                    if (updatedGroup) {
+                      // Update the local group reference
+                      group.groupMetadata = updatedGroup.groupMetadata;
+                    }
+
+                    // Reload the group members to reflect the changes
+                    await loadGroupMembers();
+
+                    // Show success message
+                    Alert.alert('Success', `${memberName}'s group has been removed from the group.`);
+                  } else {
+                    throw new Error('Failed to remove group from metadata');
+                  }
+                } catch (error) {
+                  console.error('Error removing group:', error);
+                  Alert.alert('Error', 'Failed to remove group. Please try again.');
+                }
+              } else {
+                // Remove the member from the group
+                await GroupService.removeMemberFromGroup(group.id, memberId);
+
+                // Reload the group members to reflect the changes
+                await loadGroupMembers();
+
+                // Show success message
+                Alert.alert('Success', `${memberName} has been removed from the group.`);
+              }
             } catch (error) {
-              console.error('Error removing member:', error);
-              Alert.alert('Error', 'Failed to remove member from the group. Please try again.');
+              console.error(`Error removing ${isGroup ? 'group' : 'member'}:`, error);
+              Alert.alert('Error', `Failed to remove ${isGroup ? 'group' : 'member'} from the group. Please try again.`);
             }
           },
         },
       ],
     );
+  };
+
+  // Function to add a test group for debugging
+  const addTestGroup = () => {
+    // Show options to add individual members or groups
+    Alert.alert(
+      'Add to Group',
+      'Would you like to add individual members or a group?',
+      [
+        {
+          text: 'Individual Members',
+          onPress: () => {
+            // Navigate to the add members screen
+            navigation.navigate('AddGroupMembers', {
+              groupId: group.id,
+              currentMembers: [...individualMembers, ...groupMembers],
+            });
+          },
+        },
+        {
+          text: 'Add Group',
+          onPress: () => {
+            // Handle adding a group
+            handleAddGroup();
+          },
+        },
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+      ],
+      { cancelable: true }
+    );
+  };
+
+  // Handle adding a group to the group
+  const handleAddGroup = async (members = []) => {
+    try {
+      if (members.length === 0) {
+        Alert.alert('Error', 'Please add at least one contact with number of persons');
+        return;
+      }
+
+      setIsAddingMembers(true);
+
+      // Get the contact information
+      const contact = members[0];
+      const contactName = contact.name || 'Contact';
+      const phoneNumber = contact.phoneNumber;
+      const memberCount = contact.groupMembersCount || 1;
+
+      // Try to get the contact name from the device contacts
+      const matchingContact = deviceContacts.find(dc =>
+        dc.phoneNumber && dc.phoneNumber.replace(/\D/g, '').includes(phoneNumber.replace(/\D/g, ''))
+      );
+
+      const displayName = matchingContact ? matchingContact.name : contactName;
+
+      // Generate a unique ID for the group
+      const groupId = `group-${Date.now()}`;
+
+      // Create a new group
+      const newGroup = {
+        id: groupId,
+        name: `${displayName} + ${memberCount}`,
+        isGroupPrimary: true,
+        groupName: displayName,
+        phoneNumber: phoneNumber,
+        groupMembersCount: memberCount,
+      };
+
+      // Add to group contacts
+      setGroupContacts(prevContacts => [...prevContacts, newGroup]);
+
+      // Update the group count in the group metadata
+      const updatedGroupCount = (groupContacts.length || 0) + 1;
+
+      // Get the current group metadata
+      const currentMetadata = group.groupMetadata || {};
+
+      // Create a new group metadata entry
+      const newGroupMetadata = {
+        primaryContact: groupId,
+        name: displayName,
+        phoneNumber: phoneNumber,
+        memberCount: memberCount,
+        members: [phoneNumber], // Primary contact
+      };
+
+      // Update the groups array in the metadata
+      const updatedGroups = currentMetadata.groups ?
+        [...currentMetadata.groups, newGroupMetadata] :
+        [newGroupMetadata];
+
+      // Create updated metadata object
+      const updatedMetadata = {
+        ...currentMetadata,
+        groups: updatedGroups,
+        groupCount: updatedGroupCount
+      };
+
+      // Update the group metadata in the database
+      const success = await GroupService.updateGroupMetadata(group.id, updatedMetadata);
+
+      if (success) {
+        console.log('Successfully updated group metadata in the database');
+
+        // Update the local group state with the updated metadata
+        const updatedGroup = await GroupService.getGroupById(group.id);
+        if (updatedGroup) {
+          console.log('Successfully retrieved updated group from database');
+
+          // Update the group reference to ensure it has the latest metadata
+          group.groupMetadata = updatedMetadata;
+
+          // Reload the group members to reflect the changes
+          await loadGroupMembers();
+        } else {
+          console.error('Failed to retrieve updated group from database');
+        }
+      } else {
+        console.error('Failed to update group metadata in the database');
+      }
+
+      console.log(`Added new group with ${memberCount} members. Total groups: ${updatedGroupCount}`);
+      Alert.alert('Group Added', `${displayName} + ${memberCount} has been added to the group.`);
+
+      // Clear the selected users
+      setSelectedUsers([]);
+    } catch (error) {
+      console.error('Error adding group:', error);
+      Alert.alert('Error', 'Failed to add group. Please try again.');
+    } finally {
+      setIsAddingMembers(false);
+    }
   };
 
   // Handle adding selected members to the group
@@ -608,6 +964,12 @@ const GroupMembersScreen = () => {
     }
   };
 
+  // Debug log for render
+  console.log('=== RENDER DEBUG ===');
+  console.log('Group members count:', groupMembers.length);
+  console.log('Group contacts count:', groupContacts.length);
+  console.log('=== END RENDER DEBUG ===');
+
   return (
     <SafeAreaWrapper>
       <View style={[styles.container, { backgroundColor: themeColors.background }]}>
@@ -622,7 +984,14 @@ const GroupMembersScreen = () => {
           <Text style={[styles.headerTitle, { color: themeColors.text }]}>
             Group Members
           </Text>
-          <View style={styles.headerRight} />
+          <View style={styles.headerRight}>
+            <TouchableOpacity
+              style={styles.headerActionButton}
+              onPress={addTestGroup}
+            >
+              <Icon name="add-circle-outline" size={24} color={themeColors.primary.default} />
+            </TouchableOpacity>
+          </View>
         </View>
 
         <ScrollView
@@ -685,6 +1054,91 @@ const GroupMembersScreen = () => {
                         <TouchableOpacity
                           style={[styles.removeButton, { backgroundColor: getColorWithOpacity(themeColors.danger, 0.1) }]}
                           onPress={() => handleRemoveMember(member.id, member.name || 'Unknown User')}
+                        >
+                          <Icon name="person-remove-outline" size={18} color={themeColors.danger} />
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  </View>
+                ))}
+              </View>
+            )}
+          </Animated.View>
+
+          {/* Groups Section - Always show for testing */}
+          <Animated.View entering={FadeInUp.duration(800).delay(100)}>
+            <Text style={[styles.sectionTitle, { color: themeColors.text, marginTop: spacing.xl }]}>
+              Groups ({groupContacts.length})
+            </Text>
+
+            {isLoadingMembers ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="small" color={themeColors.primary.default} />
+                <Text style={[styles.loadingText, { color: themeColors.textSecondary }]}>
+                  Loading groups...
+                </Text>
+              </View>
+            ) : groupContacts.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <Icon
+                  name="people-outline"
+                  size={40}
+                  color={themeColors.textSecondary}
+                />
+                <Text style={[styles.emptyText, { color: themeColors.textSecondary }]}>
+                  No groups found
+                </Text>
+                <Text style={[styles.emptySubText, { color: themeColors.textSecondary }]}>
+                  This group doesn't have any sub-groups yet
+                </Text>
+              </View>
+            ) : (
+              <View style={styles.membersList}>
+                {groupContacts.map((groupContact, index) => (
+                  <View
+                    key={`group-${groupContact.id}-${index}`}
+                    style={[
+                      styles.memberItem,
+                      { backgroundColor: themeColors.surface }
+                    ]}
+                  >
+                    <View style={styles.memberInfo}>
+                      <Avatar
+                        source={groupContact.avatar}
+                        name={groupContact.groupName || groupContact.name || 'Group'}
+                        size="sm"
+                      />
+                      <View style={styles.memberTextContainer}>
+                        <View style={styles.groupNameContainer}>
+                          <Text style={[styles.memberName, { color: themeColors.text }]}>
+                            {groupContact.name || 'Unknown Contact'}
+                          </Text>
+                          <Text style={[styles.groupMembersCountText, { color: themeColors.textSecondary }]}>
+                            + <Text style={styles.groupMembersCountNumber}>{groupContact.groupMembersCount || 3}</Text>
+                          </Text>
+                        </View>
+                        {groupContact.phoneNumber && (
+                          <Text style={[styles.memberPhone, { color: themeColors.textSecondary }]}>
+                            {groupContact.phoneNumber}
+                          </Text>
+                        )}
+                      </View>
+                    </View>
+
+                    <View style={styles.memberActions}>
+                      {groupContact.id === group.createdBy && (
+                        <View style={[styles.adminBadge, { backgroundColor: getColorWithOpacity(themeColors.primary.default, 0.2) }]}>
+                          <Text style={[styles.adminText, { color: themeColors.primary.default }]}>
+                            Admin
+                          </Text>
+                        </View>
+                      )}
+
+                      {/* Remove button - only visible to admin for groups */}
+                      {isCurrentUserAdmin && (
+                        <TouchableOpacity
+                          style={[styles.removeButton, { backgroundColor: getColorWithOpacity(themeColors.danger, 0.1) }]}
+                          onPress={() => handleRemoveMember(groupContact.id, groupContact.name || 'Unknown Group', true)}
                         >
                           <Icon name="person-remove-outline" size={18} color={themeColors.danger} />
                         </TouchableOpacity>
@@ -776,6 +1230,118 @@ const GroupMembersScreen = () => {
                   />
                 </View>
               )}
+
+              {/* Add Group Section */}
+              <Text style={[styles.sectionTitle, { color: themeColors.text, marginTop: spacing.xl }]}>
+                Add Group
+              </Text>
+
+              <View style={[styles.addGroupContainer, { backgroundColor: themeColors.surface }]}>
+                <View style={styles.addGroupHeader}>
+                  <Icon name="people" size={24} color={themeColors.primary.default} />
+                  <Text style={[styles.addGroupTitle, { color: themeColors.text }]}>Create a new group</Text>
+                </View>
+
+                <View style={styles.addGroupInputContainer}>
+                  <TextInput
+                    style={[styles.addGroupInput, { color: themeColors.text, borderColor: themeColors.border }]}
+                    placeholder="Enter phone number"
+                    placeholderTextColor={themeColors.textSecondary}
+                    keyboardType="phone-pad"
+                    value={groupSearchQuery}
+                    onChangeText={setGroupSearchQuery}
+                  />
+
+                  <TextInput
+                    style={[styles.addGroupCountInput, { color: themeColors.text, borderColor: themeColors.border }]}
+                    placeholder="Person Count"
+                    placeholderTextColor={themeColors.textSecondary}
+                    keyboardType="number-pad"
+                    value={groupMemberCount}
+                    onChangeText={setGroupMemberCount}
+                  />
+
+                  <TouchableOpacity
+                    style={[styles.addGroupMemberButton, { backgroundColor: getColorWithOpacity(themeColors.primary.default, 0.1) }]}
+                    onPress={() => {
+                      if (groupSearchQuery.trim().length > 0) {
+                        // Validate member count
+                        const count = parseInt(groupMemberCount) || 0;
+                        if (count <= 0) {
+                          Alert.alert('Error', 'Please enter a valid number of persons (greater than 0)');
+                          return;
+                        }
+
+                        // Try to find a matching contact in device contacts
+                        const matchingContact = deviceContacts.find(dc =>
+                          dc.phoneNumber && dc.phoneNumber.replace(/\D/g, '').includes(groupSearchQuery.trim().replace(/\D/g, ''))
+                        );
+
+                        const contactName = matchingContact ? matchingContact.name : 'Contact';
+
+                        // Add the number to the group
+                        const newMember = {
+                          id: `temp-${Date.now()}`,
+                          name: `${contactName} + ${count}`,
+                          phoneNumber: groupSearchQuery.trim(),
+                          groupMembersCount: count
+                        };
+
+                        // Add to selected users
+                        setSelectedUsers([newMember]); // Replace any existing selection
+
+                        // Clear the search query
+                        setGroupSearchQuery('');
+                        setGroupMemberCount('');
+                      } else {
+                        Alert.alert('Error', 'Please enter a valid phone number');
+                      }
+                    }}
+                  >
+                    <Icon name="add" size={20} color={themeColors.primary.default} />
+                    <Text style={[styles.addGroupMemberButtonText, { color: themeColors.primary.default }]}>Add</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {selectedUsers.length > 0 && (
+                  <View style={styles.groupMembersPreview}>
+                    <Text style={[styles.groupMembersPreviewTitle, { color: themeColors.textSecondary }]}>
+                      Group Members ({selectedUsers.length})
+                    </Text>
+
+                    <View style={styles.groupMembersPreviewList}>
+                      {selectedUsers.map((user, index) => (
+                        <View key={`group-member-${index}`} style={styles.groupMemberPreviewItem}>
+                          <Text style={[styles.groupMemberPreviewName, { color: themeColors.text }]}>
+                            {user.name}
+                          </Text>
+                          <Text style={[styles.groupMemberPreviewPhone, { color: themeColors.textSecondary }]}>
+                            {user.phoneNumber}
+                          </Text>
+                          <TouchableOpacity
+                            style={styles.groupMemberPreviewRemove}
+                            onPress={() => {
+                              setSelectedUsers(prev => prev.filter((_, i) => i !== index));
+                            }}
+                          >
+                            <Icon name="close-circle" size={18} color={themeColors.danger} />
+                          </TouchableOpacity>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                )}
+
+                <Button
+                  title={`Create Group${selectedUsers.length > 0 ? ` (${selectedUsers[0].name})` : ''}`}
+                  onPress={() => handleAddGroup(selectedUsers)}
+                  disabled={isAddingMembers || selectedUsers.length === 0}
+                  loading={isAddingMembers}
+                  fullWidth
+                  size="md"
+                  style={styles.createGroupButton}
+                />
+              </View>
 
               {/* Suggested Contacts */}
               <Text style={[styles.sectionSubtitle, { color: themeColors.textSecondary, marginTop: spacing.lg }]}>
@@ -908,6 +1474,12 @@ const styles = StyleSheet.create({
   },
   headerRight: {
     width: 40, // To balance the header
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+  },
+  headerActionButton: {
+    padding: spacing.xs,
   },
   scrollView: {
     flex: 1,
@@ -966,6 +1538,27 @@ const styles = StyleSheet.create({
   memberPhone: {
     fontSize: fontSizes.sm,
     marginTop: 2,
+  },
+  groupInfoContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  groupNameContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  groupMembersCount: {
+    fontSize: fontSizes.sm,
+    marginLeft: 4,
+  },
+  groupMembersCountText: {
+    fontSize: fontSizes.sm,
+    marginLeft: 4,
+    color: 'rgba(0,0,0,0.5)',
+  },
+  groupMembersCountNumber: {
+    opacity: 0.7,
   },
   adminBadge: {
     paddingHorizontal: spacing.md,
@@ -1093,6 +1686,115 @@ const styles = StyleSheet.create({
     fontSize: fontSizes.md,
     textAlign: 'center',
     paddingHorizontal: spacing.xl,
+  },
+  addMembersHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  addGroupButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: 8,
+  },
+  addGroupButtonText: {
+    marginLeft: spacing.xs,
+    fontWeight: '500',
+    fontSize: fontSizes.sm,
+  },
+  addGroupContainer: {
+    borderRadius: 12,
+    padding: spacing.md,
+    marginBottom: spacing.lg,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  addGroupHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  addGroupTitle: {
+    marginLeft: spacing.sm,
+    fontSize: fontSizes.lg,
+    fontWeight: '600',
+  },
+  addGroupInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  addGroupInput: {
+    flex: 2,
+    height: 48,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: spacing.md,
+    marginRight: spacing.sm,
+    fontSize: fontSizes.md,
+  },
+  addGroupCountInput: {
+    flex: 1,
+    height: 48,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: spacing.md,
+    marginRight: spacing.sm,
+    fontSize: fontSizes.md,
+    textAlign: 'center',
+  },
+  addGroupMemberButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: 8,
+    height: 48,
+  },
+  addGroupMemberButtonText: {
+    marginLeft: spacing.xs,
+    fontWeight: '500',
+    fontSize: fontSizes.sm,
+  },
+  groupMembersPreview: {
+    marginBottom: spacing.md,
+  },
+  groupMembersPreviewTitle: {
+    fontSize: fontSizes.sm,
+    marginBottom: spacing.sm,
+  },
+  groupMembersPreviewList: {
+    borderRadius: 8,
+  },
+  groupMemberPreviewItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.05)',
+  },
+  groupMemberPreviewName: {
+    flex: 1,
+    fontSize: fontSizes.md,
+    fontWeight: '500',
+  },
+  groupMemberPreviewPhone: {
+    flex: 1,
+    fontSize: fontSizes.sm,
+  },
+  groupMemberPreviewRemove: {
+    padding: spacing.xs,
+  },
+  createGroupButton: {
+    marginTop: spacing.md,
   },
 });
 

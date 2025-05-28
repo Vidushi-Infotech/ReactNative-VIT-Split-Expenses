@@ -10,9 +10,11 @@
  *
  * @param {Array} participants - Array of participants with their paid amounts and participation status
  *   Each participant object should have: { id, name, amountPaid, isParticipating }
+ * @param {string} splitType - Type of split: 'equal', 'unequal', or 'group'
+ * @param {Object} customSplits - Object with participant IDs as keys and percentage shares as values
  * @returns {Object} Split calculation result with individual shares and balances
  */
-const calculateExpenseSplit = (participants) => {
+const calculateExpenseSplit = (participants, splitType = 'equal', customSplits = null) => {
   if (!participants || !Array.isArray(participants) || participants.length === 0) {
     return {
       totalExpense: 0,
@@ -43,32 +45,70 @@ const calculateExpenseSplit = (participants) => {
   // Calculate total expense from all contributions
   const totalExpense = participatingMembers.reduce((sum, p) => sum + (p.amountPaid || 0), 0);
 
-  // Calculate per-person share (total ÷ number of participants)
-  const participantCount = participatingMembers.length;
-  const individualShare = totalExpense / participantCount;
+  // Calculate shares based on split type
+  let updatedParticipants;
 
-  // Calculate each person's balance (paid - share)
-  const updatedParticipants = participants.map(p => {
-    // If not participating, their share is 0 but they keep what they paid
-    const share = p.isParticipating ? individualShare : 0;
-    const amountPaid = p.amountPaid || 0;
-    const balance = amountPaid - share;
+  if (splitType === 'unequal' && customSplits) {
+    // Unequal split based on custom percentages
+    updatedParticipants = participants.map(p => {
+      // If not participating, their share is 0 but they keep what they paid
+      const percentShare = p.isParticipating ? (customSplits[p.id] || 0) / 100 : 0;
+      const share = totalExpense * percentShare;
+      const amountPaid = p.amountPaid || 0;
+      const balance = amountPaid - share;
 
-    return {
-      ...p,
-      share,
-      balance,
-      amountPaid
-    };
-  });
+      return {
+        ...p,
+        share,
+        balance,
+        amountPaid,
+        percentShare: percentShare * 100
+      };
+    });
+  } else if (splitType === 'group') {
+    // Group-based split (not implemented yet, fallback to equal)
+    // This could be extended to handle group-specific logic
+    const participantCount = participatingMembers.length;
+    const individualShare = totalExpense / participantCount;
+
+    updatedParticipants = participants.map(p => {
+      const share = p.isParticipating ? individualShare : 0;
+      const amountPaid = p.amountPaid || 0;
+      const balance = amountPaid - share;
+
+      return {
+        ...p,
+        share,
+        balance,
+        amountPaid
+      };
+    });
+  } else {
+    // Default: Equal split
+    const participantCount = participatingMembers.length;
+    const individualShare = totalExpense / participantCount;
+
+    updatedParticipants = participants.map(p => {
+      const share = p.isParticipating ? individualShare : 0;
+      const amountPaid = p.amountPaid || 0;
+      const balance = amountPaid - share;
+
+      return {
+        ...p,
+        share,
+        balance,
+        amountPaid
+      };
+    });
+  }
 
   // Generate settlements between members
   const settlements = generateSettlements(updatedParticipants);
 
   return {
     totalExpense,
-    individualShare,
-    participantCount,
+    splitType,
+    participantCount: participatingMembers.length,
     participants: updatedParticipants,
     settlements
   };

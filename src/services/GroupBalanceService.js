@@ -361,8 +361,16 @@ class GroupBalanceService {
         };
       });
 
-      // Calculate expense split using the new calculator
-      const splitResult = expenseSplitCalculator.calculateExpenseSplit(expenseParticipants);
+      // Get split type and custom splits from expense data
+      const splitType = expense.splitType || 'equal';
+      const customSplits = expense.customSplits || null;
+
+      // Calculate expense split using the new calculator with split type and custom splits
+      const splitResult = expenseSplitCalculator.calculateExpenseSplit(
+        expenseParticipants,
+        splitType,
+        customSplits
+      );
 
       // Update balances based on the settlements
       const updatePromises = [];

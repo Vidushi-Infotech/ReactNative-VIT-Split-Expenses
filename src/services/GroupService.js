@@ -1,5 +1,6 @@
 import { collection, addDoc, getDocs, query, where, doc, getDoc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { getFirestoreDb, isFirebaseInitialized } from '../config/firebase';
+import retryOperation from '../utils/firestoreRetry';
 
 /**
  * Service for handling group-related operations with Firebase
@@ -56,25 +57,31 @@ class GroupService {
         return [];
       }
 
-      // Query groups where the user is a member
-      const q = query(
-        collection(db, 'Groups'),
-        where('members', 'array-contains', userId)
-      );
+      // Use retry operation for Firestore query
+      return await retryOperation(async () => {
+        console.log('Fetching groups for user:', userId);
 
-      const querySnapshot = await getDocs(q);
-      const groups = [];
+        // Query groups where the user is a member
+        const q = query(
+          collection(db, 'Groups'),
+          where('members', 'array-contains', userId)
+        );
 
-      querySnapshot.forEach((document) => {
-        groups.push({
-          id: document.id,
-          ...document.data(),
+        const querySnapshot = await getDocs(q);
+        const groups = [];
+
+        querySnapshot.forEach((document) => {
+          groups.push({
+            id: document.id,
+            ...document.data(),
+          });
         });
-      });
 
-      return groups;
+        console.log(`Successfully fetched ${groups.length} groups for user ${userId}`);
+        return groups;
+      }, 5, 2000); // 5 retries with 2 second initial delay
     } catch (error) {
-      console.error('Error getting user groups:', error);
+      console.error('Error getting user groups after retries:', error);
       return []; // Return empty array instead of throwing to prevent app crashes
     }
   }
@@ -97,20 +104,26 @@ class GroupService {
         return null;
       }
 
-      const docRef = doc(db, 'Groups', groupId);
-      const docSnap = await getDoc(docRef);
+      // Use retry operation for Firestore query
+      return await retryOperation(async () => {
+        console.log('Fetching group with ID:', groupId);
 
-      if (docSnap.exists()) {
-        return {
-          id: docSnap.id,
-          ...docSnap.data(),
-        };
-      } else {
-        console.log('No such group!');
-        return null;
-      }
+        const docRef = doc(db, 'Groups', groupId);
+        const docSnap = await getDoc(docRef);
+
+        if (docSnap.exists()) {
+          console.log(`Successfully fetched group ${groupId}`);
+          return {
+            id: docSnap.id,
+            ...docSnap.data(),
+          };
+        } else {
+          console.log('No such group!');
+          return null;
+        }
+      }, 5, 2000); // 5 retries with 2 second initial delay
     } catch (error) {
-      console.error('Error getting group:', error);
+      console.error('Error getting group after retries:', error);
       return null; // Return null instead of throwing to prevent app crashes
     }
   }
@@ -229,6 +242,136 @@ class GroupService {
     } catch (error) {
       console.error('Error removing member from group:', error);
       return false; // Return false instead of throwing to prevent app crashes
+    }
+  }
+
+  /**
+   * Update group metadata
+   * @param {string} groupId - The group ID
+   * @param {Object} metadata - The metadata to update
+   * @returns {Promise<boolean>} - Success status
+   */
+  static async updateGroupMetadata(groupId, metadata) {
+    try {
+      if (!isFirebaseInitialized()) {
+        console.error('Firebase is not initialized. Cannot update group metadata.');
+        return false;
+      }
+
+      const db = getFirestoreDb();
+      if (!db) {
+        console.error('Failed to get Firestore instance');
+        return false;
+      }
+
+      const groupRef = doc(db, 'Groups', groupId);
+
+      // Get the current group data
+      const groupDoc = await getDoc(groupRef);
+      if (!groupDoc.exists()) {
+        console.error('Group not found');
+        return false;
+      }
+
+      // Update the group metadata
+      await updateDoc(groupRef, {
+        groupMetadata: metadata,
+        updatedAt: new Date().toISOString(),
+      });
+
+      return true;
+    } catch (error) {
+      console.error('Error updating group metadata:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Remove a group from a group's metadata
+   * @param {string} groupId - The group ID
+   * @param {number} groupIndex - The index of the group to remove in the groups array
+   * @returns {Promise<boolean>} - Success status
+   */
+  static async removeGroupFromMetadata(groupId, groupIndex) {
+    try {
+      if (!isFirebaseInitialized()) {
+        console.error('Firebase is not initialized. Cannot remove group from metadata.');
+        return false;
+      }
+
+      const db = getFirestoreDb();
+      if (!db) {
+        console.error('Failed to get Firestore instance');
+        return false;
+      }
+
+      console.log(`Attempting to remove group at index ${groupIndex} from group ${groupId}`);
+
+      // Get the current group data
+      const group = await this.getGroupById(groupId);
+      if (!group) {
+        console.error('Group not found');
+        return false;
+      }
+
+      // Get the current metadata
+      const currentMetadata = group.groupMetadata || {};
+      console.log('Current metadata:', JSON.stringify(currentMetadata, null, 2));
+
+      // Check if groups array exists
+      if (!currentMetadata.groups || !Array.isArray(currentMetadata.groups)) {
+        console.warn('No groups array found in metadata or it is not an array');
+        return false;
+      }
+
+      console.log(`Found ${currentMetadata.groups.length} groups in metadata`);
+
+      // Log all group IDs for debugging
+      currentMetadata.groups.forEach((g, index) => {
+        console.log(`Group ${index}: primaryContact=${g.primaryContact}, name=${g.name}`);
+      });
+
+      // Make a copy of the current groups array
+      const updatedGroups = [...currentMetadata.groups];
+
+      // Check if the index is valid
+      if (groupIndex < 0 || groupIndex >= updatedGroups.length) {
+        console.warn(`Invalid group index: ${groupIndex}. Valid range is 0-${updatedGroups.length - 1}`);
+        return false;
+      }
+
+      // Log the group that will be removed
+      console.log('Group to remove:', JSON.stringify(updatedGroups[groupIndex], null, 2));
+
+      // Remove only the specific group at the given index
+      updatedGroups.splice(groupIndex, 1);
+
+      console.log(`Groups before: ${currentMetadata.groups.length}, after: ${updatedGroups.length}`);
+
+      // Update the group count in the metadata
+      const updatedGroupCount = updatedGroups.length;
+
+      // Create updated metadata object
+      const updatedMetadata = {
+        ...currentMetadata,
+        groups: updatedGroups,
+        groupCount: updatedGroupCount
+      };
+
+      console.log('Updated metadata:', JSON.stringify(updatedMetadata, null, 2));
+
+      // Update the group metadata in the database
+      const groupRef = doc(db, 'Groups', groupId);
+      await updateDoc(groupRef, {
+        groupMetadata: updatedMetadata,
+        updatedAt: new Date().toISOString(),
+      });
+
+      console.log('Successfully updated group metadata in the database');
+      return true;
+    } catch (error) {
+      console.error('Error removing group from metadata:', error);
+      return false;
     }
   }
 

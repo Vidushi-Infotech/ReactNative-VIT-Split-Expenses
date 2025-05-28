@@ -163,9 +163,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
+  membersTextRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   membersText: {
     fontSize: 14,
     fontWeight: '500',
+  },
+  groupsText: {
+    fontSize: 14,
+    fontWeight: '500',
+    marginLeft: spacing.xs,
+    opacity: 0.8,
   },
   memberArrow: {
     marginLeft: spacing.xs,
@@ -511,6 +521,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: spacing.sm,
   },
+  balanceSummaryContent: {
+    alignItems: 'center',
+    width: '100%',
+  },
   balanceSummaryLabel: {
     fontSize: 12,
     marginBottom: spacing.xs,
@@ -518,6 +532,16 @@ const styles = StyleSheet.create({
   balanceSummaryAmount: {
     fontSize: 20,
     fontWeight: 'bold',
+  },
+  balanceSummaryCount: {
+    fontSize: 12,
+    fontWeight: '500',
+    marginTop: spacing.xs,
+  },
+  balanceSummarySubtext: {
+    fontSize: 10,
+    marginTop: spacing.xs / 2,
+    fontStyle: 'italic',
   },
 
   // Settlement Modal Styles

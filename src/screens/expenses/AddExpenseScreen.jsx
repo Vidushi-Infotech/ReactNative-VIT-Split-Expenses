@@ -46,6 +46,12 @@ const AddExpenseScreen = () => {
   const [date, setDate] = useState(new Date());
   const [image, setImage] = useState(null);
   const [participants, setParticipants] = useState([]);
+  const [paidBy, setPaidBy] = useState(''); // No default value - must be selected manually
+  const [splitType, setSplitType] = useState('equal'); // 'equal', 'unequal', 'group'
+  const [customSplits, setCustomSplits] = useState({});
+  const [customAmounts, setCustomAmounts] = useState({});
+  const [paidByModalVisible, setPaidByModalVisible] = useState(false);
+  const [splitTypeModalVisible, setSplitTypeModalVisible] = useState(false);
   const [loading, setLoading] = useState(false);
 
   // UI state
@@ -69,6 +75,20 @@ const AddExpenseScreen = () => {
       setParticipants([userProfile.id]);
     }
   }, [userProfile]);
+
+  // Initialize custom splits when participants change
+  useEffect(() => {
+    if (participants.length > 0) {
+      const equalShare = 100 / participants.length;
+      const newCustomSplits = {};
+
+      participants.forEach(participantId => {
+        newCustomSplits[participantId] = equalShare;
+      });
+
+      setCustomSplits(newCustomSplits);
+    }
+  }, [participants]);
 
   // Function to fetch group data
   const fetchGroupData = async () => {
@@ -218,9 +238,51 @@ const AddExpenseScreen = () => {
       return;
     }
 
+    if (!paidBy) {
+      Alert.alert('Missing Information', 'Please select who paid for this expense.');
+      return;
+    }
+
     if (!userProfile || !userProfile.id) {
       Alert.alert('Error', 'You must be logged in to add an expense.');
       return;
+    }
+
+    // Validate custom splits if using unequal splitting
+    if (splitType === 'unequal') {
+      const totalPercentage = Object.values(customSplits).reduce((sum, value) => sum + value, 0);
+      if (Math.abs(totalPercentage - 100) > 0.1) { // Allow small floating point errors
+        Alert.alert('Invalid Split', 'The total percentage must equal 100%.');
+        return;
+      }
+
+      // Also validate that total amount matches
+      const totalCustomAmount = Object.values(customAmounts).reduce((sum, value) => sum + (value || 0), 0);
+      if (Math.abs(totalCustomAmount - parseFloat(amount)) > 0.1) {
+        Alert.alert(
+          'Amount Mismatch',
+          `The sum of individual amounts (₹${totalCustomAmount.toFixed(2)}) doesn't match the total expense amount (₹${parseFloat(amount).toFixed(2)}).`,
+          [
+            {
+              text: 'Fix Automatically',
+              onPress: () => {
+                // Adjust the amounts proportionally to match the total
+                const newAmounts = {};
+                const factor = parseFloat(amount) / totalCustomAmount;
+
+                Object.keys(customAmounts).forEach(id => {
+                  newAmounts[id] = (customAmounts[id] || 0) * factor;
+                });
+
+                setCustomAmounts(newAmounts);
+                Alert.alert('Amounts Adjusted', 'Individual amounts have been adjusted to match the total.');
+              }
+            },
+            { text: 'Cancel', style: 'cancel' }
+          ]
+        );
+        return;
+      }
     }
 
     setLoading(true);
@@ -233,8 +295,11 @@ const AddExpenseScreen = () => {
         description,
         category,
         date: date.toISOString(),
-        paidBy: userProfile.id,
+        paidBy: paidBy,
         participants: participants,
+        splitType: splitType,
+        customSplits: splitType === 'unequal' ? customSplits : null,
+        customAmounts: splitType === 'unequal' ? customAmounts : null,
         createdAt: new Date().toISOString(),
         image: image || null,
       };
@@ -252,8 +317,12 @@ const AddExpenseScreen = () => {
         // Continue even if split payment creation fails
       }
 
-      // Send notifications to all participants except the creator
-      const participantsToNotify = participants.filter(userId => userId !== userProfile.id);
+      // Find the payer's name
+      const payer = groupMembers.find(member => member.id === paidBy);
+      const payerName = payer ? payer.name : 'A user';
+
+      // Send notifications to all participants except the payer
+      const participantsToNotify = participants.filter(userId => userId !== paidBy);
 
       if (participantsToNotify.length > 0) {
         try {
@@ -262,7 +331,7 @@ const AddExpenseScreen = () => {
             return NotificationService.createExpenseAddedNotification(
               userId,
               group.name,
-              userProfile.name || 'A user',
+              payerName,
               parseFloat(amount),
               description,
               groupId,
@@ -445,6 +514,8 @@ const AddExpenseScreen = () => {
             </ScrollView>
           </Animated.View>
 
+
+
           {/* Date Section */}
           <Animated.View
             entering={FadeInUp.duration(800).delay(500)}
@@ -544,6 +615,212 @@ const AddExpenseScreen = () => {
             </TouchableOpacity>
           </Animated.View>
 
+          {/* Paid By Section */}
+          <Animated.View
+            entering={FadeInUp.duration(800).delay(625)}
+            style={[styles.card, { backgroundColor: themeColors.card }]}
+          >
+            <View style={styles.sectionHeader}>
+              <Text style={[styles.sectionTitle, { color: themeColors.text }]}>
+                Paid By
+              </Text>
+              {!paidBy && (
+                <Text style={[styles.requiredField, { color: colors.error }]}>
+                  * Required
+                </Text>
+              )}
+            </View>
+
+            <TouchableOpacity
+              onPress={() => setPaidByModalVisible(true)}
+              style={[
+                styles.dateButton,
+                {
+                  backgroundColor: themeColors.inputBg,
+                  borderWidth: !paidBy ? 1 : 0,
+                  borderColor: !paidBy ? colors.error : 'transparent',
+                  borderStyle: !paidBy ? 'dashed' : 'solid'
+                }
+              ]}
+            >
+              <Icon
+                name="person-outline"
+                size={20}
+                color={!paidBy ? colors.error : colors.primary.default}
+              />
+              <Text
+                style={[
+                  styles.dateText,
+                  {
+                    color: !paidBy ? colors.error : themeColors.text,
+                    fontStyle: !paidBy ? 'italic' : 'normal'
+                  }
+                ]}
+              >
+                {groupMembers.find(member => member.id === paidBy)?.name || 'Select who paid for this expense'}
+              </Text>
+              <Icon
+                name="chevron-down"
+                size={18}
+                color={!paidBy ? colors.error : themeColors.textSecondary}
+                style={styles.dateIcon}
+              />
+            </TouchableOpacity>
+
+            {/* Paid By Modal */}
+            <Modal
+              visible={paidByModalVisible}
+              transparent={true}
+              animationType="slide"
+              onRequestClose={() => setPaidByModalVisible(false)}
+            >
+              <TouchableOpacity
+                style={styles.modalOverlay}
+                activeOpacity={1}
+                onPress={() => setPaidByModalVisible(false)}
+              >
+                <View
+                  style={[styles.modalContent, { backgroundColor: themeColors.card }]}
+                  onStartShouldSetResponder={() => true}
+                >
+                  <View style={styles.modalHeader}>
+                    <Text style={[styles.modalTitle, { color: themeColors.text }]}>Who paid?</Text>
+                    <TouchableOpacity onPress={() => setPaidByModalVisible(false)}>
+                      <Icon name="close" size={24} color={themeColors.text} />
+                    </TouchableOpacity>
+                  </View>
+
+                  <ScrollView style={styles.modalScrollView}>
+                    {groupMembers.map(member => (
+                      <TouchableOpacity
+                        key={member.id}
+                        style={[
+                          styles.memberItem,
+                          paidBy === member.id && {
+                            backgroundColor: colors.primary.light,
+                            borderColor: colors.primary.default
+                          }
+                        ]}
+                        onPress={() => {
+                          setPaidBy(member.id);
+                          setPaidByModalVisible(false);
+                        }}
+                      >
+                        <Avatar
+                          source={member.avatar}
+                          name={member.name}
+                          size="sm"
+                        />
+                        <Text style={[
+                          styles.memberName,
+                          { color: themeColors.text },
+                          paidBy === member.id && { fontWeight: 'bold', color: colors.primary.default }
+                        ]}>
+                          {member.name}
+                        </Text>
+                        {paidBy === member.id && (
+                          <Icon name="checkmark-circle" size={20} color={colors.primary.default} />
+                        )}
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
+              </TouchableOpacity>
+            </Modal>
+          </Animated.View>
+
+          {/* Split Type Section */}
+          <Animated.View
+            entering={FadeInUp.duration(800).delay(650)}
+            style={[styles.card, { backgroundColor: themeColors.card }]}
+          >
+            <Text style={[styles.sectionTitle, { color: themeColors.text }]}>
+              Split Type
+            </Text>
+
+            <View style={styles.splitTypeContainer}>
+              <TouchableOpacity
+                style={[
+                  styles.splitTypeButton,
+                  splitType === 'equal' && {
+                    backgroundColor: colors.primary.light,
+                    borderColor: colors.primary.default
+                  },
+                  { borderColor: themeColors.border }
+                ]}
+                onPress={() => setSplitType('equal')}
+              >
+                <Icon
+                  name="reorder-four-outline"
+                  size={20}
+                  color={splitType === 'equal' ? colors.primary.default : themeColors.textSecondary}
+                />
+                <Text style={[
+                  styles.splitTypeText,
+                  { color: themeColors.text },
+                  splitType === 'equal' && { fontWeight: 'bold', color: colors.primary.default }
+                ]}>
+                  Equal
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.splitTypeButton,
+                  splitType === 'unequal' && {
+                    backgroundColor: colors.primary.light,
+                    borderColor: colors.primary.default
+                  },
+                  { borderColor: themeColors.border }
+                ]}
+                onPress={() => setSplitType('unequal')}
+              >
+                <Icon
+                  name="options-outline"
+                  size={20}
+                  color={splitType === 'unequal' ? colors.primary.default : themeColors.textSecondary}
+                />
+                <Text style={[
+                  styles.splitTypeText,
+                  { color: themeColors.text },
+                  splitType === 'unequal' && { fontWeight: 'bold', color: colors.primary.default }
+                ]}>
+                  Unequal
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.splitTypeButton,
+                  splitType === 'group' && {
+                    backgroundColor: colors.primary.light,
+                    borderColor: colors.primary.default
+                  },
+                  { borderColor: themeColors.border }
+                ]}
+                onPress={() => setSplitType('group')}
+              >
+                <Icon
+                  name="people-outline"
+                  size={20}
+                  color={splitType === 'group' ? colors.primary.default : themeColors.textSecondary}
+                />
+                <Text style={[
+                  styles.splitTypeText,
+                  { color: themeColors.text },
+                  splitType === 'group' && { fontWeight: 'bold', color: colors.primary.default }
+                ]}>
+                  By Group
+                </Text>
+                {splitType === 'group' && (
+                  <Text style={[styles.splitTypeDescription, { color: themeColors.textSecondary }]}>
+                    (Coming soon)
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </Animated.View>
+
           {/* Participants Section */}
           <Animated.View
             entering={FadeInUp.duration(800).delay(700)}
@@ -560,16 +837,15 @@ const AddExpenseScreen = () => {
 
             <View style={styles.participantsContainer}>
               {groupMembers.map((member, index) => {
-
                 const isSelected = participants.includes(member.id);
+                const percentShare = customSplits[member.id] || 0;
 
                 return (
                   <Animated.View
                     key={member.id}
                     entering={FadeInUp.delay(700 + index * 100).duration(500)}
                   >
-                    <TouchableOpacity
-                      onPress={() => handleToggleParticipant(member.id)}
+                    <View
                       style={[
                         styles.participantRow,
                         index < groupMembers.length - 1 && {
@@ -578,7 +854,13 @@ const AddExpenseScreen = () => {
                         }
                       ]}
                     >
-                      <View style={styles.participantInfo}>
+                      <TouchableOpacity
+                        onPress={() => handleToggleParticipant(member.id)}
+                        style={[
+                          styles.participantInfo,
+                          { flex: splitType === 'unequal' && isSelected ? 0.7 : 1 }
+                        ]}
+                      >
                         <View style={[styles.avatarContainer, isSelected && styles.selectedAvatarContainer]}>
                           <Avatar source={member.avatar} name={member.name} size="md" />
                           {isSelected && (
@@ -588,33 +870,139 @@ const AddExpenseScreen = () => {
                           )}
                         </View>
                         <View>
-                          <Text style={[styles.participantName, { color: themeColors.text }]}>
-                            {member.id === userProfile?.id ? 'Me' : member.name}
-                          </Text>
+                          <View style={styles.nameContainer}>
+                            <Text style={[styles.participantName, { color: themeColors.text }]}>
+                              {member.id === userProfile?.id ? 'Me' : member.name}
+                            </Text>
+
+                            {/* Show "Paid" label if this member is the payer */}
+                            {member.id === paidBy && (
+                              <View style={[styles.paidBadge, { backgroundColor: colors.success }]}>
+                                <Text style={styles.paidBadgeText}>Paid</Text>
+                              </View>
+                            )}
+                          </View>
                           <Text style={[styles.participantEmail, { color: themeColors.textSecondary }]}>
                             {member.id === userProfile?.id ? 'You' : (member.phoneNumber || 'No phone')}
                           </Text>
                         </View>
-                      </View>
+                      </TouchableOpacity>
 
-                      <View
-                        style={[
-                          styles.checkboxContainer,
-                          {
-                            borderColor: isSelected ? colors.primary.default : themeColors.border,
-                            backgroundColor: isSelected ? colors.primary.default : 'transparent'
-                          }
-                        ]}
-                      >
-                        {isSelected && (
-                          <Icon name="checkmark" size={16} color={colors.white} />
-                        )}
-                      </View>
-                    </TouchableOpacity>
+                      {/* Show amount/percentage input for unequal split */}
+                      {splitType === 'unequal' && isSelected && (
+                        <View style={styles.splitInputContainer}>
+                          {/* Amount input */}
+                          <View style={styles.amountInputContainer}>
+                            <Text style={[styles.currencySymbolSmall, { color: themeColors.textSecondary }]}>₹</Text>
+                            <TextInput
+                              style={[
+                                styles.amountInputSmall,
+                                {
+                                  color: themeColors.text,
+                                  backgroundColor: themeColors.inputBg,
+                                  borderColor: themeColors.border
+                                }
+                              ]}
+                              value={(customAmounts[member.id] || '').toString()}
+                              onChangeText={(text) => {
+                                const newValue = parseFloat(text) || 0;
+
+                                // Update the amount for this member
+                                setCustomAmounts({
+                                  ...customAmounts,
+                                  [member.id]: newValue
+                                });
+
+                                // Calculate percentage based on total amount
+                                if (amount && parseFloat(amount) > 0) {
+                                  const percentage = (newValue / parseFloat(amount)) * 100;
+                                  setCustomSplits({
+                                    ...customSplits,
+                                    [member.id]: parseFloat(percentage.toFixed(1))
+                                  });
+                                }
+                              }}
+                              keyboardType="numeric"
+                              placeholder="0.00"
+                              placeholderTextColor={themeColors.placeholder}
+                            />
+                          </View>
+
+                          {/* Percentage display */}
+                          <View style={styles.percentContainer}>
+                            <Text style={[styles.percentValue, { color: themeColors.textSecondary }]}>
+                              {amount && parseFloat(amount) > 0
+                                ? `${percentShare.toFixed(1)}%`
+                                : '-%'}
+                            </Text>
+                          </View>
+                        </View>
+                      )}
+
+                      {splitType !== 'unequal' && (
+                        <View
+                          style={[
+                            styles.checkboxContainer,
+                            {
+                              borderColor: isSelected ? colors.primary.default : themeColors.border,
+                              backgroundColor: isSelected ? colors.primary.default : 'transparent'
+                            }
+                          ]}
+                        >
+                          {isSelected && (
+                            <Icon name="checkmark" size={16} color={colors.white} />
+                          )}
+                        </View>
+                      )}
+                    </View>
                   </Animated.View>
                 );
               }).filter(Boolean)}
             </View>
+
+            {/* Show total amount and percentage for unequal split */}
+            {splitType === 'unequal' && (
+              <View style={styles.totalContainer}>
+                <View style={styles.totalRow}>
+                  <Text style={[styles.totalLabel, { color: themeColors.textSecondary }]}>
+                    Total Amount:
+                  </Text>
+                  <Text style={[styles.totalValue, { color: themeColors.text }]}>
+                    ₹{Object.values(customAmounts).reduce((sum, value) => sum + (value || 0), 0).toFixed(2)}
+                  </Text>
+                </View>
+
+                <View style={styles.totalRow}>
+                  <Text style={[styles.totalLabel, { color: themeColors.textSecondary }]}>
+                    Total Percentage:
+                  </Text>
+                  <Text
+                    style={[
+                      styles.totalValue,
+                      {
+                        color: Math.abs(Object.values(customSplits).reduce((sum, value) => sum + value, 0) - 100) > 0.1
+                          ? colors.error
+                          : colors.success
+                      }
+                    ]}
+                  >
+                    {Object.values(customSplits).reduce((sum, value) => sum + value, 0).toFixed(1)}%
+                  </Text>
+                </View>
+
+                {Math.abs(Object.values(customSplits).reduce((sum, value) => sum + value, 0) - 100) > 0.1 && (
+                  <Text style={[styles.totalPercentWarning, { color: colors.error }]}>
+                    Note: Total percentage should equal 100%
+                  </Text>
+                )}
+
+                {Math.abs(Object.values(customAmounts).reduce((sum, value) => sum + (value || 0), 0) - parseFloat(amount || 0)) > 0.1 && (
+                  <Text style={[styles.totalPercentWarning, { color: colors.error }]}>
+                    Note: Total amount should equal ₹{parseFloat(amount || 0).toFixed(2)}
+                  </Text>
+                )}
+              </View>
+            )}
           </Animated.View>
 
           {/* Submit Button */}
@@ -623,7 +1011,7 @@ const AddExpenseScreen = () => {
               title={loading ? "Adding..." : "Add Expense"}
               onPress={handleAddExpense}
               loading={loading}
-              disabled={!amount || !description || participants.length === 0}
+              disabled={!amount || !description || !paidBy || participants.length === 0}
               fullWidth
               size="lg"
               icon={loading ? null : "checkmark-circle"}
@@ -1013,6 +1401,109 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flex: 1,
   },
+  nameContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 2,
+  },
+  paidBadge: {
+    paddingHorizontal: spacing.xs,
+    paddingVertical: 2,
+    borderRadius: borderRadius.sm,
+    marginLeft: spacing.xs,
+  },
+  paidBadgeText: {
+    color: colors.white,
+    fontSize: fontSizes.xs,
+    fontWeight: '600',
+  },
+  splitInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: spacing.sm,
+  },
+  amountInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: borderRadius.sm,
+    paddingHorizontal: spacing.xs,
+    height: 36,
+  },
+  currencySymbolSmall: {
+    fontSize: fontSizes.sm,
+    marginRight: 2,
+  },
+  amountInputSmall: {
+    width: 60,
+    height: 36,
+    textAlign: 'right',
+    fontSize: fontSizes.sm,
+  },
+  percentContainer: {
+    marginLeft: spacing.xs,
+    width: 50,
+    alignItems: 'center',
+  },
+  percentValue: {
+    fontSize: fontSizes.sm,
+    fontWeight: '500',
+  },
+  totalContainer: {
+    marginTop: spacing.md,
+    paddingTop: spacing.sm,
+    borderTopWidth: 1,
+  },
+  totalRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.xs,
+  },
+  totalLabel: {
+    fontSize: fontSizes.sm,
+    fontWeight: '500',
+  },
+  totalValue: {
+    fontSize: fontSizes.sm,
+    fontWeight: '600',
+  },
+  totalPercentWarning: {
+    fontSize: fontSizes.xs,
+    marginTop: spacing.xs,
+    fontStyle: 'italic',
+  },
+  requiredField: {
+    fontSize: fontSizes.xs,
+    fontWeight: '500',
+  },
+  splitTypeContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  splitTypeButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.md,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    marginHorizontal: 4,
+  },
+  splitTypeText: {
+    marginLeft: spacing.xs,
+    fontSize: fontSizes.sm,
+    fontWeight: '500',
+  },
+  splitTypeDescription: {
+    fontSize: fontSizes.xs,
+    fontStyle: 'italic',
+    position: 'absolute',
+    bottom: -12,
+    width: '100%',
+    textAlign: 'center',
+  },
   avatarContainer: {
     marginRight: spacing.md,
     position: 'relative',
@@ -1106,6 +1597,28 @@ const styles = StyleSheet.create({
   cancelButtonText: {
     fontSize: fontSizes.md,
     fontWeight: '500',
+  },
+  memberItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.md,
+    borderRadius: borderRadius.md,
+    marginBottom: spacing.sm,
+    borderWidth: 1,
+  },
+  memberName: {
+    fontSize: fontSizes.md,
+    marginLeft: spacing.md,
+    flex: 1,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.lg,
+  },
+  modalScrollView: {
+    maxHeight: 300,
   },
 });
 
