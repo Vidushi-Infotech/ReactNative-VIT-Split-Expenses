@@ -39,6 +39,11 @@ const LoginScreen = ({ navigation }) => {
     console.log('Apple login');
   };
 
+  const handleForgotPassword = () => {
+    // Navigate to forgot password screen
+    navigation.navigate('ForgotPassword');
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -83,7 +88,7 @@ const LoginScreen = ({ navigation }) => {
             onChangeText={setPassword}
             secureTextEntry
           />
-          <TouchableOpacity style={styles.forgotPassword}>
+          <TouchableOpacity style={styles.forgotPassword} onPress={handleForgotPassword}>
             <Text style={styles.forgotPasswordText}>Forgot password?</Text>
           </TouchableOpacity>
         </View>
@@ -111,15 +116,19 @@ const LoginScreen = ({ navigation }) => {
         
         <View style={styles.socialContainer}>
           <TouchableOpacity style={styles.socialButton} onPress={handleGoogleLogin}>
-            <View style={styles.googleLogo}>
-              <Text style={styles.googleG}>G</Text>
-            </View>
+            <Image
+              source={require('../Assets/GoogleLogo.png')}
+              style={styles.socialLogo}
+              resizeMode="contain"
+            />
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.socialButton} onPress={handleAppleLogin}>
-            <View style={styles.appleLogo}>
-              <Text style={styles.appleIcon}></Text>
-            </View>
+            <Image
+              source={require('../Assets/AppleLogo.png')}
+              style={styles.socialLogo}
+              resizeMode="contain"
+            />
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -264,42 +273,9 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
-  googleLogo: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  googleG: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#4285F4',
-    fontFamily: 'System',
-    textAlign: 'center',
-  },
-  appleLogo: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#000000',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  appleIcon: {
-    fontSize: 18,
-    color: '#FFFFFF',
-    fontWeight: 'bold',
-    textAlign: 'center',
+  socialLogo: {
+    width: 24,
+    height: 24,
   },
 });
 

@@ -9,11 +9,22 @@ import React, { useState, useEffect } from 'react';
 import { StatusBar, View, Text, TouchableOpacity } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createStackNavigator } from '@react-navigation/stack';
+
 import SplashScreen from './src/screens/SplashScreen';
 import LoginScreen from './src/screens/LoginScreen';
 import PhoneLoginScreen from './src/screens/PhoneLoginScreen';
 import OTPVerificationScreen from './src/screens/OTPVerificationScreen';
 import RegisterScreen from './src/screens/RegisterScreen';
+import ForgotPasswordScreen from './src/screens/ForgotPasswordScreen';
+import CreateNewPasswordScreen from './src/screens/CreateNewPasswordScreen';
+import HomeScreen from './src/screens/HomeScreen';
+import ActivityScreen from './src/screens/ActivityScreen';
+import ProfileScreen from './src/screens/ProfileScreen';
+import EditProfileScreen from './src/screens/EditProfileScreen';
+import GroupDetailScreen from './src/screens/GroupDetailScreen';
+import ManageGroupScreen from './src/screens/ManageGroupScreen';
+import AddExpenseScreen from './src/screens/AddExpenseScreen';
 
 // Simple placeholder screens to test navigation
 const OnboardingScreen = ({ navigation }) => (
@@ -32,13 +43,6 @@ const OnboardingScreen = ({ navigation }) => (
   </View>
 );
 
-const HomeScreen = () => (
-  <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-    <Text style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 10 }}>Splitzy Home</Text>
-    <Text style={{ fontSize: 16, color: '#6C757D' }}>Welcome to your expense tracker!</Text>
-  </View>
-);
-
 const GroupsScreen = () => (
   <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
     <Text style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 10 }}>Groups</Text>
@@ -46,32 +50,19 @@ const GroupsScreen = () => (
   </View>
 );
 
-const AddExpenseScreen = () => (
-  <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-    <Text style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 10 }}>Add Expense</Text>
-    <Text style={{ fontSize: 16, color: '#6C757D' }}>Create a new expense</Text>
-  </View>
-);
 
-const ProfileScreen = () => (
-  <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-    <Text style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 10 }}>Profile</Text>
-    <Text style={{ fontSize: 16, color: '#6C757D' }}>Your profile and settings</Text>
-  </View>
-);
 
 const Tab = createBottomTabNavigator();
+const Stack = createStackNavigator();
 
 // Tab Bar Icon Component
 const TabBarIcon = ({ name, focused }) => {
   const getIcon = () => {
     switch (name) {
       case 'Home':
-        return focused ? '🏠' : '🏡';
-      case 'Groups':
         return focused ? '👥' : '👤';
-      case 'Add':
-        return '➕';
+      case 'Activity':
+        return focused ? '🔔' : '🔕';
       case 'Profile':
         return focused ? '👤' : '👤';
       default:
@@ -83,6 +74,22 @@ const TabBarIcon = ({ name, focused }) => {
     <View style={{ alignItems: 'center', justifyContent: 'center' }}>
       <Text style={{ fontSize: 24 }}>{getIcon()}</Text>
     </View>
+  );
+};
+
+// Home Stack Navigator Component
+const HomeStackNavigator = () => {
+  return (
+    <Stack.Navigator
+      screenOptions={{
+        headerShown: false,
+      }}
+    >
+      <Stack.Screen name="HomeMain" component={HomeScreen} />
+      <Stack.Screen name="GroupDetail" component={GroupDetailScreen} />
+      <Stack.Screen name="ManageGroup" component={ManageGroupScreen} />
+      <Stack.Screen name="AddExpense" component={AddExpenseScreen} options={{ headerShown: false }} />
+    </Stack.Navigator>
   );
 };
 
@@ -119,26 +126,18 @@ const MainTabNavigator = () => {
     >
       <Tab.Screen
         name="Home"
-        component={HomeScreen}
+        component={HomeStackNavigator}
         options={{
-          title: 'Dashboard',
-          headerTitle: 'Splitzy',
+          title: 'My Groups',
+          headerShown: false, // We'll use custom header in HomeScreen
         }}
       />
       <Tab.Screen
-        name="Groups"
-        component={GroupsScreen}
+        name="Activity"
+        component={ActivityScreen}
         options={{
-          title: 'Groups',
-          headerTitle: 'My Groups',
-        }}
-      />
-      <Tab.Screen
-        name="Add"
-        component={AddExpenseScreen}
-        options={{
-          title: 'Add',
-          headerTitle: 'Add Expense',
+          title: 'Activity',
+          headerTitle: 'Activity',
         }}
       />
       <Tab.Screen
@@ -146,7 +145,7 @@ const MainTabNavigator = () => {
         component={ProfileScreen}
         options={{
           title: 'Profile',
-          headerTitle: 'My Profile',
+          headerTitle: 'Profile',
         }}
       />
     </Tab.Navigator>
@@ -159,6 +158,8 @@ function App() {
   const [showPhoneLogin, setShowPhoneLogin] = useState(false);
   const [showOTPVerification, setShowOTPVerification] = useState(false);
   const [showRegister, setShowRegister] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [showCreateNewPassword, setShowCreateNewPassword] = useState(false);
   const [phoneData, setPhoneData] = useState({ phoneNumber: '', countryCode: '+91' });
 
   useEffect(() => {
@@ -198,6 +199,12 @@ function App() {
                 setShowLogin(false);
                 setShowPhoneLogin(false);
                 setShowOTPVerification(false);
+              }
+            },
+            navigate: (screenName) => {
+              if (screenName === 'CreateNewPassword') {
+                setShowOTPVerification(false);
+                setShowCreateNewPassword(true);
               }
             },
             goBack: () => {
@@ -268,6 +275,58 @@ function App() {
     );
   }
 
+  // Show create new password screen
+  if (showCreateNewPassword) {
+    return (
+      <>
+        <StatusBar
+          barStyle="dark-content"
+          backgroundColor="#FFFFFF"
+        />
+        <CreateNewPasswordScreen
+          navigation={{
+            replace: (screenName) => {
+              if (screenName === 'Login') {
+                setShowCreateNewPassword(false);
+                setShowLogin(true);
+              }
+            },
+            goBack: () => {
+              setShowCreateNewPassword(false);
+              setShowOTPVerification(true);
+            },
+          }}
+        />
+      </>
+    );
+  }
+
+  // Show forgot password screen
+  if (showForgotPassword) {
+    return (
+      <>
+        <StatusBar
+          barStyle="dark-content"
+          backgroundColor="#FFFFFF"
+        />
+        <ForgotPasswordScreen
+          navigation={{
+            navigate: (screenName, params) => {
+              if (screenName === 'OTPVerification') {
+                setPhoneData(params);
+                setShowOTPVerification(true);
+                setShowForgotPassword(false);
+              }
+            },
+            goBack: () => {
+              setShowForgotPassword(false);
+            },
+          }}
+        />
+      </>
+    );
+  }
+
   // Show login screen after splash
   if (showLogin) {
     return (
@@ -288,6 +347,8 @@ function App() {
                 setShowPhoneLogin(true);
               } else if (screenName === 'Register') {
                 setShowRegister(true);
+              } else if (screenName === 'ForgotPassword') {
+                setShowForgotPassword(true);
               }
             },
           }}

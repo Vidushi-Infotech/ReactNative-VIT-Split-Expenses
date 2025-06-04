@@ -18,6 +18,8 @@ const OTPVerificationScreen = ({ navigation, route }) => {
 
   const phoneNumber = route?.params?.phoneNumber || '';
   const countryCode = route?.params?.countryCode || '+91';
+  const email = route?.params?.email || '';
+  const isFromForgotPassword = route?.params?.isFromForgotPassword || false;
 
   useEffect(() => {
     // Start countdown timer
@@ -63,8 +65,20 @@ const OTPVerificationScreen = ({ navigation, route }) => {
     if (otpString.length === 6) {
       // Handle OTP verification
       console.log('Verifying OTP:', otpString);
-      // Navigate to main app
-      navigation.replace('Main');
+
+      // Validate OTP - for demo purposes, accept "123456"
+      if (otpString === '123456') {
+        if (isFromForgotPassword) {
+          // For forgot password flow, navigate to create new password screen
+          console.log('OTP verified successfully for forgot password flow');
+          navigation.navigate('CreateNewPassword');
+        } else {
+          // Regular login flow - navigate to main app
+          navigation.replace('Main');
+        }
+      } else {
+        alert('Invalid OTP. Please enter 123456 for demo purposes.');
+      }
     } else {
       alert('Please enter complete 6-digit OTP');
     }
@@ -89,7 +103,11 @@ const OTPVerificationScreen = ({ navigation, route }) => {
         });
       }, 1000);
       
-      console.log('Resending OTP to:', countryCode + phoneNumber);
+      if (email) {
+        console.log('Resending OTP to email:', email);
+      } else {
+        console.log('Resending OTP to phone:', countryCode + phoneNumber);
+      }
     }
   };
 
@@ -112,7 +130,9 @@ const OTPVerificationScreen = ({ navigation, route }) => {
         </View>
 
         {/* Title */}
-        <Text style={styles.title}>Verify your phone number</Text>
+        <Text style={styles.title}>
+          {email ? 'Verify your email address' : 'Verify your phone number'}
+        </Text>
 
         {/* OTP Input Fields */}
         <View style={styles.otpContainer}>
