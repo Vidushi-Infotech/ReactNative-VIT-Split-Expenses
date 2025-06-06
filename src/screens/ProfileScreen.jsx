@@ -10,6 +10,9 @@ import {
   Modal,
 } from 'react-native';
 import EditProfileScreen from './EditProfileScreen';
+import Ionicons from 'react-native-vector-icons/Ionicons';
+import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
+import FontAwesome from 'react-native-vector-icons/FontAwesome';
 
 const ProfileScreen = ({ navigation }) => {
   const [showEditProfile, setShowEditProfile] = useState(false);
@@ -17,37 +20,37 @@ const ProfileScreen = ({ navigation }) => {
     {
       id: 1,
       title: 'Theme Setting',
-      icon: '🌙',
+      iconComponent: <Ionicons name="moon" size={20} color="#6B7280" />,
       onPress: () => console.log('Theme Setting pressed'),
     },
     {
       id: 2,
       title: 'Payments',
-      icon: '💳',
+      iconComponent: <Ionicons name="card" size={20} color="#6B7280" />,
       onPress: () => console.log('Payments pressed'),
     },
     {
       id: 3,
       title: 'Settings',
-      icon: '⚙️',
+      iconComponent: <Ionicons name="settings" size={20} color="#6B7280" />,
       onPress: () => console.log('Settings pressed'),
     },
     {
       id: 4,
       title: 'Referral System',
-      icon: '🎁',
+      iconComponent: <FontAwesome name="gift" size={20} color="#6B7280" />,
       onPress: () => console.log('Referral System pressed'),
     },
     {
       id: 5,
       title: 'Help & Support',
-      icon: '❓',
+      iconComponent: <Ionicons name="help-circle" size={20} color="#6B7280" />,
       onPress: () => console.log('Help & Support pressed'),
     },
     {
       id: 6,
       title: 'Logout',
-      icon: '🚪',
+      iconComponent: <MaterialIcons name="logout" size={20} color="#6B7280" />,
       onPress: () => console.log('Logout pressed'),
     },
   ];
@@ -83,7 +86,7 @@ const ProfileScreen = ({ navigation }) => {
             </View>
           </View>
           <TouchableOpacity style={styles.editButton} onPress={handleEditProfile}>
-            <Text style={styles.editIcon}>✏️</Text>
+            <MaterialIcons name="edit" size={20} color="#6B7280" />
           </TouchableOpacity>
         </View>
 
@@ -93,11 +96,11 @@ const ProfileScreen = ({ navigation }) => {
             <TouchableOpacity key={item.id} style={styles.menuItem} onPress={item.onPress}>
               <View style={styles.menuItemLeft}>
                 <View style={styles.menuIconContainer}>
-                  <Text style={styles.menuIcon}>{item.icon}</Text>
+                  {item.iconComponent}
                 </View>
                 <Text style={styles.menuTitle}>{item.title}</Text>
               </View>
-              <Text style={styles.menuArrow}>›</Text>
+              <Ionicons name="chevron-forward" size={20} color="#CBD5E0" />
             </TouchableOpacity>
           ))}
         </View>
@@ -181,9 +184,6 @@ const styles = StyleSheet.create({
   editButton: {
     padding: 8,
   },
-  editIcon: {
-    fontSize: 20,
-  },
   menuSection: {
     backgroundColor: '#FFFFFF',
     marginHorizontal: 16,
@@ -221,17 +221,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: 16,
   },
-  menuIcon: {
-    fontSize: 18,
-  },
   menuTitle: {
     fontSize: 16,
     color: '#2D3748',
     fontWeight: '500',
-  },
-  menuArrow: {
-    fontSize: 20,
-    color: '#CBD5E0',
   },
 });
 

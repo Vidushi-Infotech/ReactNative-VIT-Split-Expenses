@@ -10,6 +10,8 @@ import { StatusBar, View, Text, TouchableOpacity } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
+import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 
 import SplashScreen from './src/screens/SplashScreen';
 import LoginScreen from './src/screens/LoginScreen';
@@ -57,22 +59,46 @@ const Stack = createStackNavigator();
 
 // Tab Bar Icon Component
 const TabBarIcon = ({ name, focused }) => {
-  const getIcon = () => {
+  const getIconComponent = () => {
     switch (name) {
       case 'Home':
-        return focused ? '👥' : '👤';
+        return (
+          <MaterialIcons
+            name="groups"
+            size={24}
+            color={focused ? '#6C63FF' : '#ADB5BD'}
+          />
+        );
       case 'Activity':
-        return focused ? '🔔' : '🔕';
+        return (
+          <Ionicons
+            name={focused ? 'notifications' : 'notifications-outline'}
+            size={24}
+            color={focused ? '#6C63FF' : '#ADB5BD'}
+          />
+        );
       case 'Profile':
-        return focused ? '👤' : '👤';
+        return (
+          <Ionicons
+            name={focused ? 'person' : 'person-outline'}
+            size={24}
+            color={focused ? '#6C63FF' : '#ADB5BD'}
+          />
+        );
       default:
-        return '📱';
+        return (
+          <MaterialIcons
+            name="smartphone"
+            size={24}
+            color={focused ? '#6C63FF' : '#ADB5BD'}
+          />
+        );
     }
   };
 
   return (
     <View style={{ alignItems: 'center', justifyContent: 'center' }}>
-      <Text style={{ fontSize: 24 }}>{getIcon()}</Text>
+      {getIconComponent()}
     </View>
   );
 };

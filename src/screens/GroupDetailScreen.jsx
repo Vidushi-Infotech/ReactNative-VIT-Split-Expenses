@@ -9,6 +9,8 @@ import {
   Image,
   Modal,
 } from 'react-native';
+import Ionicons from 'react-native-vector-icons/Ionicons';
+import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 
 const GroupDetailScreen = ({ route, navigation }) => {
   const { group } = route.params;
@@ -205,7 +207,7 @@ const GroupDetailScreen = ({ route, navigation }) => {
               <Text style={styles.balanceAmount}>₹{balance.totalOwes}</Text>
             </View>
             <TouchableOpacity style={styles.expandButton}>
-              <Text style={styles.expandIcon}>▼</Text>
+              <Ionicons name="chevron-down" size={12} color="#6B7280" />
             </TouchableOpacity>
           </View>
 
@@ -267,10 +269,10 @@ const GroupDetailScreen = ({ route, navigation }) => {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <Text style={styles.backIcon}>←</Text>
+          <Ionicons name="arrow-back" size={24} color="#2D3748" />
         </TouchableOpacity>
         <TouchableOpacity style={styles.settingsButton} onPress={handleGroupOptions}>
-          <Text style={styles.settingsIcon}>⚙️</Text>
+          <Ionicons name="settings" size={20} color="#6B7280" />
         </TouchableOpacity>
       </View>
 
@@ -325,7 +327,7 @@ const GroupDetailScreen = ({ route, navigation }) => {
 
       {/* Floating Add Button */}
       <TouchableOpacity style={styles.floatingButton} onPress={() => navigation.navigate('AddExpense', { group })}>
-        <Text style={styles.floatingButtonText}>+</Text>
+        <Ionicons name="add" size={24} color="#FFFFFF" />
       </TouchableOpacity>
 
       {/* Group Options Modal */}
@@ -341,15 +343,15 @@ const GroupDetailScreen = ({ route, navigation }) => {
         >
           <View style={styles.optionsMenu}>
             <TouchableOpacity style={styles.optionItem} onPress={handleManageGroup}>
-              <Text style={styles.optionIcon}>👥</Text>
+              <MaterialIcons name="group" size={16} color="#6B7280" style={styles.optionIconStyle} />
               <Text style={styles.optionText}>Manage Group</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.optionItem} onPress={handleDeleteGroup}>
-              <Text style={styles.optionIcon}>🗑️</Text>
+              <MaterialIcons name="delete" size={16} color="#6B7280" style={styles.optionIconStyle} />
               <Text style={styles.optionText}>Delete Group</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.optionItem} onPress={handleLeaveGroup}>
-              <Text style={[styles.optionIcon, styles.leaveIcon]}>🚪</Text>
+              <MaterialIcons name="logout" size={16} color="#EF4444" style={styles.optionIconStyle} />
               <Text style={[styles.optionText, styles.leaveText]}>Leave Group</Text>
             </TouchableOpacity>
           </View>
@@ -374,15 +376,8 @@ const styles = StyleSheet.create({
   backButton: {
     padding: 8,
   },
-  backIcon: {
-    fontSize: 24,
-    color: '#2D3748',
-  },
   settingsButton: {
     padding: 8,
-  },
-  settingsIcon: {
-    fontSize: 20,
   },
   groupInfo: {
     alignItems: 'center',
@@ -551,10 +546,6 @@ const styles = StyleSheet.create({
   expandButton: {
     padding: 8,
   },
-  expandIcon: {
-    fontSize: 12,
-    color: '#6B7280',
-  },
   balanceDetail: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -618,10 +609,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
   },
-  floatingButtonText: {
-    fontSize: 24,
-    color: '#FFFFFF',
-  },
+
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -645,16 +633,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
-  optionIcon: {
-    fontSize: 16,
+  optionIconStyle: {
     marginRight: 12,
   },
   optionText: {
     fontSize: 14,
     color: '#2D3748',
-  },
-  leaveIcon: {
-    color: '#EF4444',
   },
   leaveText: {
     color: '#EF4444',

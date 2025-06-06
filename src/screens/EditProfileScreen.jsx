@@ -9,6 +9,8 @@ import {
   Image,
   TextInput,
 } from 'react-native';
+import Ionicons from 'react-native-vector-icons/Ionicons';
+import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 
 const EditProfileScreen = ({ onClose }) => {
   const [formData, setFormData] = useState({
@@ -45,7 +47,7 @@ const EditProfileScreen = ({ onClose }) => {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={onClose}>
-          <Text style={styles.backIcon}>←</Text>
+          <Ionicons name="arrow-back" size={24} color="#2D3748" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Edit Profile</Text>
         <View style={styles.placeholder} />
@@ -60,7 +62,7 @@ const EditProfileScreen = ({ onClose }) => {
               style={styles.profilePhoto}
             />
             <TouchableOpacity style={styles.editPhotoButton} onPress={handleEditPhoto}>
-              <Text style={styles.editPhotoIcon}>📷</Text>
+              <MaterialIcons name="camera-alt" size={16} color="#FFFFFF" />
             </TouchableOpacity>
           </View>
         </View>
@@ -111,7 +113,7 @@ const EditProfileScreen = ({ onClose }) => {
                   style={styles.flagIcon}
                 />
                 <Text style={styles.countryCode}>{selectedCountryCode}</Text>
-                <Text style={styles.dropdownIcon}>▼</Text>
+                <Ionicons name="chevron-down" size={12} color="#6B7280" />
               </TouchableOpacity>
               <TextInput
                 style={styles.phoneInput}
@@ -134,7 +136,7 @@ const EditProfileScreen = ({ onClose }) => {
                   style={styles.flagIcon}
                 />
                 <Text style={styles.countryCode}>{selectedAltCountryCode}</Text>
-                <Text style={styles.dropdownIcon}>▼</Text>
+                <Ionicons name="chevron-down" size={12} color="#6B7280" />
               </TouchableOpacity>
               <TextInput
                 style={styles.phoneInput}
@@ -187,10 +189,6 @@ const styles = StyleSheet.create({
   backButton: {
     padding: 8,
   },
-  backIcon: {
-    fontSize: 24,
-    color: '#2D3748',
-  },
   headerTitle: {
     fontSize: 20,
     fontWeight: '600',
@@ -227,10 +225,7 @@ const styles = StyleSheet.create({
     borderWidth: 3,
     borderColor: '#FFFFFF',
   },
-  editPhotoIcon: {
-    fontSize: 16,
-    color: '#FFFFFF',
-  },
+
   formSection: {
     paddingHorizontal: 20,
   },
@@ -277,10 +272,7 @@ const styles = StyleSheet.create({
     color: '#2D3748',
     marginRight: 4,
   },
-  dropdownIcon: {
-    fontSize: 12,
-    color: '#6B7280',
-  },
+
   phoneInput: {
     flex: 1,
     borderWidth: 1,

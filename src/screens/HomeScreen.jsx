@@ -10,6 +10,8 @@ import {
   Modal,
 } from 'react-native';
 import CreateNewGroupScreen from './CreateNewGroupScreen';
+import Ionicons from 'react-native-vector-icons/Ionicons';
+import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 
 const HomeScreen = ({ navigation }) => {
   const [showCreateGroup, setShowCreateGroup] = useState(false);
@@ -81,10 +83,10 @@ const HomeScreen = ({ navigation }) => {
         <Text style={styles.headerTitle}>My Groups</Text>
         <View style={styles.headerActions}>
           <TouchableOpacity style={styles.headerButton} onPress={handleSearch}>
-            <Text style={styles.headerIcon}>🔍</Text>
+            <Ionicons name="search" size={24} color="#6B7280" />
           </TouchableOpacity>
           <TouchableOpacity style={styles.headerButton} onPress={handleAddGroup}>
-            <Text style={styles.headerIcon}>👥+</Text>
+            <MaterialIcons name="group-add" size={24} color="#6B7280" />
           </TouchableOpacity>
         </View>
       </View>
@@ -221,9 +223,6 @@ const styles = StyleSheet.create({
   headerButton: {
     padding: 8,
     marginLeft: 12,
-  },
-  headerIcon: {
-    fontSize: 20,
   },
   scrollView: {
     flex: 1,
