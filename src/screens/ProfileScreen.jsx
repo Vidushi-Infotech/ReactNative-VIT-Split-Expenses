@@ -10,6 +10,7 @@ import {
   Modal,
   Alert,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import EditProfileScreen from './EditProfileScreen';
 import Ionicons from 'react-native-vector-icons/Ionicons';
@@ -18,39 +19,105 @@ import FontAwesome from 'react-native-vector-icons/FontAwesome';
 import { useAuth } from '../context/AuthContext';
 
 const ProfileScreen = ({ navigation }) => {
-  const { signOut, user, isAndroid } = useAuth();
+  const { signOut, user, isAndroid, loading } = useAuth();
   const [showEditProfile, setShowEditProfile] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const handleLogout = () => {
-    Alert.alert(
-      'Logout',
-      'Are you sure you want to logout?',
-      [
+    // Show different alerts based on platform and user state
+    const title = isAndroid && user ? 'Logout' : 'Demo Mode';
+    const message = isAndroid && user
+      ? `Are you sure you want to logout?\n\nYou are currently signed in as:\n${user.email || 'Unknown User'}`
+      : isAndroid
+        ? 'You are not currently signed in.'
+        : 'Logout functionality will be available when Firebase Auth is implemented for iOS.';
+
+    const buttons = isAndroid && user ? [
+      {
+        text: 'Cancel',
+        style: 'cancel',
+      },
+      {
+        text: 'Logout',
+        style: 'destructive',
+        onPress: performLogout,
+      },
+    ] : [
+      {
+        text: 'OK',
+        style: 'default',
+      }
+    ];
+
+    Alert.alert(title, message, buttons);
+  };
+
+  const performLogout = async () => {
+    try {
+      setIsLoggingOut(true);
+      console.log('🔥 Starting logout process...');
+
+      await signOut();
+
+      console.log('✅ Logout successful!');
+      // Navigation will be handled automatically by auth state change
+
+    } catch (error) {
+      console.error('❌ Logout error:', error);
+
+      // Show user-friendly error message
+      let errorMessage = 'Failed to logout. Please try again.';
+
+      if (error.code === 'auth/network-request-failed') {
+        errorMessage = 'Network error. Please check your internet connection and try again.';
+      } else if (error.code === 'auth/too-many-requests') {
+        errorMessage = 'Too many requests. Please wait a moment and try again.';
+      }
+
+      Alert.alert('Logout Failed', errorMessage, [
+        {
+          text: 'Retry',
+          onPress: performLogout,
+        },
         {
           text: 'Cancel',
           style: 'cancel',
-        },
-        {
-          text: 'Logout',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              if (isAndroid) {
-                await signOut();
-                // Navigation will be handled automatically by auth state change
-              } else {
-                // For iOS, just show a message since Firebase Auth is not implemented
-                Alert.alert('Demo Mode', 'Logout functionality will be available when Firebase Auth is implemented for iOS');
-              }
-            } catch (error) {
-              console.error('Logout error:', error);
-              Alert.alert('Error', 'Failed to logout. Please try again.');
-            }
-          },
-        },
-      ]
-    );
+        }
+      ]);
+    } finally {
+      setIsLoggingOut(false);
+    }
   };
+  // Dynamic logout button configuration
+  const getLogoutButtonConfig = () => {
+    if (isLoggingOut) {
+      return {
+        title: 'Logging out...',
+        iconComponent: <MaterialIcons name="logout" size={20} color="#9CA3AF" />,
+        disabled: true,
+        textColor: '#9CA3AF',
+      };
+    }
+
+    if (isAndroid && user) {
+      return {
+        title: 'Logout',
+        iconComponent: <MaterialIcons name="logout" size={20} color="#EF4444" />,
+        disabled: false,
+        textColor: '#EF4444',
+      };
+    }
+
+    return {
+      title: isAndroid ? 'Not Signed In' : 'Logout (Demo)',
+      iconComponent: <MaterialIcons name="logout" size={20} color="#6B7280" />,
+      disabled: false,
+      textColor: '#6B7280',
+    };
+  };
+
+  const logoutConfig = getLogoutButtonConfig();
+
   const menuItems = [
     {
       id: 1,
@@ -84,9 +151,12 @@ const ProfileScreen = ({ navigation }) => {
     },
     {
       id: 6,
-      title: 'Logout',
-      iconComponent: <MaterialIcons name="logout" size={20} color="#6B7280" />,
-      onPress: handleLogout,
+      title: logoutConfig.title,
+      iconComponent: logoutConfig.iconComponent,
+      onPress: logoutConfig.disabled ? null : handleLogout,
+      disabled: logoutConfig.disabled,
+      textColor: logoutConfig.textColor,
+      isLogout: true,
     },
   ];
 
@@ -132,14 +202,42 @@ const ProfileScreen = ({ navigation }) => {
         {/* Menu Items */}
         <View style={styles.menuSection}>
           {menuItems.map((item) => (
-            <TouchableOpacity key={item.id} style={styles.menuItem} onPress={item.onPress}>
+            <TouchableOpacity
+              key={item.id}
+              style={[
+                styles.menuItem,
+                item.disabled && styles.menuItemDisabled,
+                item.isLogout && isLoggingOut && styles.menuItemLoading
+              ]}
+              onPress={item.onPress}
+              disabled={item.disabled}
+              activeOpacity={item.disabled ? 1 : 0.7}
+            >
               <View style={styles.menuItemLeft}>
                 <View style={styles.menuIconContainer}>
                   {item.iconComponent}
                 </View>
-                <Text style={styles.menuTitle}>{item.title}</Text>
+                <Text style={[
+                  styles.menuTitle,
+                  item.textColor && { color: item.textColor },
+                  item.disabled && styles.menuTitleDisabled
+                ]}>
+                  {item.title}
+                </Text>
               </View>
-              <Ionicons name="chevron-forward" size={20} color="#CBD5E0" />
+
+              {/* Show loading indicator for logout */}
+              {item.isLogout && isLoggingOut ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="small" color="#9CA3AF" />
+                </View>
+              ) : (
+                <Ionicons
+                  name="chevron-forward"
+                  size={20}
+                  color={item.disabled ? "#E5E7EB" : "#CBD5E0"}
+                />
+              )}
             </TouchableOpacity>
           ))}
         </View>
@@ -246,6 +344,12 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#F7FAFC',
   },
+  menuItemDisabled: {
+    opacity: 0.6,
+  },
+  menuItemLoading: {
+    backgroundColor: '#F9FAFB',
+  },
   menuItemLeft: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -264,6 +368,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#2D3748',
     fontWeight: '500',
+  },
+  menuTitleDisabled: {
+    color: '#9CA3AF',
+  },
+  loadingContainer: {
+    paddingHorizontal: 4,
   },
 });
 
