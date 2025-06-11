@@ -8,15 +8,48 @@ import {
   TouchableOpacity,
   Image,
   ScrollView,
+  Alert,
+  ActivityIndicator,
+  Platform,
 } from 'react-native';
+import { useAuth } from '../context/AuthContext';
+import { testSignup, testLogin, testLogout } from '../utils/authTest';
 
 const LoginScreen = ({ navigation }) => {
+  const { signIn, loading, getErrorMessage, isAndroid } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleLogin = () => {
-    // Navigate to main app after login
-    navigation.replace('Main');
+  const handleLogin = async () => {
+    // Basic validation
+    if (!email.trim()) {
+      Alert.alert('Error', 'Please enter your email address');
+      return;
+    }
+
+    if (!password.trim()) {
+      Alert.alert('Error', 'Please enter your password');
+      return;
+    }
+
+    // For iOS, use static navigation (Firebase Auth not implemented yet)
+    if (!isAndroid) {
+      navigation.replace('Main');
+      return;
+    }
+
+    // For Android, use Firebase Auth
+    try {
+      setIsLoading(true);
+      await signIn(email.trim(), password);
+      // Navigation will be handled automatically by auth state change
+    } catch (error) {
+      console.error('Login error:', error);
+      Alert.alert('Login Failed', getErrorMessage(error));
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleSignup = () => {
@@ -94,8 +127,18 @@ const LoginScreen = ({ navigation }) => {
         </View>
 
         {/* Login Button */}
-        <TouchableOpacity style={styles.loginButton} onPress={handleLogin}>
-          <Text style={styles.loginButtonText}>Login</Text>
+        <TouchableOpacity
+          style={[styles.loginButton, (isLoading || loading) && styles.loginButtonDisabled]}
+          onPress={handleLogin}
+          disabled={isLoading || loading}
+        >
+          {isLoading || loading ? (
+            <ActivityIndicator color="#FFFFFF" size="small" />
+          ) : (
+            <Text style={styles.loginButtonText}>
+              {isAndroid ? 'Login' : 'Login (Demo)'}
+            </Text>
+          )}
         </TouchableOpacity>
 
         {/* Phone Login Button */}
@@ -131,6 +174,25 @@ const LoginScreen = ({ navigation }) => {
             />
           </TouchableOpacity>
         </View>
+
+        {/* Firebase Test Buttons (Android Only) */}
+        {isAndroid && (
+          <View style={styles.testSection}>
+            <Text style={styles.testTitle}>🔥 Firebase Auth Tests</Text>
+
+            <TouchableOpacity style={styles.testButton} onPress={testSignup}>
+              <Text style={styles.testButtonText}>Test Signup</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={[styles.testButton, styles.testButtonSecondary]} onPress={testLogin}>
+              <Text style={styles.testButtonText}>Test Login</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={[styles.testButton, styles.testButtonDanger]} onPress={testLogout}>
+              <Text style={styles.testButtonText}>Test Logout</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -217,6 +279,9 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textAlign: 'center',
   },
+  loginButtonDisabled: {
+    backgroundColor: '#A0AEC0',
+  },
   phoneLoginButton: {
     borderWidth: 1,
     borderColor: '#E2E8F0',
@@ -276,6 +341,37 @@ const styles = StyleSheet.create({
   socialLogo: {
     width: 24,
     height: 24,
+  },
+  testSection: {
+    marginTop: 40,
+    paddingTop: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+  },
+  testTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#2D3748',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  testButton: {
+    backgroundColor: '#4A90E2',
+    borderRadius: 8,
+    paddingVertical: 12,
+    marginBottom: 12,
+  },
+  testButtonSecondary: {
+    backgroundColor: '#48BB78',
+  },
+  testButtonDanger: {
+    backgroundColor: '#F56565',
+  },
+  testButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
   },
 });
 

@@ -9,11 +9,16 @@ import {
   Image,
   ScrollView,
   Alert,
+  ActivityIndicator,
+  Platform,
 } from 'react-native';
+import { useAuth } from '../context/AuthContext';
 
 const ForgotPasswordScreen = ({ navigation }) => {
+  const { resetPassword, getErrorMessage, isAndroid } = useAuth();
   const [mobileOrEmail, setMobileOrEmail] = useState('');
   const [inputError, setInputError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
   // Validate email format
   const isValidEmail = (email) => {
@@ -36,8 +41,8 @@ const ForgotPasswordScreen = ({ navigation }) => {
     }
   };
 
-  // Validate input and send OTP
-  const handleSendOTP = () => {
+  // Validate input and send OTP/Reset Email
+  const handleSendOTP = async () => {
     if (!mobileOrEmail.trim()) {
       setInputError('Please enter your mobile number or email ID');
       return;
@@ -45,14 +50,14 @@ const ForgotPasswordScreen = ({ navigation }) => {
 
     // Check if input is a phone number (only digits)
     const isPhoneNumber = /^[0-9]+$/.test(mobileOrEmail.trim());
-    
+
     if (isPhoneNumber) {
-      // Validate phone number
+      // For phone numbers, use the existing OTP flow (iOS and Android)
       if (!isValidPhoneNumber(mobileOrEmail.trim())) {
         setInputError('Please enter a valid 10-digit mobile number');
         return;
       }
-      
+
       // Navigate to OTP verification with phone number
       console.log('Sending OTP to phone:', mobileOrEmail);
       navigation.navigate('OTPVerification', {
@@ -60,27 +65,57 @@ const ForgotPasswordScreen = ({ navigation }) => {
         countryCode: '+91',
         isFromForgotPassword: true
       });
+
+      // Show success message
+      Alert.alert(
+        'OTP Sent',
+        `A verification code has been sent to ${mobileOrEmail}`,
+        [{ text: 'OK' }]
+      );
     } else {
-      // Validate email
+      // For email addresses
       if (!isValidEmail(mobileOrEmail.trim())) {
         setInputError('Please enter a valid email address');
         return;
       }
-      
-      // Navigate to OTP verification with email
-      console.log('Sending OTP to email:', mobileOrEmail);
-      navigation.navigate('OTPVerification', {
-        email: mobileOrEmail,
-        isFromForgotPassword: true
-      });
-    }
 
-    // Show success message
-    Alert.alert(
-      'OTP Sent',
-      `A verification code has been sent to ${mobileOrEmail}`,
-      [{ text: 'OK' }]
-    );
+      // For Android, use Firebase Auth password reset
+      if (isAndroid) {
+        try {
+          setIsLoading(true);
+          await resetPassword(mobileOrEmail.trim());
+          Alert.alert(
+            'Password Reset Email Sent',
+            `A password reset link has been sent to ${mobileOrEmail}. Please check your email and follow the instructions to reset your password.`,
+            [
+              {
+                text: 'OK',
+                onPress: () => navigation.goBack()
+              }
+            ]
+          );
+        } catch (error) {
+          console.error('Password reset error:', error);
+          Alert.alert('Error', getErrorMessage(error));
+        } finally {
+          setIsLoading(false);
+        }
+      } else {
+        // For iOS, use the existing OTP flow
+        console.log('Sending OTP to email:', mobileOrEmail);
+        navigation.navigate('OTPVerification', {
+          email: mobileOrEmail,
+          isFromForgotPassword: true
+        });
+
+        // Show success message
+        Alert.alert(
+          'OTP Sent',
+          `A verification code has been sent to ${mobileOrEmail}`,
+          [{ text: 'OK' }]
+        );
+      }
+    }
   };
 
   const handleBackToLogin = () => {
@@ -131,14 +166,21 @@ const ForgotPasswordScreen = ({ navigation }) => {
         </View>
 
         {/* Send OTP Button */}
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[
             styles.sendOTPButton,
-            mobileOrEmail.trim() ? styles.sendOTPButtonActive : styles.sendOTPButtonInactive
-          ]} 
+            (mobileOrEmail.trim() && !isLoading) ? styles.sendOTPButtonActive : styles.sendOTPButtonInactive
+          ]}
           onPress={handleSendOTP}
+          disabled={!mobileOrEmail.trim() || isLoading}
         >
-          <Text style={styles.sendOTPButtonText}>Send OTP</Text>
+          {isLoading ? (
+            <ActivityIndicator color="#FFFFFF" size="small" />
+          ) : (
+            <Text style={styles.sendOTPButtonText}>
+              {isAndroid && !(/^[0-9]+$/.test(mobileOrEmail.trim())) ? 'Send Reset Email' : 'Send OTP'}
+            </Text>
+          )}
         </TouchableOpacity>
 
         {/* Back to Login */}

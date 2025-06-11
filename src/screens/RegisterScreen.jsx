@@ -8,9 +8,14 @@ import {
   TouchableOpacity,
   ScrollView,
   Image,
+  Alert,
+  ActivityIndicator,
+  Platform,
 } from 'react-native';
+import { useAuth } from '../context/AuthContext';
 
 const RegisterScreen = ({ navigation }) => {
+  const { signUp, loading, getErrorMessage, isAndroid } = useAuth();
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
@@ -20,12 +25,71 @@ const RegisterScreen = ({ navigation }) => {
   const [referralCode, setReferralCode] = useState('');
   const [countryCode, setCountryCode] = useState('+91');
   const [showCountryPicker, setShowCountryPicker] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSignUp = () => {
-    // Handle registration logic
-    console.log('Registering user...');
-    // Navigate to OTP verification or main app
-    navigation.replace('Main');
+  const validateForm = () => {
+    if (!firstName.trim()) {
+      Alert.alert('Error', 'Please enter your first name');
+      return false;
+    }
+
+    if (!lastName.trim()) {
+      Alert.alert('Error', 'Please enter your last name');
+      return false;
+    }
+
+    if (!email.trim()) {
+      Alert.alert('Error', 'Please enter your email address');
+      return false;
+    }
+
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.trim())) {
+      Alert.alert('Error', 'Please enter a valid email address');
+      return false;
+    }
+
+    if (!password.trim()) {
+      Alert.alert('Error', 'Please enter a password');
+      return false;
+    }
+
+    if (password.length < 6) {
+      Alert.alert('Error', 'Password must be at least 6 characters long');
+      return false;
+    }
+
+    if (password !== confirmPassword) {
+      Alert.alert('Error', 'Passwords do not match');
+      return false;
+    }
+
+    return true;
+  };
+
+  const handleSignUp = async () => {
+    if (!validateForm()) {
+      return;
+    }
+
+    // For iOS, use static navigation (Firebase Auth not implemented yet)
+    if (!isAndroid) {
+      navigation.replace('Main');
+      return;
+    }
+
+    // For Android, use Firebase Auth
+    try {
+      setIsLoading(true);
+      await signUp(email.trim(), password, firstName.trim(), lastName.trim());
+      // Navigation will be handled automatically by auth state change
+    } catch (error) {
+      console.error('Sign up error:', error);
+      Alert.alert('Registration Failed', getErrorMessage(error));
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleSignIn = () => {
@@ -192,8 +256,18 @@ const RegisterScreen = ({ navigation }) => {
         </View>
 
         {/* Sign Up Button */}
-        <TouchableOpacity style={styles.signUpButton} onPress={handleSignUp}>
-          <Text style={styles.signUpButtonText}>Sign Up</Text>
+        <TouchableOpacity
+          style={[styles.signUpButton, (isLoading || loading) && styles.signUpButtonDisabled]}
+          onPress={handleSignUp}
+          disabled={isLoading || loading}
+        >
+          {isLoading || loading ? (
+            <ActivityIndicator color="#FFFFFF" size="small" />
+          ) : (
+            <Text style={styles.signUpButtonText}>
+              {isAndroid ? 'Sign Up' : 'Sign Up (Demo)'}
+            </Text>
+          )}
         </TouchableOpacity>
 
         {/* Sign In Link */}
@@ -370,6 +444,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     textAlign: 'center',
+  },
+  signUpButtonDisabled: {
+    backgroundColor: '#A0AEC0',
   },
   signInContainer: {
     flexDirection: 'row',

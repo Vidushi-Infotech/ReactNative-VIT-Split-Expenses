@@ -9,6 +9,7 @@ import {
   TextInput,
   Alert,
   Image,
+  Modal,
 } from 'react-native';
 import Dropdown from '../components/Dropdown';
 
@@ -24,6 +25,8 @@ const AddExpenseScreen = ({ route, navigation }) => {
   const [splitType, setSplitType] = useState('Equal');
   const [members, setMembers] = useState([]);
 
+
+
   // Categories data
   const categories = [
     { id: 1, name: 'Food', emoji: '🍽️', color: '#FEF3C7' },
@@ -32,6 +35,7 @@ const AddExpenseScreen = ({ route, navigation }) => {
     { id: 4, name: 'Drinks', emoji: '🍺', color: '#FED7AA' },
     { id: 5, name: 'Entertainment', emoji: '🎬', color: '#F3E8FF' },
     { id: 6, name: 'Health', emoji: '🏥', color: '#FECACA' },
+    { id: 7, name: 'Other', emoji: '📝', color: '#F3F4F6' },
   ];
 
   // Currency options
@@ -123,6 +127,8 @@ const AddExpenseScreen = ({ route, navigation }) => {
 
     setMembers(updatedMembers);
   };
+
+
 
   const handleMemberToggle = (memberId) => {
     const updatedMembers = members.map(member =>
@@ -376,6 +382,8 @@ const AddExpenseScreen = ({ route, navigation }) => {
           <Text style={styles.uploadText}>Upload Receipt</Text>
         </TouchableOpacity>
       </View>
+
+
     </SafeAreaView>
   );
 };

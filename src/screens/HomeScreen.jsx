@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   Image,
   Modal,
+  TextInput,
 } from 'react-native';
 import CreateNewGroupScreen from './CreateNewGroupScreen';
 import Ionicons from 'react-native-vector-icons/Ionicons';
@@ -15,6 +16,8 @@ import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 
 const HomeScreen = ({ navigation }) => {
   const [showCreateGroup, setShowCreateGroup] = useState(false);
+  const [showSearchBar, setShowSearchBar] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const [groups, setGroups] = useState([
     {
       id: 1,
@@ -72,9 +75,23 @@ const HomeScreen = ({ navigation }) => {
   };
 
   const handleSearch = () => {
-    // Handle search functionality
-    console.log('Search pressed');
+    setShowSearchBar(!showSearchBar);
+    if (showSearchBar) {
+      setSearchQuery('');
+    }
   };
+
+  const handleSearchQueryChange = (query) => {
+    setSearchQuery(query);
+  };
+
+  // Filter groups based on search query
+  const filteredGroups = groups.filter(group =>
+    group.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    group.details.some(detail =>
+      detail.text.toLowerCase().includes(searchQuery.toLowerCase())
+    )
+  );
 
   return (
     <SafeAreaView style={styles.container}>
@@ -83,13 +100,35 @@ const HomeScreen = ({ navigation }) => {
         <Text style={styles.headerTitle}>My Groups</Text>
         <View style={styles.headerActions}>
           <TouchableOpacity style={styles.headerButton} onPress={handleSearch}>
-            <Ionicons name="search" size={24} color="#6B7280" />
+            <Ionicons name="search" size={24} color={showSearchBar ? "#4A90E2" : "#6B7280"} />
           </TouchableOpacity>
           <TouchableOpacity style={styles.headerButton} onPress={handleAddGroup}>
             <MaterialIcons name="group-add" size={24} color="#6B7280" />
           </TouchableOpacity>
         </View>
       </View>
+
+      {/* Search Bar */}
+      {showSearchBar && (
+        <View style={styles.searchContainer}>
+          <View style={styles.searchInputContainer}>
+            <Ionicons name="search" size={20} color="#6B7280" style={styles.searchIcon} />
+            <TextInput
+              style={styles.searchInput}
+              value={searchQuery}
+              onChangeText={handleSearchQueryChange}
+              placeholder="Search groups, members, or expenses..."
+              placeholderTextColor="#9CA3AF"
+              autoFocus={true}
+            />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity onPress={() => setSearchQuery('')} style={styles.clearButton}>
+                <Ionicons name="close-circle" size={20} color="#6B7280" />
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      )}
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {/* Overall Balance Section */}
@@ -115,9 +154,19 @@ const HomeScreen = ({ navigation }) => {
 
         {/* Groups Wise Expenses */}
         <View style={styles.groupsSection}>
-          <Text style={styles.sectionTitle}>Groups Wise Expenses</Text>
+          <Text style={styles.sectionTitle}>
+            {searchQuery ? `Search Results (${filteredGroups.length})` : 'Groups Wise Expenses'}
+          </Text>
 
-          {groups.map((group) => (
+          {searchQuery && filteredGroups.length === 0 && (
+            <View style={styles.noResultsContainer}>
+              <Ionicons name="search" size={48} color="#9CA3AF" />
+              <Text style={styles.noResultsText}>No groups found</Text>
+              <Text style={styles.noResultsSubtext}>Try searching with different keywords</Text>
+            </View>
+          )}
+
+          {(searchQuery ? filteredGroups : groups).map((group) => (
             <TouchableOpacity
               key={group.id}
               style={styles.groupCard}
@@ -223,6 +272,32 @@ const styles = StyleSheet.create({
   headerButton: {
     padding: 8,
     marginLeft: 12,
+  },
+  searchContainer: {
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  searchInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8F9FA',
+    borderRadius: 25,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  searchIcon: {
+    marginRight: 12,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: '#2D3748',
+  },
+  clearButton: {
+    marginLeft: 8,
   },
   scrollView: {
     flex: 1,
@@ -403,6 +478,21 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     tintColor: '#FFFFFF',
+  },
+  noResultsContainer: {
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  noResultsText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#6B7280',
+    marginTop: 16,
+  },
+  noResultsSubtext: {
+    fontSize: 14,
+    color: '#9CA3AF',
+    marginTop: 8,
   },
 });
 

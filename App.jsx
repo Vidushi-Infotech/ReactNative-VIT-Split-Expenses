@@ -12,8 +12,10 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import Ionicons from 'react-native-vector-icons/Ionicons';
+import auth from '@react-native-firebase/auth';
 
 import SplashScreen from './src/screens/SplashScreen';
+import { AuthProvider, useAuth } from './src/context/AuthContext';
 import LoginScreen from './src/screens/LoginScreen';
 import PhoneLoginScreen from './src/screens/PhoneLoginScreen';
 import OTPVerificationScreen from './src/screens/OTPVerificationScreen';
@@ -178,7 +180,9 @@ const MainTabNavigator = () => {
   );
 };
 
-function App() {
+// App Content Component that uses Auth Context
+function AppContent() {
+  const { user, loading, initializing, isAndroid } = useAuth();
   const [showSplash, setShowSplash] = useState(true);
   const [showLogin, setShowLogin] = useState(true);
   const [showPhoneLogin, setShowPhoneLogin] = useState(false);
@@ -197,6 +201,35 @@ function App() {
     return () => clearTimeout(timer);
   }, []);
 
+  // Show splash screen while Firebase is initializing or during initial load
+  if (showSplash || (isAndroid && initializing)) {
+    return (
+      <>
+        <StatusBar
+          barStyle="dark-content"
+          backgroundColor="#FFFFFF"
+        />
+        <SplashScreen />
+      </>
+    );
+  }
+
+  // If user is authenticated on Android, show main app
+  if (isAndroid && user && !showSplash) {
+    return (
+      <>
+        <StatusBar
+          barStyle="dark-content"
+          backgroundColor="#FFFFFF"
+        />
+        <NavigationContainer>
+          <MainTabNavigator />
+        </NavigationContainer>
+      </>
+    );
+  }
+
+  // For iOS or when user is not authenticated, show authentication flow
   // Show splash screen first
   if (showSplash) {
     return (
@@ -383,7 +416,7 @@ function App() {
     );
   }
 
-  // Show main app after login
+  // Show main app after login (for iOS or fallback)
   return (
     <>
       <StatusBar
@@ -394,6 +427,15 @@ function App() {
         <MainTabNavigator />
       </NavigationContainer>
     </>
+  );
+}
+
+// Main App Component with Auth Provider
+function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 }
 

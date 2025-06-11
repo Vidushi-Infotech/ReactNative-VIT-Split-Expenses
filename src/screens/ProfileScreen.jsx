@@ -8,14 +8,49 @@ import {
   TouchableOpacity,
   Image,
   Modal,
+  Alert,
+  Platform,
 } from 'react-native';
 import EditProfileScreen from './EditProfileScreen';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import FontAwesome from 'react-native-vector-icons/FontAwesome';
+import { useAuth } from '../context/AuthContext';
 
 const ProfileScreen = ({ navigation }) => {
+  const { signOut, user, isAndroid } = useAuth();
   const [showEditProfile, setShowEditProfile] = useState(false);
+
+  const handleLogout = () => {
+    Alert.alert(
+      'Logout',
+      'Are you sure you want to logout?',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Logout',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              if (isAndroid) {
+                await signOut();
+                // Navigation will be handled automatically by auth state change
+              } else {
+                // For iOS, just show a message since Firebase Auth is not implemented
+                Alert.alert('Demo Mode', 'Logout functionality will be available when Firebase Auth is implemented for iOS');
+              }
+            } catch (error) {
+              console.error('Logout error:', error);
+              Alert.alert('Error', 'Failed to logout. Please try again.');
+            }
+          },
+        },
+      ]
+    );
+  };
   const menuItems = [
     {
       id: 1,
@@ -51,7 +86,7 @@ const ProfileScreen = ({ navigation }) => {
       id: 6,
       title: 'Logout',
       iconComponent: <MaterialIcons name="logout" size={20} color="#6B7280" />,
-      onPress: () => console.log('Logout pressed'),
+      onPress: handleLogout,
     },
   ];
 
@@ -81,8 +116,12 @@ const ProfileScreen = ({ navigation }) => {
               />
             </View>
             <View style={styles.userInfo}>
-              <Text style={styles.userName}>Sagar Mali</Text>
-              <Text style={styles.userEmail}>sagar@gmail.com</Text>
+              <Text style={styles.userName}>
+                {isAndroid && user ? (user.displayName || 'User') : 'Sagar Mali'}
+              </Text>
+              <Text style={styles.userEmail}>
+                {isAndroid && user ? user.email : 'sagar@gmail.com'}
+              </Text>
             </View>
           </View>
           <TouchableOpacity style={styles.editButton} onPress={handleEditProfile}>
