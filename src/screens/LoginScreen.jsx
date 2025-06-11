@@ -13,10 +13,12 @@ import {
   Platform,
 } from 'react-native';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import { testSignup, testLogin, testLogout } from '../utils/authTest';
 
 const LoginScreen = ({ navigation }) => {
   const { signIn, loading, getErrorMessage, isAndroid } = useAuth();
+  const { theme } = useTheme();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -76,6 +78,8 @@ const LoginScreen = ({ navigation }) => {
     // Navigate to forgot password screen
     navigation.navigate('ForgotPassword');
   };
+
+  const styles = createStyles(theme);
 
   return (
     <SafeAreaView style={styles.container}>

@@ -10,8 +10,10 @@ import {
   TextInput,
   Alert,
 } from 'react-native';
+import { useTheme } from '../context/ThemeContext';
 
 const CreateNewGroupScreen = ({ onClose, onSave }) => {
+  const { theme } = useTheme();
   const [groupData, setGroupData] = useState({
     name: '',
     description: '',
@@ -100,6 +102,8 @@ const CreateNewGroupScreen = ({ onClose, onSave }) => {
   const filteredContacts = suggestedContacts.filter(contact =>
     contact.displayName.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const styles = createStyles(theme);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -225,10 +229,10 @@ const CreateNewGroupScreen = ({ onClose, onSave }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.background,
   },
   header: {
     flexDirection: 'row',
@@ -237,19 +241,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E5E5',
+    borderBottomColor: theme.colors.border,
   },
   backButton: {
     padding: 8,
   },
   backIcon: {
     fontSize: 24,
-    color: '#2D3748',
+    color: theme.colors.text,
   },
   headerTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#2D3748',
+    color: theme.colors.text,
   },
   placeholder: {
     width: 40,
@@ -265,7 +269,7 @@ const styles = StyleSheet.create({
     width: 120,
     height: 120,
     borderRadius: 60,
-    backgroundColor: '#E5E7EB',
+    backgroundColor: theme.colors.borderLight,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -273,7 +277,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#9CA3AF',
+    backgroundColor: theme.colors.textMuted,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 8,
@@ -284,7 +288,7 @@ const styles = StyleSheet.create({
   },
   uploadText: {
     fontSize: 14,
-    color: '#6B7280',
+    color: theme.colors.textSecondary,
     textAlign: 'center',
   },
   inputGroup: {
@@ -293,19 +297,19 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 14,
-    color: '#6B7280',
+    color: theme.colors.textSecondary,
     marginBottom: 8,
     fontWeight: '500',
   },
   input: {
     borderWidth: 1,
-    borderColor: '#D1D5DB',
+    borderColor: theme.colors.border,
     borderRadius: 8,
     paddingHorizontal: 16,
     paddingVertical: 12,
     fontSize: 16,
-    color: '#2D3748',
-    backgroundColor: '#FFFFFF',
+    color: theme.colors.text,
+    backgroundColor: theme.colors.surface,
   },
   descriptionInput: {
     height: 100,
@@ -318,13 +322,13 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#2D3748',
+    color: theme.colors.text,
     marginBottom: 16,
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F3F4F6',
+    backgroundColor: theme.colors.borderLight,
     borderRadius: 25,
     paddingHorizontal: 16,
     paddingVertical: 12,
@@ -333,7 +337,7 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     fontSize: 16,
-    color: '#2D3748',
+    color: theme.colors.text,
   },
   searchIcon: {
     padding: 4,
@@ -372,7 +376,7 @@ const styles = StyleSheet.create({
   suggestedTitle: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#6B7280',
+    color: theme.colors.textSecondary,
     marginBottom: 12,
   },
   contactItem: {
@@ -380,7 +384,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+    borderBottomColor: theme.colors.borderLight,
   },
   contactImage: {
     width: 40,
@@ -391,13 +395,13 @@ const styles = StyleSheet.create({
   contactName: {
     flex: 1,
     fontSize: 16,
-    color: '#2D3748',
+    color: theme.colors.text,
   },
   selectedIndicator: {
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: '#10B981',
+    backgroundColor: theme.colors.success,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -407,7 +411,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   saveButton: {
-    backgroundColor: '#4F46E5',
+    backgroundColor: theme.colors.primary,
     marginHorizontal: 16,
     marginVertical: 24,
     paddingVertical: 16,

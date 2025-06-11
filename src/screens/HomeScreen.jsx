@@ -13,8 +13,10 @@ import {
 import CreateNewGroupScreen from './CreateNewGroupScreen';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
+import { useTheme } from '../context/ThemeContext';
 
 const HomeScreen = ({ navigation }) => {
+  const { theme } = useTheme();
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [showSearchBar, setShowSearchBar] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -92,6 +94,8 @@ const HomeScreen = ({ navigation }) => {
       detail.text.toLowerCase().includes(searchQuery.toLowerCase())
     )
   );
+
+  const styles = createStyles(theme);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -246,10 +250,10 @@ const HomeScreen = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.background,
   },
   header: {
     flexDirection: 'row',
@@ -257,14 +261,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingVertical: 16,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.surface,
     borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
+    borderBottomColor: theme.colors.border,
   },
   headerTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#2D3748',
+    color: theme.colors.text,
   },
   headerActions: {
     flexDirection: 'row',
@@ -274,16 +278,16 @@ const styles = StyleSheet.create({
     marginLeft: 12,
   },
   searchContainer: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.surface,
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
+    borderBottomColor: theme.colors.border,
   },
   searchInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8F9FA',
+    backgroundColor: theme.colors.borderLight,
     borderRadius: 25,
     paddingHorizontal: 16,
     paddingVertical: 12,
@@ -294,21 +298,21 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     fontSize: 16,
-    color: '#2D3748',
+    color: theme.colors.text,
   },
   clearButton: {
     marginLeft: 8,
   },
   scrollView: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: theme.colors.background,
   },
   balanceSection: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.surface,
     margin: 16,
     padding: 20,
     borderRadius: 12,
-    shadowColor: '#000',
+    shadowColor: theme.colors.text,
     shadowOffset: {
       width: 0,
       height: 2,
@@ -320,7 +324,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#2D3748',
+    color: theme.colors.text,
     marginBottom: 16,
   },
   balanceRow: {
@@ -340,7 +344,7 @@ const styles = StyleSheet.create({
   },
   balanceLabel: {
     fontSize: 14,
-    color: '#718096',
+    color: theme.colors.textSecondary,
     marginBottom: 4,
   },
   balanceAmountGreen: {
@@ -358,10 +362,10 @@ const styles = StyleSheet.create({
     paddingBottom: 100, // Space for floating button
   },
   groupCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.surface,
     marginBottom: 16,
     borderRadius: 12,
-    shadowColor: '#000',
+    shadowColor: theme.colors.text,
     shadowOffset: {
       width: 0,
       height: 2,
@@ -385,7 +389,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#F7FAFC',
+    backgroundColor: theme.colors.borderLight,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
@@ -396,7 +400,7 @@ const styles = StyleSheet.create({
   groupName: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#2D3748',
+    color: theme.colors.text,
     flex: 1,
   },
   groupBalance: {
@@ -431,7 +435,7 @@ const styles = StyleSheet.create({
   detailText: {
     flex: 1,
     fontSize: 14,
-    color: '#4A5568',
+    color: theme.colors.textSecondary,
   },
   detailAmountOrange: {
     fontSize: 14,
@@ -446,7 +450,7 @@ const styles = StyleSheet.create({
   moreBalancesText: {
     flex: 1,
     fontSize: 14,
-    color: '#6B7280',
+    color: theme.colors.textMuted,
     fontStyle: 'italic',
   },
   floatingButton: {
@@ -486,12 +490,12 @@ const styles = StyleSheet.create({
   noResultsText: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#6B7280',
+    color: theme.colors.textSecondary,
     marginTop: 16,
   },
   noResultsSubtext: {
     fontSize: 14,
-    color: '#9CA3AF',
+    color: theme.colors.textMuted,
     marginTop: 8,
   },
 });

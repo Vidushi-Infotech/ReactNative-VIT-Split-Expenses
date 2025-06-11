@@ -7,8 +7,11 @@ import {
   ScrollView,
   TouchableOpacity,
 } from 'react-native';
+import { useTheme } from '../context/ThemeContext';
 
 const ActivityScreen = ({ navigation }) => {
+  const { theme } = useTheme();
+
   // Mock activity data
   const activities = [
     {
@@ -77,6 +80,8 @@ const ActivityScreen = ({ navigation }) => {
     }
   };
 
+  const styles = createStyles(theme);
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
@@ -110,10 +115,10 @@ const ActivityScreen = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: theme.colors.background,
   },
   scrollView: {
     flex: 1,
@@ -124,15 +129,15 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#2D3748',
+    color: theme.colors.text,
     marginBottom: 20,
   },
   activityCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.surface,
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
-    shadowColor: '#000',
+    shadowColor: theme.colors.text,
     shadowOffset: {
       width: 0,
       height: 2,
@@ -162,17 +167,17 @@ const styles = StyleSheet.create({
   activityTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#2D3748',
+    color: theme.colors.text,
     marginBottom: 4,
   },
   activityGroup: {
     fontSize: 14,
-    color: '#6B7280',
+    color: theme.colors.textSecondary,
     marginBottom: 4,
   },
   activityTime: {
     fontSize: 12,
-    color: '#9CA3AF',
+    color: theme.colors.textMuted,
   },
   activityAmount: {
     fontSize: 16,

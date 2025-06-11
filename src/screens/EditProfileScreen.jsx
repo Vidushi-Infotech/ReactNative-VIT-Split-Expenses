@@ -11,8 +11,10 @@ import {
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
+import { useTheme } from '../context/ThemeContext';
 
 const EditProfileScreen = ({ onClose }) => {
+  const { theme } = useTheme();
   const [formData, setFormData] = useState({
     firstName: 'Sagar',
     lastName: 'Mali',
@@ -41,6 +43,8 @@ const EditProfileScreen = ({ onClose }) => {
     // Handle photo edit functionality
     console.log('Edit photo pressed');
   };
+
+  const styles = createStyles(theme);
 
   return (
     <SafeAreaView style={styles.container}>

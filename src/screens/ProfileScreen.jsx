@@ -13,15 +13,35 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import EditProfileScreen from './EditProfileScreen';
+import ThemeSettingsScreen from './ThemeSettingsScreen';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import FontAwesome from 'react-native-vector-icons/FontAwesome';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 
 const ProfileScreen = ({ navigation }) => {
   const { signOut, user, isAndroid, loading } = useAuth();
+  const { theme, themeMode, getThemeDisplayName, getThemeIcon, setTheme } = useTheme();
   const [showEditProfile, setShowEditProfile] = useState(false);
+  const [showThemeSettings, setShowThemeSettings] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  // Debug theme context
+  console.log('ProfileScreen - Theme Mode:', themeMode);
+  console.log('ProfileScreen - Theme:', theme?.mode);
+
+  // Theme settings handlers
+  const handleThemeSettings = () => {
+    console.log('🎨 Theme Settings button pressed!');
+    console.log('🎨 Current showThemeSettings state:', showThemeSettings);
+    setShowThemeSettings(true);
+    console.log('🎨 Setting showThemeSettings to true');
+  };
+
+  const handleCloseThemeSettings = () => {
+    setShowThemeSettings(false);
+  };
 
   const handleLogout = () => {
     // Show different alerts based on platform and user state
@@ -122,31 +142,35 @@ const ProfileScreen = ({ navigation }) => {
     {
       id: 1,
       title: 'Theme Setting',
-      iconComponent: <Ionicons name="moon" size={20} color="#6B7280" />,
-      onPress: () => console.log('Theme Setting pressed'),
+      subtitle: getThemeDisplayName(themeMode),
+      iconComponent: <Ionicons name={getThemeIcon(themeMode)} size={20} color={theme.colors.icon} />,
+      onPress: () => {
+        console.log('🎨 Theme Setting menu item clicked!');
+        handleThemeSettings();
+      },
     },
     {
       id: 2,
       title: 'Payments',
-      iconComponent: <Ionicons name="card" size={20} color="#6B7280" />,
+      iconComponent: <Ionicons name="card" size={20} color={theme.colors.icon} />,
       onPress: () => console.log('Payments pressed'),
     },
     {
       id: 3,
       title: 'Settings',
-      iconComponent: <Ionicons name="settings" size={20} color="#6B7280" />,
+      iconComponent: <Ionicons name="settings" size={20} color={theme.colors.icon} />,
       onPress: () => console.log('Settings pressed'),
     },
     {
       id: 4,
       title: 'Referral System',
-      iconComponent: <FontAwesome name="gift" size={20} color="#6B7280" />,
+      iconComponent: <FontAwesome name="gift" size={20} color={theme.colors.icon} />,
       onPress: () => console.log('Referral System pressed'),
     },
     {
       id: 5,
       title: 'Help & Support',
-      iconComponent: <Ionicons name="help-circle" size={20} color="#6B7280" />,
+      iconComponent: <Ionicons name="help-circle" size={20} color={theme.colors.icon} />,
       onPress: () => console.log('Help & Support pressed'),
     },
     {
@@ -167,6 +191,8 @@ const ProfileScreen = ({ navigation }) => {
   const handleCloseEditProfile = () => {
     setShowEditProfile(false);
   };
+
+  const styles = createStyles(theme);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -217,13 +243,20 @@ const ProfileScreen = ({ navigation }) => {
                 <View style={styles.menuIconContainer}>
                   {item.iconComponent}
                 </View>
-                <Text style={[
-                  styles.menuTitle,
-                  item.textColor && { color: item.textColor },
-                  item.disabled && styles.menuTitleDisabled
-                ]}>
-                  {item.title}
-                </Text>
+                <View style={styles.menuTextContainer}>
+                  <Text style={[
+                    styles.menuTitle,
+                    item.textColor && { color: item.textColor },
+                    item.disabled && styles.menuTitleDisabled
+                  ]}>
+                    {item.title}
+                  </Text>
+                  {item.subtitle && (
+                    <Text style={styles.menuSubtitle}>
+                      {item.subtitle}
+                    </Text>
+                  )}
+                </View>
               </View>
 
               {/* Show loading indicator for logout */}
@@ -251,39 +284,48 @@ const ProfileScreen = ({ navigation }) => {
       >
         <EditProfileScreen onClose={handleCloseEditProfile} />
       </Modal>
+
+      {/* Theme Settings Modal */}
+      <Modal
+        visible={showThemeSettings}
+        animationType="slide"
+        presentationStyle="pageSheet"
+      >
+        <ThemeSettingsScreen onClose={handleCloseThemeSettings} />
+      </Modal>
     </SafeAreaView>
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: theme.colors.background,
   },
   header: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.surface,
     paddingHorizontal: 20,
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
+    borderBottomColor: theme.colors.border,
   },
   headerTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#2D3748',
+    color: theme.colors.text,
   },
   scrollView: {
     flex: 1,
   },
   profileSection: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.surface,
     margin: 16,
     padding: 20,
     borderRadius: 12,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    shadowColor: '#000',
+    shadowColor: theme.colors.text,
     shadowOffset: {
       width: 0,
       height: 2,
@@ -311,22 +353,22 @@ const styles = StyleSheet.create({
   userName: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#2D3748',
+    color: theme.colors.text,
     marginBottom: 4,
   },
   userEmail: {
     fontSize: 14,
-    color: '#718096',
+    color: theme.colors.textSecondary,
   },
   editButton: {
     padding: 8,
   },
   menuSection: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.surface,
     marginHorizontal: 16,
     marginBottom: 16,
     borderRadius: 12,
-    shadowColor: '#000',
+    shadowColor: theme.colors.text,
     shadowOffset: {
       width: 0,
       height: 2,
@@ -342,13 +384,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#F7FAFC',
+    borderBottomColor: theme.colors.borderLight,
   },
   menuItemDisabled: {
     opacity: 0.6,
   },
   menuItemLoading: {
-    backgroundColor: '#F9FAFB',
+    backgroundColor: theme.colors.borderLight,
   },
   menuItemLeft: {
     flexDirection: 'row',
@@ -359,18 +401,26 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#F7FAFC',
+    backgroundColor: theme.colors.borderLight,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 16,
   },
+  menuTextContainer: {
+    flex: 1,
+  },
   menuTitle: {
     fontSize: 16,
-    color: '#2D3748',
+    color: theme.colors.text,
     fontWeight: '500',
   },
+  menuSubtitle: {
+    fontSize: 14,
+    color: theme.colors.textSecondary,
+    marginTop: 2,
+  },
   menuTitleDisabled: {
-    color: '#9CA3AF',
+    color: theme.colors.textMuted,
   },
   loadingContainer: {
     paddingHorizontal: 4,

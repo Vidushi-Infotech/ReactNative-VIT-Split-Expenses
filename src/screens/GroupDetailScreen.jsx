@@ -11,9 +11,11 @@ import {
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
+import { useTheme } from '../context/ThemeContext';
 
 const GroupDetailScreen = ({ route, navigation }) => {
   const { group } = route.params;
+  const { theme } = useTheme();
   const [activeTab, setActiveTab] = useState('Expenses');
   const [showGroupOptions, setShowGroupOptions] = useState(false);
   const [showManageGroup, setShowManageGroup] = useState(false);
@@ -264,6 +266,8 @@ const GroupDetailScreen = ({ route, navigation }) => {
     }
   };
 
+  const styles = createStyles(theme);
+
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
@@ -361,10 +365,10 @@ const GroupDetailScreen = ({ route, navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.background,
   },
   header: {
     flexDirection: 'row',
@@ -412,12 +416,12 @@ const styles = StyleSheet.create({
   groupName: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#2D3748',
+    color: theme.colors.text,
   },
   summarySection: {
     paddingHorizontal: 16,
     paddingVertical: 16,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: theme.colors.surface,
     marginHorizontal: 16,
     borderRadius: 8,
     marginBottom: 20,
@@ -425,12 +429,12 @@ const styles = StyleSheet.create({
   summaryTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#2D3748',
+    color: theme.colors.text,
     marginBottom: 8,
   },
   summaryText: {
     fontSize: 14,
-    color: '#6B7280',
+    color: theme.colors.textSecondary,
     marginBottom: 4,
   },
   oweAmount: {
@@ -617,12 +621,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   optionsMenu: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.surface,
     borderRadius: 8,
     paddingVertical: 8,
     minWidth: 200,
     elevation: 8,
-    shadowColor: '#000',
+    shadowColor: theme.colors.text,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -638,7 +642,7 @@ const styles = StyleSheet.create({
   },
   optionText: {
     fontSize: 14,
-    color: '#2D3748',
+    color: theme.colors.text,
   },
   leaveText: {
     color: '#EF4444',

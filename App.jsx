@@ -16,6 +16,7 @@ import auth from '@react-native-firebase/auth';
 
 import SplashScreen from './src/screens/SplashScreen';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
+import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 import LoginScreen from './src/screens/LoginScreen';
 import PhoneLoginScreen from './src/screens/PhoneLoginScreen';
 import OTPVerificationScreen from './src/screens/OTPVerificationScreen';
@@ -61,6 +62,8 @@ const Stack = createStackNavigator();
 
 // Tab Bar Icon Component
 const TabBarIcon = ({ name, focused }) => {
+  const { theme } = useTheme();
+
   const getIconComponent = () => {
     switch (name) {
       case 'Home':
@@ -68,7 +71,7 @@ const TabBarIcon = ({ name, focused }) => {
           <MaterialIcons
             name="groups"
             size={24}
-            color={focused ? '#6C63FF' : '#ADB5BD'}
+            color={focused ? theme.colors.primary : theme.colors.textMuted}
           />
         );
       case 'Activity':
@@ -76,7 +79,7 @@ const TabBarIcon = ({ name, focused }) => {
           <Ionicons
             name={focused ? 'notifications' : 'notifications-outline'}
             size={24}
-            color={focused ? '#6C63FF' : '#ADB5BD'}
+            color={focused ? theme.colors.primary : theme.colors.textMuted}
           />
         );
       case 'Profile':
@@ -84,7 +87,7 @@ const TabBarIcon = ({ name, focused }) => {
           <Ionicons
             name={focused ? 'person' : 'person-outline'}
             size={24}
-            color={focused ? '#6C63FF' : '#ADB5BD'}
+            color={focused ? theme.colors.primary : theme.colors.textMuted}
           />
         );
       default:
@@ -92,7 +95,7 @@ const TabBarIcon = ({ name, focused }) => {
           <MaterialIcons
             name="smartphone"
             size={24}
-            color={focused ? '#6C63FF' : '#ADB5BD'}
+            color={focused ? theme.colors.primary : theme.colors.textMuted}
           />
         );
     }
@@ -123,33 +126,35 @@ const HomeStackNavigator = () => {
 
 // Main Tab Navigator Component
 const MainTabNavigator = () => {
+  const { theme } = useTheme();
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
         tabBarIcon: ({ focused }) => (
           <TabBarIcon name={route.name} focused={focused} />
         ),
-        tabBarActiveTintColor: '#6C63FF',
-        tabBarInactiveTintColor: '#ADB5BD',
+        tabBarActiveTintColor: theme.colors.primary,
+        tabBarInactiveTintColor: theme.colors.textMuted,
         tabBarStyle: {
-          backgroundColor: '#FFFFFF',
-          borderTopColor: '#E9ECEF',
+          backgroundColor: theme.colors.surface,
+          borderTopColor: theme.colors.border,
           borderTopWidth: 1,
           paddingTop: 8,
           paddingBottom: 8,
           height: 60,
         },
         headerStyle: {
-          backgroundColor: '#FFFFFF',
-          borderBottomColor: '#E9ECEF',
+          backgroundColor: theme.colors.surface,
+          borderBottomColor: theme.colors.border,
           borderBottomWidth: 1,
         },
         headerTitleStyle: {
           fontSize: 18,
           fontWeight: '600',
-          color: '#212529',
+          color: theme.colors.text,
         },
-        headerTintColor: '#6C63FF',
+        headerTintColor: theme.colors.primary,
       })}
     >
       <Tab.Screen
@@ -180,9 +185,10 @@ const MainTabNavigator = () => {
   );
 };
 
-// App Content Component that uses Auth Context
+// App Content Component that uses Auth and Theme Context
 function AppContent() {
   const { user, loading, initializing, isAndroid } = useAuth();
+  const { theme } = useTheme();
   const [showSplash, setShowSplash] = useState(true);
   const [showLogin, setShowLogin] = useState(true);
   const [showPhoneLogin, setShowPhoneLogin] = useState(false);
@@ -206,8 +212,8 @@ function AppContent() {
     return (
       <>
         <StatusBar
-          barStyle="dark-content"
-          backgroundColor="#FFFFFF"
+          barStyle={theme.colors.statusBarStyle}
+          backgroundColor={theme.colors.statusBarBackground}
         />
         <SplashScreen />
       </>
@@ -219,8 +225,8 @@ function AppContent() {
     return (
       <>
         <StatusBar
-          barStyle="dark-content"
-          backgroundColor="#FFFFFF"
+          barStyle={theme.colors.statusBarStyle}
+          backgroundColor={theme.colors.statusBarBackground}
         />
         <NavigationContainer>
           <MainTabNavigator />
@@ -391,8 +397,8 @@ function AppContent() {
     return (
       <>
         <StatusBar
-          barStyle="dark-content"
-          backgroundColor="#FFFFFF"
+          barStyle={theme.colors.statusBarStyle}
+          backgroundColor={theme.colors.statusBarBackground}
         />
         <LoginScreen
           navigation={{
@@ -420,8 +426,8 @@ function AppContent() {
   return (
     <>
       <StatusBar
-        barStyle="dark-content"
-        backgroundColor="#FFFFFF"
+        barStyle={theme.colors.statusBarStyle}
+        backgroundColor={theme.colors.statusBarBackground}
       />
       <NavigationContainer>
         <MainTabNavigator />
@@ -430,12 +436,14 @@ function AppContent() {
   );
 }
 
-// Main App Component with Auth Provider
+// Main App Component with Theme and Auth Providers
 function App() {
   return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
+    </ThemeProvider>
   );
 }
 

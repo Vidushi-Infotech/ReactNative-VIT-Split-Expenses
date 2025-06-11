@@ -7,6 +7,7 @@ import {
   FlatList,
   StyleSheet,
 } from 'react-native';
+import { useTheme } from '../context/ThemeContext';
 
 const Dropdown = ({
   label,
@@ -21,6 +22,7 @@ const Dropdown = ({
   displayKey = 'label',
   valueKey = 'value',
 }) => {
+  const { theme } = useTheme();
   const [isVisible, setIsVisible] = useState(false);
 
   const handleSelect = (item) => {
@@ -33,6 +35,8 @@ const Dropdown = ({
     if (typeof value === 'string') return value;
     return value[displayKey] || value.name || value.label || value;
   };
+
+  const styles = createStyles(theme);
 
   const defaultRenderItem = ({ item }) => (
     <TouchableOpacity
@@ -109,14 +113,14 @@ const Dropdown = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme) => StyleSheet.create({
   container: {
     marginBottom: 16,
   },
   label: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#374151',
+    color: theme.colors.text,
     marginBottom: 8,
   },
   dropdown: {
@@ -124,32 +128,32 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     borderWidth: 1,
-    borderColor: '#D1D5DB',
+    borderColor: theme.colors.border,
     borderRadius: 8,
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.surface,
     minHeight: 48,
   },
   dropdownError: {
-    borderColor: '#EF4444',
+    borderColor: theme.colors.error,
   },
   dropdownText: {
     fontSize: 16,
-    color: '#374151',
+    color: theme.colors.text,
     flex: 1,
   },
   placeholderText: {
-    color: '#9CA3AF',
+    color: theme.colors.textMuted,
   },
   dropdownArrow: {
     fontSize: 12,
-    color: '#6B7280',
+    color: theme.colors.textSecondary,
     marginLeft: 8,
   },
   errorText: {
     fontSize: 12,
-    color: '#EF4444',
+    color: theme.colors.error,
     marginTop: 4,
   },
   modalOverlay: {
@@ -159,12 +163,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalContent: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.surface,
     borderRadius: 12,
     width: '80%',
     maxHeight: '60%',
     elevation: 8,
-    shadowColor: '#000',
+    shadowColor: theme.colors.text,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -176,16 +180,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    borderBottomColor: theme.colors.border,
   },
   modalTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#374151',
+    color: theme.colors.text,
   },
   closeButton: {
     fontSize: 18,
-    color: '#6B7280',
+    color: theme.colors.textSecondary,
     fontWeight: 'bold',
   },
   optionsList: {
@@ -198,7 +202,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+    borderBottomColor: theme.colors.borderLight,
   },
   optionContent: {
     flexDirection: 'row',
@@ -215,17 +219,17 @@ const styles = StyleSheet.create({
   },
   optionText: {
     fontSize: 16,
-    color: '#374151',
+    color: theme.colors.text,
     flex: 1,
   },
   optionCode: {
     fontSize: 14,
-    color: '#6B7280',
+    color: theme.colors.textSecondary,
     marginLeft: 8,
   },
   checkmark: {
     fontSize: 16,
-    color: '#10B981',
+    color: theme.colors.success,
     fontWeight: 'bold',
   },
 });
