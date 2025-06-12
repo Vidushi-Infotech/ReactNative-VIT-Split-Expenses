@@ -9,8 +9,10 @@ import {
   Image,
   ScrollView,
 } from 'react-native';
+import { useTheme } from '../context/ThemeContext';
 
 const PhoneLoginScreen = ({ navigation }) => {
+  const { theme } = useTheme();
   const [phoneNumber, setPhoneNumber] = useState('');
   const [countryCode, setCountryCode] = useState('+91');
   const [showCountryPicker, setShowCountryPicker] = useState(false);
@@ -73,6 +75,8 @@ const PhoneLoginScreen = ({ navigation }) => {
     navigation.goBack();
   };
 
+  const styles = createStyles(theme);
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -113,7 +117,7 @@ const PhoneLoginScreen = ({ navigation }) => {
                 phoneError ? styles.phoneTextInputError : null
               ]}
               placeholder="Enter Your Phone Number"
-              placeholderTextColor="#ADB5BD"
+              placeholderTextColor={theme.colors.textSecondary}
               value={phoneNumber}
               onChangeText={handlePhoneNumberChange}
               keyboardType="numeric"
@@ -192,10 +196,10 @@ const PhoneLoginScreen = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.background,
   },
   scrollContent: {
     flexGrow: 1,
@@ -215,20 +219,20 @@ const styles = StyleSheet.create({
   brandName: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: '#4A5568',
+    color: theme.colors.text,
     textAlign: 'center',
   },
   welcomeText: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#4A90E2',
+    color: theme.colors.primary,
     textAlign: 'center',
     marginBottom: 60,
   },
   loginTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#2D3748',
+    color: theme.colors.text,
     marginBottom: 32,
     textAlign: 'center',
   },
@@ -237,7 +241,7 @@ const styles = StyleSheet.create({
   },
   inputLabel: {
     fontSize: 14,
-    color: '#718096',
+    color: theme.colors.textSecondary,
     marginBottom: 8,
     fontWeight: '500',
   },
@@ -245,14 +249,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: theme.colors.border,
     borderRadius: 8,
-    backgroundColor: '#F7FAFC',
+    backgroundColor: theme.colors.surface,
     height: 56,
   },
   phoneInputContainerError: {
-    borderColor: '#E53E3E',
-    backgroundColor: '#FED7D7',
+    borderColor: theme.colors.error,
+    backgroundColor: theme.colors.errorBackground || theme.colors.surface,
   },
   countryCodeButton: {
     flexDirection: 'row',
@@ -260,7 +264,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 16,
     borderRightWidth: 1,
-    borderRightColor: '#E2E8F0',
+    borderRightColor: theme.colors.border,
     minWidth: 80,
   },
   flagEmoji: {
@@ -269,24 +273,24 @@ const styles = StyleSheet.create({
   },
   countryCodeText: {
     fontSize: 16,
-    color: '#2D3748',
+    color: theme.colors.text,
     fontWeight: '500',
     marginRight: 4,
   },
   dropdownArrow: {
     fontSize: 10,
-    color: '#718096',
+    color: theme.colors.textSecondary,
   },
   phoneTextInput: {
     flex: 1,
     paddingHorizontal: 16,
     paddingVertical: 16,
     fontSize: 16,
-    color: '#2D3748',
+    color: theme.colors.text,
     backgroundColor: 'transparent',
   },
   phoneTextInputError: {
-    borderColor: '#E53E3E',
+    borderColor: theme.colors.error,
   },
   phoneCounterContainer: {
     alignItems: 'flex-end',
@@ -294,7 +298,7 @@ const styles = StyleSheet.create({
   },
   phoneCounter: {
     fontSize: 12,
-    color: '#718096',
+    color: theme.colors.textSecondary,
     fontWeight: '400',
   },
   errorContainer: {
@@ -302,7 +306,7 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: 14,
-    color: '#E53E3E',
+    color: theme.colors.error,
     fontWeight: '500',
   },
   countryPickerContainer: {
@@ -310,11 +314,11 @@ const styles = StyleSheet.create({
     top: 60,
     left: 0,
     right: 0,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.surface,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: theme.colors.border,
     borderRadius: 8,
-    shadowColor: '#000',
+    shadowColor: theme.colors.shadow || '#000',
     shadowOffset: {
       width: 0,
       height: 2,
@@ -330,21 +334,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
+    borderBottomColor: theme.colors.border,
   },
   countryName: {
     flex: 1,
     fontSize: 16,
-    color: '#2D3748',
+    color: theme.colors.text,
     marginLeft: 8,
   },
   countryCodeOption: {
     fontSize: 16,
-    color: '#718096',
+    color: theme.colors.textSecondary,
     fontWeight: '500',
   },
   sendOTPButton: {
-    backgroundColor: '#4A90E2',
+    backgroundColor: theme.colors.primary,
     borderRadius: 8,
     paddingVertical: 18,
     marginTop: 24,
@@ -362,7 +366,7 @@ const styles = StyleSheet.create({
   },
   backToLoginText: {
     fontSize: 16,
-    color: '#4A90E2',
+    color: theme.colors.primary,
     fontWeight: '500',
     textDecorationLine: 'underline',
   },

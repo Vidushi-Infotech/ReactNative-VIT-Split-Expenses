@@ -13,9 +13,11 @@ import {
   Platform,
 } from 'react-native';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 
 const RegisterScreen = ({ navigation }) => {
   const { signUp, loading, getErrorMessage, isAndroid } = useAuth();
+  const { theme } = useTheme();
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
@@ -26,6 +28,8 @@ const RegisterScreen = ({ navigation }) => {
   const [countryCode, setCountryCode] = useState('+91');
   const [showCountryPicker, setShowCountryPicker] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+
+  const styles = createStyles(theme);
 
   const validateForm = () => {
     if (!firstName.trim()) {
@@ -119,7 +123,7 @@ const RegisterScreen = ({ navigation }) => {
           <TextInput
             style={styles.textInput}
             placeholder="Enter Your First Name"
-            placeholderTextColor="#ADB5BD"
+            placeholderTextColor={theme.colors.textSecondary}
             value={firstName}
             onChangeText={setFirstName}
             autoCapitalize="words"
@@ -132,7 +136,7 @@ const RegisterScreen = ({ navigation }) => {
           <TextInput
             style={styles.textInput}
             placeholder="Enter Your Last Name"
-            placeholderTextColor="#ADB5BD"
+            placeholderTextColor={theme.colors.textSecondary}
             value={lastName}
             onChangeText={setLastName}
             autoCapitalize="words"
@@ -145,7 +149,7 @@ const RegisterScreen = ({ navigation }) => {
           <TextInput
             style={styles.textInput}
             placeholder="Enter Your Email ID"
-            placeholderTextColor="#ADB5BD"
+            placeholderTextColor={theme.colors.textSecondary}
             value={email}
             onChangeText={setEmail}
             keyboardType="email-address"
@@ -168,7 +172,7 @@ const RegisterScreen = ({ navigation }) => {
             <TextInput
               style={styles.phoneTextInput}
               placeholder="Enter Your Phone Number"
-              placeholderTextColor="#ADB5BD"
+              placeholderTextColor={theme.colors.textSecondary}
               value={phoneNumber}
               onChangeText={setPhoneNumber}
               keyboardType="numeric"
@@ -212,7 +216,7 @@ const RegisterScreen = ({ navigation }) => {
           <TextInput
             style={styles.textInput}
             placeholder="Enter Your Password"
-            placeholderTextColor="#ADB5BD"
+            placeholderTextColor={theme.colors.textSecondary}
             value={password}
             onChangeText={setPassword}
             secureTextEntry
@@ -225,7 +229,7 @@ const RegisterScreen = ({ navigation }) => {
           <TextInput
             style={styles.textInput}
             placeholder="Confirm Your Password"
-            placeholderTextColor="#ADB5BD"
+            placeholderTextColor={theme.colors.textSecondary}
             value={confirmPassword}
             onChangeText={setConfirmPassword}
             secureTextEntry
@@ -238,7 +242,7 @@ const RegisterScreen = ({ navigation }) => {
           <TextInput
             style={styles.textInput}
             placeholder="Enter Referral Code"
-            placeholderTextColor="#ADB5BD"
+            placeholderTextColor={theme.colors.textSecondary}
             value={referralCode}
             onChangeText={setReferralCode}
             autoCapitalize="characters"
@@ -303,10 +307,10 @@ const RegisterScreen = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.background,
   },
   scrollContent: {
     flexGrow: 1,
@@ -317,7 +321,7 @@ const styles = StyleSheet.create({
   header: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#2D3748',
+    color: theme.colors.text,
     textAlign: 'center',
     marginBottom: 32,
   },
@@ -327,27 +331,27 @@ const styles = StyleSheet.create({
   },
   inputLabel: {
     fontSize: 14,
-    color: '#718096',
+    color: theme.colors.textSecondary,
     marginBottom: 8,
     fontWeight: '500',
   },
   textInput: {
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: theme.colors.border,
     borderRadius: 8,
     paddingHorizontal: 16,
     paddingVertical: 14,
     fontSize: 16,
-    color: '#2D3748',
-    backgroundColor: '#F7FAFC',
+    color: theme.colors.text,
+    backgroundColor: theme.colors.surface,
   },
   phoneInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: theme.colors.border,
     borderRadius: 8,
-    backgroundColor: '#F7FAFC',
+    backgroundColor: theme.colors.surface,
     height: 56,
   },
   countryCodeButton: {
@@ -356,7 +360,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 16,
     borderRightWidth: 1,
-    borderRightColor: '#E2E8F0',
+    borderRightColor: theme.colors.border,
     minWidth: 80,
   },
   flagEmoji: {
@@ -365,20 +369,20 @@ const styles = StyleSheet.create({
   },
   countryCodeText: {
     fontSize: 16,
-    color: '#2D3748',
+    color: theme.colors.text,
     fontWeight: '500',
     marginRight: 4,
   },
   dropdownArrow: {
     fontSize: 10,
-    color: '#718096',
+    color: theme.colors.textSecondary,
   },
   phoneTextInput: {
     flex: 1,
     paddingHorizontal: 16,
     paddingVertical: 16,
     fontSize: 16,
-    color: '#2D3748',
+    color: theme.colors.text,
     backgroundColor: 'transparent',
   },
   countryPickerContainer: {
@@ -386,9 +390,9 @@ const styles = StyleSheet.create({
     top: 60,
     left: 0,
     right: 0,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.surface,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: theme.colors.border,
     borderRadius: 8,
     shadowColor: '#000',
     shadowOffset: {
@@ -406,17 +410,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
+    borderBottomColor: theme.colors.border,
   },
   countryName: {
     flex: 1,
     fontSize: 16,
-    color: '#2D3748',
+    color: theme.colors.text,
     marginLeft: 8,
   },
   countryCodeOption: {
     fontSize: 16,
-    color: '#718096',
+    color: theme.colors.textSecondary,
     fontWeight: '500',
   },
   termsContainer: {
@@ -425,16 +429,16 @@ const styles = StyleSheet.create({
   },
   termsText: {
     fontSize: 14,
-    color: '#718096',
+    color: theme.colors.textSecondary,
     textAlign: 'center',
     lineHeight: 20,
   },
   linkText: {
-    color: '#4A90E2',
+    color: theme.colors.primary,
     fontWeight: '500',
   },
   signUpButton: {
-    backgroundColor: '#4A90E2',
+    backgroundColor: theme.colors.primary,
     borderRadius: 8,
     paddingVertical: 16,
     marginBottom: 24,
@@ -446,7 +450,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   signUpButtonDisabled: {
-    backgroundColor: '#A0AEC0',
+    backgroundColor: theme.colors.textSecondary,
   },
   signInContainer: {
     flexDirection: 'row',
@@ -455,16 +459,16 @@ const styles = StyleSheet.create({
   },
   signInText: {
     fontSize: 14,
-    color: '#718096',
+    color: theme.colors.textSecondary,
   },
   signInLink: {
     fontSize: 14,
-    color: '#4A90E2',
+    color: theme.colors.primary,
     fontWeight: '600',
   },
   socialTitle: {
     fontSize: 14,
-    color: '#718096',
+    color: theme.colors.textSecondary,
     textAlign: 'center',
     marginBottom: 20,
   },
@@ -477,9 +481,9 @@ const styles = StyleSheet.create({
     width: 50,
     height: 50,
     borderRadius: 25,
-    backgroundColor: '#F7FAFC',
+    backgroundColor: theme.colors.surface,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: theme.colors.border,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',

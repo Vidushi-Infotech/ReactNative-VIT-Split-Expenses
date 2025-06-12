@@ -8,13 +8,13 @@ import {
   TouchableOpacity,
   Image,
   ScrollView,
-  Alert,
   ActivityIndicator,
   Platform,
 } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
-import { testSignup, testLogin, testLogout } from '../utils/authTest';
+import ThemedAlert from '../components/ThemedAlert';
+
 
 const LoginScreen = ({ navigation }) => {
   const { signIn, loading, getErrorMessage, isAndroid } = useAuth();
@@ -23,15 +23,27 @@ const LoginScreen = ({ navigation }) => {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
+  // Alert state
+  const [showAlert, setShowAlert] = useState(false);
+  const [alertTitle, setAlertTitle] = useState('');
+  const [alertMessage, setAlertMessage] = useState('');
+
+  // Helper function to show themed alerts
+  const showThemedAlert = (title, message) => {
+    setAlertTitle(title);
+    setAlertMessage(message);
+    setShowAlert(true);
+  };
+
   const handleLogin = async () => {
     // Basic validation
     if (!email.trim()) {
-      Alert.alert('Error', 'Please enter your email address');
+      showThemedAlert('Error', 'Please enter your email address');
       return;
     }
 
     if (!password.trim()) {
-      Alert.alert('Error', 'Please enter your password');
+      showThemedAlert('Error', 'Please enter your password');
       return;
     }
 
@@ -48,7 +60,7 @@ const LoginScreen = ({ navigation }) => {
       // Navigation will be handled automatically by auth state change
     } catch (error) {
       console.error('Login error:', error);
-      Alert.alert('Login Failed', getErrorMessage(error));
+      showThemedAlert('Login Failed', getErrorMessage(error));
     } finally {
       setIsLoading(false);
     }
@@ -106,7 +118,7 @@ const LoginScreen = ({ navigation }) => {
           <TextInput
             style={styles.textInput}
             placeholder="Enter Your Email"
-            placeholderTextColor="#ADB5BD"
+            placeholderTextColor={theme.colors.textSecondary}
             value={email}
             onChangeText={setEmail}
             keyboardType="email-address"
@@ -120,7 +132,7 @@ const LoginScreen = ({ navigation }) => {
           <TextInput
             style={styles.textInput}
             placeholder="Enter Your Password"
-            placeholderTextColor="#ADB5BD"
+            placeholderTextColor={theme.colors.textSecondary}
             value={password}
             onChangeText={setPassword}
             secureTextEntry
@@ -179,33 +191,31 @@ const LoginScreen = ({ navigation }) => {
           </TouchableOpacity>
         </View>
 
-        {/* Firebase Test Buttons (Android Only) */}
-        {isAndroid && (
-          <View style={styles.testSection}>
-            <Text style={styles.testTitle}>🔥 Firebase Auth Tests</Text>
 
-            <TouchableOpacity style={styles.testButton} onPress={testSignup}>
-              <Text style={styles.testButtonText}>Test Signup</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={[styles.testButton, styles.testButtonSecondary]} onPress={testLogin}>
-              <Text style={styles.testButtonText}>Test Login</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={[styles.testButton, styles.testButtonDanger]} onPress={testLogout}>
-              <Text style={styles.testButtonText}>Test Logout</Text>
-            </TouchableOpacity>
-          </View>
-        )}
       </ScrollView>
+
+      {/* Themed Alert */}
+      <ThemedAlert
+        visible={showAlert}
+        title={alertTitle}
+        message={alertMessage}
+        buttons={[
+          {
+            text: 'OK',
+            style: 'default',
+            onPress: () => setShowAlert(false),
+          },
+        ]}
+        onClose={() => setShowAlert(false)}
+      />
     </SafeAreaView>
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.background,
   },
   scrollContent: {
     flexGrow: 1,
@@ -225,20 +235,20 @@ const styles = StyleSheet.create({
   brandName: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: '#4A5568',
+    color: theme.colors.text,
     textAlign: 'center',
   },
   welcomeText: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#4A90E2',
+    color: theme.colors.primary,
     textAlign: 'center',
     marginBottom: 40,
   },
   signInTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#2D3748',
+    color: theme.colors.text,
     marginBottom: 24,
     textAlign: 'center',
   },
@@ -247,19 +257,19 @@ const styles = StyleSheet.create({
   },
   inputLabel: {
     fontSize: 14,
-    color: '#718096',
+    color: theme.colors.textSecondary,
     marginBottom: 8,
     fontWeight: '500',
   },
   textInput: {
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: theme.colors.border,
     borderRadius: 8,
     paddingHorizontal: 16,
     paddingVertical: 14,
     fontSize: 16,
-    color: '#2D3748',
-    backgroundColor: '#F7FAFC',
+    color: theme.colors.text,
+    backgroundColor: theme.colors.surface,
   },
   forgotPassword: {
     alignSelf: 'flex-end',
@@ -267,11 +277,11 @@ const styles = StyleSheet.create({
   },
   forgotPasswordText: {
     fontSize: 14,
-    color: '#4A90E2',
+    color: theme.colors.primary,
     fontWeight: '500',
   },
   loginButton: {
-    backgroundColor: '#4A90E2',
+    backgroundColor: theme.colors.primary,
     borderRadius: 8,
     paddingVertical: 16,
     marginTop: 24,
@@ -284,17 +294,17 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   loginButtonDisabled: {
-    backgroundColor: '#A0AEC0',
+    backgroundColor: theme.colors.textMuted,
   },
   phoneLoginButton: {
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: theme.colors.border,
     borderRadius: 8,
     paddingVertical: 16,
     marginBottom: 24,
   },
   phoneLoginText: {
-    color: '#4A5568',
+    color: theme.colors.text,
     fontSize: 16,
     fontWeight: '500',
     textAlign: 'center',
@@ -306,16 +316,16 @@ const styles = StyleSheet.create({
   },
   signupText: {
     fontSize: 14,
-    color: '#718096',
+    color: theme.colors.textSecondary,
   },
   signupLink: {
     fontSize: 14,
-    color: '#4A90E2',
+    color: theme.colors.primary,
     fontWeight: '600',
   },
   socialTitle: {
     fontSize: 14,
-    color: '#718096',
+    color: theme.colors.textSecondary,
     textAlign: 'center',
     marginBottom: 20,
   },
@@ -328,9 +338,9 @@ const styles = StyleSheet.create({
     width: 50,
     height: 50,
     borderRadius: 25,
-    backgroundColor: '#F7FAFC',
+    backgroundColor: theme.colors.surface,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: theme.colors.border,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
@@ -346,37 +356,7 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
   },
-  testSection: {
-    marginTop: 40,
-    paddingTop: 20,
-    borderTopWidth: 1,
-    borderTopColor: '#E2E8F0',
-  },
-  testTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#2D3748',
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  testButton: {
-    backgroundColor: '#4A90E2',
-    borderRadius: 8,
-    paddingVertical: 12,
-    marginBottom: 12,
-  },
-  testButtonSecondary: {
-    backgroundColor: '#48BB78',
-  },
-  testButtonDanger: {
-    backgroundColor: '#F56565',
-  },
-  testButtonText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
+
 });
 
 export default LoginScreen;

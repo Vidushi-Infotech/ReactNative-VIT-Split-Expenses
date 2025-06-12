@@ -9,17 +9,38 @@ import {
   Image,
   ScrollView,
 } from 'react-native';
+import { useTheme } from '../context/ThemeContext';
+import ThemedAlert from '../components/ThemedAlert';
 
 const OTPVerificationScreen = ({ navigation, route }) => {
+  const { theme } = useTheme();
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [timer, setTimer] = useState(23);
   const [canResend, setCanResend] = useState(false);
   const inputRefs = useRef([]);
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertConfig, setAlertConfig] = useState({});
 
   const phoneNumber = route?.params?.phoneNumber || '';
   const countryCode = route?.params?.countryCode || '+91';
   const email = route?.params?.email || '';
   const isFromForgotPassword = route?.params?.isFromForgotPassword || false;
+
+  // Helper function to show themed alerts
+  const showThemedAlert = (title, message, buttons = [{ text: 'OK' }]) => {
+    setAlertConfig({
+      title,
+      message,
+      buttons: buttons.map(button => ({
+        ...button,
+        onPress: () => {
+          setAlertVisible(false);
+          if (button.onPress) button.onPress();
+        }
+      }))
+    });
+    setAlertVisible(true);
+  };
 
   useEffect(() => {
     // Start countdown timer
@@ -77,10 +98,10 @@ const OTPVerificationScreen = ({ navigation, route }) => {
           navigation.replace('Main');
         }
       } else {
-        alert('Invalid OTP. Please enter 123456 for demo purposes.');
+        showThemedAlert('Invalid OTP', 'Please enter 123456 for demo purposes.');
       }
     } else {
-      alert('Please enter complete 6-digit OTP');
+      showThemedAlert('Incomplete OTP', 'Please enter complete 6-digit OTP');
     }
   };
 
@@ -116,6 +137,8 @@ const OTPVerificationScreen = ({ navigation, route }) => {
     const secs = seconds % 60;
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
+
+  const styles = createStyles(theme);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -179,14 +202,22 @@ const OTPVerificationScreen = ({ navigation, route }) => {
           )}
         </View>
       </ScrollView>
+
+      {/* Themed Alert */}
+      <ThemedAlert
+        visible={alertVisible}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        buttons={alertConfig.buttons}
+      />
     </SafeAreaView>
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.background,
   },
   scrollContent: {
     flexGrow: 1,
@@ -208,7 +239,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#2D3748',
+    color: theme.colors.text,
     textAlign: 'center',
     marginBottom: 40,
   },
@@ -223,16 +254,16 @@ const styles = StyleSheet.create({
     width: 45,
     height: 50,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: theme.colors.border,
     borderRadius: 8,
-    backgroundColor: '#F7FAFC',
+    backgroundColor: theme.colors.surface,
     fontSize: 18,
     fontWeight: '600',
-    color: '#2D3748',
+    color: theme.colors.text,
   },
   otpInputFilled: {
-    borderColor: '#4A90E2',
-    backgroundColor: '#EBF8FF',
+    borderColor: theme.colors.primary,
+    backgroundColor: theme.colors.primaryBackground || theme.colors.surface,
   },
   verifyButton: {
     width: '100%',
@@ -241,10 +272,10 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   verifyButtonActive: {
-    backgroundColor: '#4A90E2',
+    backgroundColor: theme.colors.primary,
   },
   verifyButtonInactive: {
-    backgroundColor: '#CBD5E0',
+    backgroundColor: theme.colors.disabled || theme.colors.border,
   },
   verifyButtonText: {
     color: '#FFFFFF',
@@ -257,13 +288,13 @@ const styles = StyleSheet.create({
   },
   resendText: {
     fontSize: 16,
-    color: '#4A90E2',
+    color: theme.colors.primary,
     fontWeight: '500',
     textDecorationLine: 'underline',
   },
   timerText: {
     fontSize: 16,
-    color: '#718096',
+    color: theme.colors.textSecondary,
     fontWeight: '400',
   },
 });

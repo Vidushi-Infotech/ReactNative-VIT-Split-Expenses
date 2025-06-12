@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import EditProfileScreen from './EditProfileScreen';
 import ThemeSettingsScreen from './ThemeSettingsScreen';
+import ThemedAlert from '../components/ThemedAlert';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import FontAwesome from 'react-native-vector-icons/FontAwesome';
@@ -25,6 +26,7 @@ const ProfileScreen = ({ navigation }) => {
   const { theme, themeMode, getThemeDisplayName, getThemeIcon, setTheme } = useTheme();
   const [showEditProfile, setShowEditProfile] = useState(false);
   const [showThemeSettings, setShowThemeSettings] = useState(false);
+  const [showLogoutAlert, setShowLogoutAlert] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   // Debug theme context
@@ -44,32 +46,7 @@ const ProfileScreen = ({ navigation }) => {
   };
 
   const handleLogout = () => {
-    // Show different alerts based on platform and user state
-    const title = isAndroid && user ? 'Logout' : 'Demo Mode';
-    const message = isAndroid && user
-      ? `Are you sure you want to logout?\n\nYou are currently signed in as:\n${user.email || 'Unknown User'}`
-      : isAndroid
-        ? 'You are not currently signed in.'
-        : 'Logout functionality will be available when Firebase Auth is implemented for iOS.';
-
-    const buttons = isAndroid && user ? [
-      {
-        text: 'Cancel',
-        style: 'cancel',
-      },
-      {
-        text: 'Logout',
-        style: 'destructive',
-        onPress: performLogout,
-      },
-    ] : [
-      {
-        text: 'OK',
-        style: 'default',
-      }
-    ];
-
-    Alert.alert(title, message, buttons);
+    setShowLogoutAlert(true);
   };
 
   const performLogout = async () => {
@@ -94,16 +71,8 @@ const ProfileScreen = ({ navigation }) => {
         errorMessage = 'Too many requests. Please wait a moment and try again.';
       }
 
-      Alert.alert('Logout Failed', errorMessage, [
-        {
-          text: 'Retry',
-          onPress: performLogout,
-        },
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        }
-      ]);
+      // For now, just log the error - we can add a themed error alert later if needed
+      console.error('Logout failed:', errorMessage);
     } finally {
       setIsLoggingOut(false);
     }
@@ -293,6 +262,45 @@ const ProfileScreen = ({ navigation }) => {
       >
         <ThemeSettingsScreen onClose={handleCloseThemeSettings} />
       </Modal>
+
+      {/* Themed Logout Alert */}
+      <ThemedAlert
+        visible={showLogoutAlert}
+        title={isAndroid && user ? 'Logout' : 'Demo Mode'}
+        message={
+          isAndroid && user
+            ? `Are you sure you want to logout?\n\nYou are currently signed in as:\n${user.email || 'Unknown User'}`
+            : isAndroid
+            ? 'You are not currently signed in.'
+            : 'Logout functionality will be available when Firebase Auth is implemented for iOS.'
+        }
+        buttons={
+          isAndroid && user
+            ? [
+                {
+                  text: 'Cancel',
+                  style: 'cancel',
+                  onPress: () => setShowLogoutAlert(false),
+                },
+                {
+                  text: 'Logout',
+                  style: 'destructive',
+                  onPress: () => {
+                    setShowLogoutAlert(false);
+                    performLogout();
+                  },
+                },
+              ]
+            : [
+                {
+                  text: 'OK',
+                  style: 'default',
+                  onPress: () => setShowLogoutAlert(false),
+                },
+              ]
+        }
+        onClose={() => setShowLogoutAlert(false)}
+      />
     </SafeAreaView>
   );
 };

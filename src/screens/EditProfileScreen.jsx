@@ -175,17 +175,17 @@ const EditProfileScreen = ({ onClose }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.background,
   },
   header: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.surface,
     paddingHorizontal: 20,
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
+    borderBottomColor: theme.colors.border,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -196,7 +196,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#2D3748',
+    color: theme.colors.text,
   },
   placeholder: {
     width: 40,
@@ -223,11 +223,11 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#4F46E5',
+    backgroundColor: theme.colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 3,
-    borderColor: '#FFFFFF',
+    borderColor: theme.colors.surface,
   },
 
   formSection: {
@@ -238,19 +238,19 @@ const styles = StyleSheet.create({
   },
   inputLabel: {
     fontSize: 14,
-    color: '#4A5568',
+    color: theme.colors.textSecondary,
     marginBottom: 8,
     fontWeight: '500',
   },
   textInput: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.surface,
     borderRadius: 8,
     paddingHorizontal: 16,
     paddingVertical: 12,
     fontSize: 16,
-    color: '#2D3748',
+    color: theme.colors.text,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: theme.colors.border,
   },
   phoneInputContainer: {
     flexDirection: 'row',
@@ -259,11 +259,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#D1D5DB',
+    borderColor: theme.colors.border,
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 12,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.surface,
     minWidth: 100,
   },
   flagIcon: {
@@ -273,24 +273,24 @@ const styles = StyleSheet.create({
   },
   countryCode: {
     fontSize: 16,
-    color: '#2D3748',
+    color: theme.colors.text,
     marginRight: 4,
   },
 
   phoneInput: {
     flex: 1,
     borderWidth: 1,
-    borderColor: '#D1D5DB',
+    borderColor: theme.colors.border,
     borderRadius: 8,
     paddingHorizontal: 16,
     paddingVertical: 12,
     fontSize: 16,
-    color: '#2D3748',
-    backgroundColor: '#FFFFFF',
+    color: theme.colors.text,
+    backgroundColor: theme.colors.surface,
     marginLeft: 12,
   },
   saveButton: {
-    backgroundColor: '#4F46E5',
+    backgroundColor: theme.colors.primary,
     marginHorizontal: 20,
     marginVertical: 30,
     paddingVertical: 16,

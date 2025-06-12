@@ -8,17 +8,33 @@ import {
   TouchableOpacity,
   Image,
   ScrollView,
-  Alert,
   ActivityIndicator,
   Platform,
 } from 'react-native';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
+import ThemedAlert from '../components/ThemedAlert';
 
 const ForgotPasswordScreen = ({ navigation }) => {
   const { resetPassword, getErrorMessage, isAndroid } = useAuth();
+  const { theme } = useTheme();
   const [mobileOrEmail, setMobileOrEmail] = useState('');
   const [inputError, setInputError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+
+  // Alert state
+  const [showAlert, setShowAlert] = useState(false);
+  const [alertTitle, setAlertTitle] = useState('');
+  const [alertMessage, setAlertMessage] = useState('');
+  const [alertButtons, setAlertButtons] = useState([]);
+
+  // Helper function to show themed alerts
+  const showThemedAlert = (title, message, buttons = [{ text: 'OK', style: 'default', onPress: () => setShowAlert(false) }]) => {
+    setAlertTitle(title);
+    setAlertMessage(message);
+    setAlertButtons(buttons);
+    setShowAlert(true);
+  };
 
   // Validate email format
   const isValidEmail = (email) => {
@@ -67,10 +83,9 @@ const ForgotPasswordScreen = ({ navigation }) => {
       });
 
       // Show success message
-      Alert.alert(
+      showThemedAlert(
         'OTP Sent',
-        `A verification code has been sent to ${mobileOrEmail}`,
-        [{ text: 'OK' }]
+        `A verification code has been sent to ${mobileOrEmail}`
       );
     } else {
       // For email addresses
@@ -84,19 +99,23 @@ const ForgotPasswordScreen = ({ navigation }) => {
         try {
           setIsLoading(true);
           await resetPassword(mobileOrEmail.trim());
-          Alert.alert(
+          showThemedAlert(
             'Password Reset Email Sent',
             `A password reset link has been sent to ${mobileOrEmail}. Please check your email and follow the instructions to reset your password.`,
             [
               {
                 text: 'OK',
-                onPress: () => navigation.goBack()
+                style: 'default',
+                onPress: () => {
+                  setShowAlert(false);
+                  navigation.goBack();
+                }
               }
             ]
           );
         } catch (error) {
           console.error('Password reset error:', error);
-          Alert.alert('Error', getErrorMessage(error));
+          showThemedAlert('Error', getErrorMessage(error));
         } finally {
           setIsLoading(false);
         }
@@ -109,10 +128,9 @@ const ForgotPasswordScreen = ({ navigation }) => {
         });
 
         // Show success message
-        Alert.alert(
+        showThemedAlert(
           'OTP Sent',
-          `A verification code has been sent to ${mobileOrEmail}`,
-          [{ text: 'OK' }]
+          `A verification code has been sent to ${mobileOrEmail}`
         );
       }
     }
@@ -121,6 +139,8 @@ const ForgotPasswordScreen = ({ navigation }) => {
   const handleBackToLogin = () => {
     navigation.goBack();
   };
+
+  const styles = createStyles(theme);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -153,7 +173,7 @@ const ForgotPasswordScreen = ({ navigation }) => {
               inputError ? styles.textInputError : null
             ]}
             placeholder="Enter Your Mobile Number/ Email ID"
-            placeholderTextColor="#ADB5BD"
+            placeholderTextColor={theme.colors.textSecondary}
             value={mobileOrEmail}
             onChangeText={handleInputChange}
             keyboardType="default"
@@ -188,14 +208,23 @@ const ForgotPasswordScreen = ({ navigation }) => {
           <Text style={styles.backToLoginText}>Back to Login</Text>
         </TouchableOpacity>
       </ScrollView>
+
+      {/* Themed Alert */}
+      <ThemedAlert
+        visible={showAlert}
+        title={alertTitle}
+        message={alertMessage}
+        buttons={alertButtons}
+        onClose={() => setShowAlert(false)}
+      />
     </SafeAreaView>
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.background,
   },
   scrollContent: {
     flexGrow: 1,
@@ -215,13 +244,13 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#2D3748',
+    color: theme.colors.text,
     textAlign: 'center',
     marginBottom: 16,
   },
   description: {
     fontSize: 14,
-    color: '#718096',
+    color: theme.colors.textSecondary,
     textAlign: 'center',
     lineHeight: 20,
     marginBottom: 40,
@@ -232,26 +261,26 @@ const styles = StyleSheet.create({
   },
   inputLabel: {
     fontSize: 14,
-    color: '#718096',
+    color: theme.colors.textSecondary,
     marginBottom: 8,
     fontWeight: '500',
   },
   textInput: {
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: theme.colors.border,
     borderRadius: 8,
     paddingHorizontal: 16,
     paddingVertical: 14,
     fontSize: 16,
-    color: '#2D3748',
-    backgroundColor: '#F7FAFC',
+    color: theme.colors.text,
+    backgroundColor: theme.colors.surface,
   },
   textInputError: {
-    borderColor: '#E53E3E',
+    borderColor: theme.colors.error,
   },
   errorText: {
     fontSize: 12,
-    color: '#E53E3E',
+    color: theme.colors.error,
     marginTop: 4,
   },
   sendOTPButton: {
@@ -260,10 +289,10 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   sendOTPButtonActive: {
-    backgroundColor: '#4A90E2',
+    backgroundColor: theme.colors.primary,
   },
   sendOTPButtonInactive: {
-    backgroundColor: '#CBD5E0',
+    backgroundColor: theme.colors.disabled,
   },
   sendOTPButtonText: {
     color: '#FFFFFF',
@@ -276,7 +305,7 @@ const styles = StyleSheet.create({
   },
   backToLoginText: {
     fontSize: 14,
-    color: '#4A90E2',
+    color: theme.colors.primary,
     fontWeight: '500',
   },
 });
