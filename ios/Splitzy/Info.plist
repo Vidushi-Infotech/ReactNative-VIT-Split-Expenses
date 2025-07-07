@@ -33,6 +33,8 @@
 	</dict>
 	<key>NSContactsUsageDescription</key>
 	<string>Splitzy needs access to your contacts to add group members for expense sharing.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Splitzy needs access to your photo library to set group cover images.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string></string>
 	<key>UIAppFonts</key>

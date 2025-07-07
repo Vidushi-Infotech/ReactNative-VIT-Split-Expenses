@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,59 +9,182 @@ import {
   Image,
   Modal,
   TextInput,
+  ActivityIndicator,
+  Alert,
+  RefreshControl,
 } from 'react-native';
 import CreateNewGroupScreen from './CreateNewGroupScreen';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { useTheme } from '../context/ThemeContext';
+import firebaseService from '../services/firebaseService';
+import auth from '@react-native-firebase/auth';
 
 const HomeScreen = ({ navigation }) => {
   const { theme } = useTheme();
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [showSearchBar, setShowSearchBar] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [groups, setGroups] = useState([
-    {
-      id: 1,
-      name: 'Good Times Gang',
-      avatar: '🎭',
-      youOwe: 200,
-      details: [
-        { text: 'You owe Raj P.', amount: 240, type: 'owe' },
-        { text: 'Samir J. owes you', amount: 40, type: 'owed' },
-      ]
-    },
-    {
-      id: 2,
-      name: 'Plan Pending',
-      avatar: '🕶️',
-      youAreOwed: 320,
-      details: [
-        { text: 'Kishor C. owes you', amount: 160, type: 'owed' },
-        { text: 'Sanjiv J. owes you', amount: 160, type: 'owed' },
-      ]
-    },
-    {
-      id: 3,
-      name: 'Jungle Crew',
-      avatar: '🌲',
-      youOwe: 200,
-      details: [
-        { text: 'You owe Suhani T.', amount: 200, type: 'owe' },
-      ]
-    },
-    {
-      id: 4,
-      name: 'Road Tripper',
-      avatar: '👷',
-      youAreOwed: 660,
-      details: [
-        { text: 'Namrata S. owes you', amount: 110, type: 'owed' },
-        { text: 'Suraj R. owes you', amount: 110, type: 'owed' },
-      ],
-      moreBalances: 4
-    },
-  ]);
+  const [groups, setGroups] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [user, setUser] = useState(null);
+  const [overallBalance, setOverallBalance] = useState({
+    netBalance: 0,
+    totalYouOwe: 0,
+    totalYouAreOwed: 0,
+    groupBalanceDetails: []
+  });
+  const [balanceLoading, setBalanceLoading] = useState(false);
+
+  useEffect(() => {
+    const unsubscribe = auth().onAuthStateChanged((user) => {
+      setUser(user);
+      if (user) {
+        // Load both groups and overall balance
+        Promise.all([
+          loadUserGroups(user.uid),
+          loadOverallBalance(user.uid)
+        ]).catch(error => {
+          console.error('Error loading initial data:', error);
+        });
+      }
+    });
+
+    return unsubscribe;
+  }, []);
+
+  const loadUserGroups = async (userId) => {
+    setLoading(true);
+    try {
+      console.log('🏠 HomeScreen: Loading groups for user:', userId);
+      
+      // Load groups with detailed balance information
+      const userGroups = await firebaseService.getUserGroups(userId);
+      console.log('🏠 HomeScreen: Loaded', userGroups.length, 'groups from Firebase');
+      
+      // Get detailed balance breakdown for each group
+      const transformedGroups = await Promise.all(
+        userGroups.map(async (group) => {
+          try {
+            const [groupBalances, groupMembers] = await Promise.all([
+              firebaseService.calculateGroupBalances(group.id),
+              firebaseService.getGroupMembersWithProfiles(group.id)
+            ]);
+            
+            const userBalance = groupBalances[userId];
+            const youOwe = userBalance?.net < 0 ? Math.abs(userBalance.net) : 0;
+            const youAreOwed = userBalance?.net > 0 ? userBalance.net : 0;
+            
+            // Create member balance details for UI display
+            const memberBalanceDetails = [];
+            let balanceCount = 0;
+            
+            Object.entries(groupBalances).forEach(([memberId, balance]) => {
+              if (memberId !== userId && balance.net !== 0) {
+                const member = groupMembers.find(m => m.userId === memberId);
+                if (member && balanceCount < 2) { // Show max 2 details initially
+                  if (balance.net > 0) {
+                    // This member is owed money (you owe them)
+                    memberBalanceDetails.push({
+                      text: `You owe ${member.name}`,
+                      amount: balance.net,
+                      type: 'owe'
+                    });
+                  } else {
+                    // This member owes money (they owe you)
+                    memberBalanceDetails.push({
+                      text: `${member.name} owes you`,
+                      amount: Math.abs(balance.net),
+                      type: 'owed'
+                    });
+                  }
+                  balanceCount++;
+                }
+              }
+            });
+            
+            // Count remaining balances
+            const totalNonZeroBalances = Object.values(groupBalances).filter(
+              (balance, index) => Object.keys(groupBalances)[index] !== userId && balance.net !== 0
+            ).length;
+            
+            const moreBalances = totalNonZeroBalances > 2 ? totalNonZeroBalances - 2 : 0;
+            
+            return {
+              id: group.id,
+              name: group.name,
+              description: group.description,
+              avatar: group.coverImageUrl ? null : '🎭',
+              coverImageUrl: group.coverImageUrl,
+              youOwe,
+              youAreOwed,
+              details: memberBalanceDetails,
+              moreBalances: moreBalances > 0 ? moreBalances : null,
+              members: group.members || [],
+              createdAt: group.createdAt,
+              totalExpenses: group.totalExpenses || 0,
+            };
+          } catch (groupError) {
+            console.error('🏠 Error processing group:', group.id, groupError);
+            return {
+              id: group.id,
+              name: group.name,
+              description: group.description,
+              avatar: '🎭',
+              coverImageUrl: group.coverImageUrl,
+              youOwe: 0,
+              youAreOwed: 0,
+              details: [],
+              moreBalances: null,
+              members: group.members || [],
+              createdAt: group.createdAt,
+              totalExpenses: group.totalExpenses || 0,
+            };
+          }
+        })
+      );
+      
+      console.log('🏠 HomeScreen: Transformed groups with details:', transformedGroups);
+      setGroups(transformedGroups);
+    } catch (error) {
+      console.error('🏠 HomeScreen: Error loading groups:', error);
+      Alert.alert('Error', 'Failed to load groups');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadOverallBalance = async (userId) => {
+    setBalanceLoading(true);
+    try {
+      console.log('🏠 HomeScreen: Loading overall balance for user:', userId);
+      const balance = await firebaseService.calculateOverallBalance(userId);
+      console.log('🏠 HomeScreen: Overall balance loaded:', balance);
+      setOverallBalance(balance);
+    } catch (error) {
+      console.error('🏠 HomeScreen: Error loading overall balance:', error);
+      // Keep default zero values if error occurs
+    } finally {
+      setBalanceLoading(false);
+    }
+  };
+
+  const onRefresh = async () => {
+    if (!user) return;
+    
+    setRefreshing(true);
+    try {
+      await Promise.all([
+        loadUserGroups(user.uid),
+        loadOverallBalance(user.uid)
+      ]);
+    } catch (error) {
+      console.error('Error refreshing data:', error);
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const handleAddGroup = () => {
     setShowCreateGroup(true);
@@ -72,7 +195,22 @@ const HomeScreen = ({ navigation }) => {
   };
 
   const handleSaveNewGroup = (newGroup) => {
-    setGroups(prevGroups => [...prevGroups, newGroup]);
+    // Transform the new group to match the UI format
+    const transformedGroup = {
+      id: newGroup.id,
+      name: newGroup.name,
+      description: newGroup.description,
+      avatar: newGroup.coverImageUrl ? null : '🎭',
+      coverImageUrl: newGroup.coverImageUrl,
+      youOwe: 0,
+      youAreOwed: 0,
+      details: [],
+      members: newGroup.members || [],
+      createdAt: newGroup.createdAt,
+      totalExpenses: 0,
+    };
+    
+    setGroups(prevGroups => [transformedGroup, ...prevGroups]);
     setShowCreateGroup(false);
   };
 
@@ -134,26 +272,48 @@ const HomeScreen = ({ navigation }) => {
         </View>
       )}
 
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        style={styles.scrollView} 
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={[theme.colors.primary]}
+            tintColor={theme.colors.primary}
+          />
+        }
+      >
         {/* Overall Balance Section */}
         <View style={styles.balanceSection}>
           <Text style={styles.sectionTitle}>Overall Balance</Text>
-          <View style={styles.balanceRow}>
-            <View style={styles.balanceItem}>
-              <Text style={styles.balanceLabel}>Net Balance</Text>
-              <Text style={styles.balanceAmountGreen}>₹580</Text>
+          {balanceLoading ? (
+            <View style={styles.balanceLoadingContainer}>
+              <ActivityIndicator size="small" color={theme.colors.primary} />
+              <Text style={styles.balanceLoadingText}>Calculating...</Text>
             </View>
-            <View style={styles.balanceDivider} />
-            <View style={styles.balanceItem}>
-              <Text style={styles.balanceLabel}>You Get</Text>
-              <Text style={styles.balanceAmountGreen}>₹980</Text>
+          ) : (
+            <View style={styles.balanceRow}>
+              <View style={styles.balanceItem}>
+                <Text style={styles.balanceLabel}>Net Balance</Text>
+                <Text style={[
+                  overallBalance.netBalance >= 0 ? styles.balanceAmountGreen : styles.balanceAmountOrange
+                ]}>
+                  ₹{Math.abs(overallBalance.netBalance).toFixed(0)}
+                </Text>
+              </View>
+              <View style={styles.balanceDivider} />
+              <View style={styles.balanceItem}>
+                <Text style={styles.balanceLabel}>You Get</Text>
+                <Text style={styles.balanceAmountGreen}>₹{overallBalance.totalYouAreOwed.toFixed(0)}</Text>
+              </View>
+              <View style={styles.balanceDivider} />
+              <View style={styles.balanceItem}>
+                <Text style={styles.balanceLabel}>You Owe</Text>
+                <Text style={styles.balanceAmountOrange}>₹{overallBalance.totalYouOwe.toFixed(0)}</Text>
+              </View>
             </View>
-            <View style={styles.balanceDivider} />
-            <View style={styles.balanceItem}>
-              <Text style={styles.balanceLabel}>You Owe</Text>
-              <Text style={styles.balanceAmountOrange}>₹400</Text>
-            </View>
-          </View>
+          )}
         </View>
 
         {/* Groups Wise Expenses */}
@@ -162,7 +322,14 @@ const HomeScreen = ({ navigation }) => {
             {searchQuery ? `Search Results (${filteredGroups.length})` : 'Groups Wise Expenses'}
           </Text>
 
-          {searchQuery && filteredGroups.length === 0 && (
+          {loading && (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={theme.colors.primary} />
+              <Text style={styles.loadingText}>Loading groups...</Text>
+            </View>
+          )}
+
+          {!loading && searchQuery && filteredGroups.length === 0 && (
             <View style={styles.noResultsContainer}>
               <Ionicons name="search" size={48} color="#9CA3AF" />
               <Text style={styles.noResultsText}>No groups found</Text>
@@ -170,7 +337,15 @@ const HomeScreen = ({ navigation }) => {
             </View>
           )}
 
-          {(searchQuery ? filteredGroups : groups).map((group) => (
+          {!loading && groups.length === 0 && !searchQuery && (
+            <View style={styles.noResultsContainer}>
+              <Ionicons name="people" size={48} color="#9CA3AF" />
+              <Text style={styles.noResultsText}>No groups yet</Text>
+              <Text style={styles.noResultsSubtext}>Create your first group to get started</Text>
+            </View>
+          )}
+
+          {!loading && (searchQuery ? filteredGroups : groups).map((group) => (
             <TouchableOpacity
               key={group.id}
               style={styles.groupCard}
@@ -179,22 +354,29 @@ const HomeScreen = ({ navigation }) => {
               <View style={styles.groupHeader}>
                 <View style={styles.groupInfo}>
                   <View style={styles.avatarContainer}>
-                    <Text style={styles.avatar}>{group.avatar}</Text>
+                    {group.coverImageUrl ? (
+                      <Image source={{ uri: group.coverImageUrl }} style={styles.avatarImage} />
+                    ) : (
+                      <Text style={styles.avatar}>{group.avatar}</Text>
+                    )}
                   </View>
                   <Text style={styles.groupName}>{group.name}</Text>
                 </View>
                 <View style={styles.groupBalance}>
-                  {group.youOwe && (
+                  {group.youOwe > 0 && (
                     <>
                       <Text style={styles.balanceTypeOwe}>You owe</Text>
-                      <Text style={styles.balanceAmountOrange}>₹{group.youOwe}</Text>
+                      <Text style={styles.balanceAmountOrange}>₹{group.youOwe.toFixed(0)}</Text>
                     </>
                   )}
-                  {group.youAreOwed && (
+                  {group.youAreOwed > 0 && (
                     <>
                       <Text style={styles.balanceTypeOwed}>You are owed</Text>
-                      <Text style={styles.balanceAmountGreen}>₹{group.youAreOwed}</Text>
+                      <Text style={styles.balanceAmountGreen}>₹{group.youAreOwed.toFixed(0)}</Text>
                     </>
+                  )}
+                  {group.youOwe === 0 && group.youAreOwed === 0 && group.totalExpenses === 0 && (
+                    <Text style={styles.balanceTypeSettled}>No expenses yet</Text>
                   )}
                 </View>
               </View>
@@ -206,7 +388,7 @@ const HomeScreen = ({ navigation }) => {
                     <View style={styles.detailLine} />
                     <Text style={styles.detailText}>{detail.text}</Text>
                     <Text style={detail.type === 'owe' ? styles.detailAmountOrange : styles.detailAmountGreen}>
-                      ₹{detail.amount}
+                      ₹{detail.amount.toFixed(0)}
                     </Text>
                   </View>
                 ))}
@@ -217,6 +399,13 @@ const HomeScreen = ({ navigation }) => {
                     <Text style={styles.moreBalancesText}>📊 {group.moreBalances} more balances</Text>
                   </View>
                 )}
+                
+                {group.details.length === 0 && group.totalExpenses > 0 && (
+                  <View style={styles.detailRow}>
+                    <View style={styles.detailLine} />
+                    <Text style={styles.detailText}>✅ All settled up</Text>
+                  </View>
+                )}
               </View>
             </TouchableOpacity>
           ))}
@@ -225,14 +414,7 @@ const HomeScreen = ({ navigation }) => {
 
       {/* Floating Add Button */}
       <TouchableOpacity style={styles.floatingButton} onPress={handleAddGroup}>
-        <View style={styles.addButtonContainer}>
-          <Image
-            source={require('../Assets/AddLogo.png')}
-            style={styles.addButtonImage}
-            resizeMode="contain"
-            onError={(error) => console.log('Image load error:', error)}
-          />
-        </View>
+        <Ionicons name="add" size={32} color="#FFFFFF" />
       </TouchableOpacity>
 
       {/* Create New Group Modal */}
@@ -309,28 +491,32 @@ const createStyles = (theme) => StyleSheet.create({
   },
   balanceSection: {
     backgroundColor: theme.colors.surface,
-    margin: 16,
-    padding: 20,
-    borderRadius: 12,
+    marginHorizontal: 16,
+    marginTop: 16,
+    marginBottom: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderRadius: 0,
     shadowColor: theme.colors.text,
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: 1,
     },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
     color: theme.colors.text,
-    marginBottom: 16,
+    marginBottom: 12,
   },
   balanceRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    paddingVertical: 4,
   },
   balanceItem: {
     flex: 1,
@@ -338,22 +524,23 @@ const createStyles = (theme) => StyleSheet.create({
   },
   balanceDivider: {
     width: 1,
-    height: 40,
+    height: 35,
     backgroundColor: '#E2E8F0',
     marginHorizontal: 8,
   },
   balanceLabel: {
     fontSize: 14,
     color: theme.colors.textSecondary,
-    marginBottom: 4,
+    marginBottom: 6,
+    fontWeight: '500',
   },
   balanceAmountGreen: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
     color: '#10B981',
   },
   balanceAmountOrange: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
     color: '#F59E0B',
   },
@@ -363,16 +550,16 @@ const createStyles = (theme) => StyleSheet.create({
   },
   groupCard: {
     backgroundColor: theme.colors.surface,
-    marginBottom: 16,
-    borderRadius: 12,
+    marginBottom: 20,
+    borderRadius: 0,
     shadowColor: theme.colors.text,
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: 1,
     },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
   groupHeader: {
     flexDirection: 'row',
@@ -386,35 +573,49 @@ const createStyles = (theme) => StyleSheet.create({
     flex: 1,
   },
   avatarContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     backgroundColor: theme.colors.borderLight,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: 16,
   },
   avatar: {
-    fontSize: 24,
+    fontSize: 30,
+  },
+  avatarImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
   },
   groupName: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '600',
     color: theme.colors.text,
     flex: 1,
+    marginBottom: 4,
   },
   groupBalance: {
     alignItems: 'flex-end',
   },
   balanceTypeOwe: {
-    fontSize: 12,
+    fontSize: 14,
     color: '#F59E0B',
-    marginBottom: 2,
+    marginBottom: 4,
+    textAlign: 'right',
   },
   balanceTypeOwed: {
-    fontSize: 12,
+    fontSize: 14,
     color: '#10B981',
-    marginBottom: 2,
+    marginBottom: 4,
+    textAlign: 'right',
+  },
+  balanceTypeSettled: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 4,
+    textAlign: 'right',
   },
   groupDetails: {
     paddingHorizontal: 16,
@@ -430,7 +631,7 @@ const createStyles = (theme) => StyleSheet.create({
     height: 20,
     backgroundColor: '#E2E8F0',
     marginRight: 12,
-    marginLeft: 24,
+    marginLeft: 30,
   },
   detailText: {
     flex: 1,
@@ -447,6 +648,11 @@ const createStyles = (theme) => StyleSheet.create({
     fontWeight: '600',
     color: '#10B981',
   },
+  detailAmountNeutral: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: theme.colors.textSecondary,
+  },
   moreBalancesText: {
     flex: 1,
     fontSize: 14,
@@ -455,33 +661,22 @@ const createStyles = (theme) => StyleSheet.create({
   },
   floatingButton: {
     position: 'absolute',
-    bottom: 80,
-    right: 20,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    bottom: 40,
+    right: 24,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     backgroundColor: '#4A90E2',
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 4,
+      height: 6,
     },
     shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  addButtonContainer: {
-    width: 24,
-    height: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  addButtonImage: {
-    width: 24,
-    height: 24,
-    tintColor: '#FFFFFF',
+    shadowRadius: 10,
+    elevation: 10,
   },
   noResultsContainer: {
     alignItems: 'center',
@@ -496,6 +691,24 @@ const createStyles = (theme) => StyleSheet.create({
   noResultsSubtext: {
     fontSize: 14,
     color: theme.colors.textMuted,
+    marginTop: 8,
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: theme.colors.textSecondary,
+    marginTop: 16,
+  },
+  balanceLoadingContainer: {
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
+  balanceLoadingText: {
+    fontSize: 14,
+    color: theme.colors.textSecondary,
     marginTop: 8,
   },
 });

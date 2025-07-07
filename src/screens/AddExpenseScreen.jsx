@@ -10,13 +10,18 @@ import {
   Alert,
   Image,
   Modal,
+  ActivityIndicator,
 } from 'react-native';
 import Dropdown from '../components/Dropdown';
 import { useTheme } from '../context/ThemeContext';
+import { useAuth } from '../context/AuthContext';
+import firebaseService from '../services/firebaseService';
+import { launchImageLibrary } from 'react-native-image-picker';
 
 const AddExpenseScreen = ({ route, navigation }) => {
   const { group } = route.params || {};
   const { theme } = useTheme();
+  const { user } = useAuth();
 
   // Form state
   const [description, setDescription] = useState('');
@@ -26,6 +31,9 @@ const AddExpenseScreen = ({ route, navigation }) => {
   const [paidBy, setPaidBy] = useState(null);
   const [splitType, setSplitType] = useState('Equal');
   const [members, setMembers] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [membersLoading, setMembersLoading] = useState(true);
+  const [receiptImage, setReceiptImage] = useState(null);
 
 
 
@@ -47,48 +55,51 @@ const AddExpenseScreen = ({ route, navigation }) => {
     { code: 'EUR', symbol: '€', name: 'Euro' },
   ];
 
-  // Mock group members
-  const groupMembers = [
-    {
-      id: 1,
-      name: 'Raj Pathan',
-      avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=50&h=50&fit=crop&crop=face',
-    },
-    {
-      id: 2,
-      name: 'Ajit Kumar',
-      avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=50&h=50&fit=crop&crop=face',
-    },
-    {
-      id: 3,
-      name: 'Samir Jakaria',
-      avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=50&h=50&fit=crop&crop=face',
-    },
-    {
-      id: 4,
-      name: 'Vishal Sai',
-      avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=50&h=50&fit=crop&crop=face',
-      isYou: true,
-    },
-  ];
+  const [groupMembers, setGroupMembers] = useState([]);
 
   useEffect(() => {
-    // Initialize members with equal split
-    const initialMembers = groupMembers.map(member => ({
-      ...member,
-      isSelected: true,
-      amount: 0,
-      percentage: 0,
-      shares: 1,
-    }));
-    setMembers(initialMembers);
+    loadGroupMembers();
+  }, [group]);
 
-    // Set default paid by to "You"
-    const youMember = initialMembers.find(m => m.isYou);
-    if (youMember) {
-      setPaidBy(youMember);
+  useEffect(() => {
+    if (groupMembers.length > 0) {
+      // Initialize members with equal split
+      const initialMembers = groupMembers.map(member => ({
+        ...member,
+        isSelected: true,
+        amount: 0,
+        percentage: 0,
+        shares: 1,
+      }));
+      setMembers(initialMembers);
+
+      // Set default paid by to "You"
+      const youMember = initialMembers.find(m => m.isYou);
+      if (youMember) {
+        setPaidBy(youMember);
+      }
     }
-  }, []);
+  }, [groupMembers]);
+
+  const loadGroupMembers = async () => {
+    if (!group?.id) {
+      console.log('No group ID provided for AddExpenseScreen');
+      return;
+    }
+    
+    console.log('AddExpenseScreen: Loading members for group:', group.id);
+    setMembersLoading(true);
+    try {
+      const membersWithProfiles = await firebaseService.getGroupMembersWithProfiles(group.id);
+      console.log('AddExpenseScreen: Loaded group members:', membersWithProfiles);
+      setGroupMembers(membersWithProfiles);
+    } catch (error) {
+      console.error('AddExpenseScreen: Error loading group members:', error);
+      Alert.alert('Error', 'Failed to load group members');
+    } finally {
+      setMembersLoading(false);
+    }
+  };
 
   useEffect(() => {
     calculateSplit();
@@ -150,7 +161,28 @@ const AddExpenseScreen = ({ route, navigation }) => {
     setMembers(updatedMembers);
   };
 
-  const handleSave = () => {
+  const handleUploadReceipt = () => {
+    const options = {
+      mediaType: 'photo',
+      quality: 0.8,
+      maxWidth: 1000,
+      maxHeight: 1000,
+    };
+
+    launchImageLibrary(options, (response) => {
+      if (response.didCancel) {
+        console.log('User cancelled image picker');
+      } else if (response.errorMessage) {
+        console.log('ImagePicker Error: ', response.errorMessage);
+        Alert.alert('Error', 'Failed to select image');
+      } else if (response.assets && response.assets[0]) {
+        const asset = response.assets[0];
+        setReceiptImage(asset.uri);
+      }
+    });
+  };
+
+  const handleSave = async () => {
     if (!description.trim()) {
       Alert.alert('Error', 'Please enter a description');
       return;
@@ -171,10 +203,58 @@ const AddExpenseScreen = ({ route, navigation }) => {
       return;
     }
 
-    // Here you would save the expense
-    Alert.alert('Success', 'Expense added successfully!', [
-      { text: 'OK', onPress: () => navigation.goBack() }
-    ]);
+    const selectedMembers = members.filter(m => m.isSelected);
+    if (selectedMembers.length === 0) {
+      Alert.alert('Error', 'Please select at least one member to split the expense');
+      return;
+    }
+
+    // Validate split calculations
+    const totalSplit = selectedMembers.reduce((sum, member) => sum + (member.amount || 0), 0);
+    const expenseAmount = parseFloat(amount);
+    
+    if (Math.abs(totalSplit - expenseAmount) > 0.01) {
+      Alert.alert('Error', `Split amounts (₹${totalSplit.toFixed(2)}) don't match expense amount (₹${expenseAmount.toFixed(2)})`);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // Prepare participants data
+      const participants = selectedMembers.map(member => ({
+        userId: member.userId || member.id,
+        name: member.name,
+        amount: member.amount || 0,
+        percentage: member.percentage || 0,
+        shares: member.shares || 1
+      }));
+
+      // Prepare expense data
+      const expenseData = {
+        description: description.trim(),
+        amount: expenseAmount,
+        currency: selectedCurrency.code,
+        category: selectedCategory,
+        paidBy: paidBy,
+        splitType,
+        participants,
+        receiptUrl: receiptImage // Store local image URI
+      };
+
+      console.log('Creating expense:', expenseData);
+      
+      // Create expense in Firebase
+      await firebaseService.createExpense(group.id, expenseData);
+      
+      Alert.alert('Success', 'Expense added successfully!', [
+        { text: 'OK', onPress: () => navigation.goBack() }
+      ]);
+    } catch (error) {
+      console.error('Error saving expense:', error);
+      Alert.alert('Error', 'Failed to save expense. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const renderSplitTypeButtons = () => (
@@ -219,7 +299,15 @@ const AddExpenseScreen = ({ route, navigation }) => {
           </View>
         </TouchableOpacity>
 
-        <Image source={{ uri: member.avatar }} style={styles.memberAvatar} />
+        {member.avatar ? (
+          <Image source={{ uri: member.avatar }} style={styles.memberAvatar} />
+        ) : (
+          <View style={styles.memberAvatarPlaceholder}>
+            <Text style={styles.memberAvatarText}>
+              {member.name ? member.name.charAt(0).toUpperCase() : 'U'}
+            </Text>
+          </View>
+        )}
 
         <View style={styles.memberInfo}>
           <Text style={styles.memberName}>
@@ -363,7 +451,18 @@ const AddExpenseScreen = ({ route, navigation }) => {
 
         {/* Members List */}
         <View style={styles.membersContainer}>
-          {members.map(renderMemberItem)}
+          {membersLoading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={theme.colors.primary} />
+              <Text style={styles.loadingText}>Loading group members...</Text>
+            </View>
+          ) : members.length > 0 ? (
+            members.map(renderMemberItem)
+          ) : (
+            <View style={styles.noMembersContainer}>
+              <Text style={styles.noMembersText}>No group members found</Text>
+            </View>
+          )}
         </View>
 
         {/* Total Amount */}
@@ -377,13 +476,23 @@ const AddExpenseScreen = ({ route, navigation }) => {
 
       {/* Save Button */}
       <View style={styles.footer}>
-        <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
-          <Text style={styles.saveButtonText}>Save</Text>
+        <TouchableOpacity 
+          style={[styles.saveButton, loading && styles.saveButtonDisabled]} 
+          onPress={handleSave}
+          disabled={loading}
+        >
+          {loading ? (
+            <ActivityIndicator color="#FFFFFF" />
+          ) : (
+            <Text style={styles.saveButtonText}>Save</Text>
+          )}
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.uploadButton}>
+        <TouchableOpacity style={styles.uploadButton} onPress={handleUploadReceipt}>
           <Text style={styles.uploadIcon}>📎</Text>
-          <Text style={styles.uploadText}>Upload Receipt</Text>
+          <Text style={styles.uploadText}>
+            {receiptImage ? 'Receipt Added' : 'Upload Receipt'}
+          </Text>
         </TouchableOpacity>
       </View>
 
@@ -677,6 +786,40 @@ const createStyles = (theme) => StyleSheet.create({
   uploadText: {
     fontSize: 14,
     color: theme.colors.textSecondary,
+  },
+  memberAvatarPlaceholder: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: theme.colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  memberAvatarText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    paddingVertical: 32,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: theme.colors.textSecondary,
+    marginTop: 16,
+  },
+  noMembersContainer: {
+    alignItems: 'center',
+    paddingVertical: 32,
+  },
+  noMembersText: {
+    fontSize: 16,
+    color: theme.colors.textSecondary,
+  },
+  saveButtonDisabled: {
+    opacity: 0.6,
   },
 });
 

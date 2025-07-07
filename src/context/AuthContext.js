@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Platform } from 'react-native';
 import auth from '@react-native-firebase/auth';
+import firestore from '@react-native-firebase/firestore';
 
 const AuthContext = createContext({});
 
@@ -38,7 +39,7 @@ export const AuthProvider = ({ children }) => {
   }, [initializing]);
 
   // Sign up with email and password (Android only)
-  const signUp = async (email, password, firstName, lastName) => {
+  const signUp = async (email, password, firstName, lastName, phoneNumber = '', countryCode = '+91') => {
     if (Platform.OS !== 'android') {
       throw new Error('Firebase Auth is only available on Android');
     }
@@ -52,7 +53,23 @@ export const AuthProvider = ({ children }) => {
         displayName: `${firstName} ${lastName}`,
       });
 
+      // Store additional user data in Firestore
+      const userData = {
+        uid: userCredential.user.uid,
+        email: email.trim(),
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        displayName: `${firstName.trim()} ${lastName.trim()}`,
+        phoneNumber: phoneNumber.trim() ? `${countryCode}${phoneNumber.trim()}` : null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      // Save to Firestore users collection
+      await firestore().collection('users').doc(userCredential.user.uid).set(userData);
+
       console.log('User account created & signed in!');
+      console.log('User data stored in Firestore:', userData);
       return userCredential.user;
     } catch (error) {
       console.error('Sign up error:', error);

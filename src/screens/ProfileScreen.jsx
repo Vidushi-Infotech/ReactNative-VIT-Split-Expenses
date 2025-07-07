@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -20,6 +20,7 @@ import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import FontAwesome from 'react-native-vector-icons/FontAwesome';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import firebaseService from '../services/firebaseService';
 
 const ProfileScreen = ({ navigation }) => {
   const { signOut, user, isAndroid, loading } = useAuth();
@@ -28,10 +29,50 @@ const ProfileScreen = ({ navigation }) => {
   const [showThemeSettings, setShowThemeSettings] = useState(false);
   const [showLogoutAlert, setShowLogoutAlert] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [userProfile, setUserProfile] = useState(null);
+  const [loadingProfile, setLoadingProfile] = useState(true);
 
   // Debug theme context
   console.log('ProfileScreen - Theme Mode:', themeMode);
   console.log('ProfileScreen - Theme:', theme?.mode);
+
+  useEffect(() => {
+    loadUserProfile();
+  }, [user]);
+
+  const loadUserProfile = async () => {
+    if (!user) {
+      setLoadingProfile(false);
+      return;
+    }
+    
+    setLoadingProfile(true);
+    try {
+      const profile = await firebaseService.getUserProfile(user.uid);
+      if (profile) {
+        setUserProfile(profile);
+      } else {
+        // Use Firebase Auth data as fallback
+        setUserProfile({
+          firstName: user.displayName?.split(' ')[0] || '',
+          lastName: user.displayName?.split(' ').slice(1).join(' ') || '',
+          email: user.email || '',
+          profileImageUrl: user.photoURL || null,
+        });
+      }
+    } catch (error) {
+      console.log('Error loading profile:', error);
+      // Use Firebase Auth data as fallback
+      setUserProfile({
+        firstName: user.displayName?.split(' ')[0] || '',
+        lastName: user.displayName?.split(' ').slice(1).join(' ') || '',
+        email: user.email || '',
+        profileImageUrl: user.photoURL || null,
+      });
+    } finally {
+      setLoadingProfile(false);
+    }
+  };
 
   // Theme settings handlers
   const handleThemeSettings = () => {
@@ -82,26 +123,28 @@ const ProfileScreen = ({ navigation }) => {
     if (isLoggingOut) {
       return {
         title: 'Logging out...',
-        iconComponent: <MaterialIcons name="logout" size={20} color="#9CA3AF" />,
+        iconComponent: <MaterialIcons name="logout" size={20} color={theme.colors.textMuted} />,
         disabled: true,
-        textColor: '#9CA3AF',
+        textColor: theme.colors.textMuted,
       };
     }
 
-    if (isAndroid && user) {
+    // Check if user is actually authenticated
+    if (user && !loading) {
       return {
         title: 'Logout',
-        iconComponent: <MaterialIcons name="logout" size={20} color="#EF4444" />,
+        iconComponent: <MaterialIcons name="logout" size={20} color={theme.colors.error || '#EF4444'} />,
         disabled: false,
-        textColor: '#EF4444',
+        textColor: theme.colors.error || '#EF4444',
       };
     }
 
+    // User not authenticated
     return {
-      title: isAndroid ? 'Not Signed In' : 'Logout (Demo)',
-      iconComponent: <MaterialIcons name="logout" size={20} color="#6B7280" />,
-      disabled: false,
-      textColor: '#6B7280',
+      title: 'Not Signed In',
+      iconComponent: <MaterialIcons name="person-off" size={20} color={theme.colors.textSecondary} />,
+      disabled: true,
+      textColor: theme.colors.textSecondary,
     };
   };
 
@@ -159,6 +202,8 @@ const ProfileScreen = ({ navigation }) => {
 
   const handleCloseEditProfile = () => {
     setShowEditProfile(false);
+    // Reload profile data when edit profile closes
+    loadUserProfile();
   };
 
   const styles = createStyles(theme);
@@ -175,17 +220,37 @@ const ProfileScreen = ({ navigation }) => {
         <View style={styles.profileSection}>
           <View style={styles.profileInfo}>
             <View style={styles.avatarContainer}>
-              <Image
-                source={{ uri: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face' }}
-                style={styles.avatar}
-              />
+              {loadingProfile ? (
+                <View style={styles.avatarPlaceholder}>
+                  <ActivityIndicator size="small" color={theme.colors.primary} />
+                </View>
+              ) : (
+                <Image
+                  source={{ 
+                    uri: userProfile?.profileImageUrl || 
+                         (user?.photoURL) ||
+                         `https://via.placeholder.com/150x150/333/fff?text=${
+                           userProfile?.firstName ? userProfile.firstName.charAt(0) : 
+                           user?.displayName ? user.displayName.charAt(0) : 'U'
+                         }`
+                  }}
+                  style={styles.avatar}
+                />
+              )}
             </View>
             <View style={styles.userInfo}>
               <Text style={styles.userName}>
-                {isAndroid && user ? (user.displayName || 'User') : 'Sagar Mali'}
+                {loadingProfile ? 'Loading...' : (
+                  userProfile ? 
+                    `${userProfile.firstName} ${userProfile.lastName}`.trim() || 'User' :
+                    (isAndroid && user ? (user.displayName || 'User') : 'User')
+                )}
               </Text>
               <Text style={styles.userEmail}>
-                {isAndroid && user ? user.email : 'sagar@gmail.com'}
+                {loadingProfile ? 'Loading...' : (
+                  userProfile?.email || 
+                  (isAndroid && user ? user.email : 'user@email.com')
+                )}
               </Text>
             </View>
           </View>
@@ -266,16 +331,14 @@ const ProfileScreen = ({ navigation }) => {
       {/* Themed Logout Alert */}
       <ThemedAlert
         visible={showLogoutAlert}
-        title={isAndroid && user ? 'Logout' : 'Demo Mode'}
+        title={user && !loading ? 'Logout Confirmation' : 'Authentication Status'}
         message={
-          isAndroid && user
-            ? `Are you sure you want to logout?\n\nYou are currently signed in as:\n${user.email || 'Unknown User'}`
-            : isAndroid
-            ? 'You are not currently signed in.'
-            : 'Logout functionality will be available when Firebase Auth is implemented for iOS.'
+          user && !loading
+            ? `Are you sure you want to logout?\n\nYou are currently signed in as:\n${userProfile?.email || user?.email || 'Unknown User'}\n\nName: ${userProfile ? `${userProfile.firstName} ${userProfile.lastName}`.trim() : user?.displayName || 'Not set'}`
+            : 'You are not currently signed in. Please login to access your account.'
         }
         buttons={
-          isAndroid && user
+          user && !loading
             ? [
                 {
                   text: 'Cancel',
@@ -354,6 +417,14 @@ const createStyles = (theme) => StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
+  },
+  avatarPlaceholder: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: theme.colors.borderLight,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   userInfo: {
     flex: 1,

@@ -86,7 +86,14 @@ const RegisterScreen = ({ navigation }) => {
     // For Android, use Firebase Auth
     try {
       setIsLoading(true);
-      await signUp(email.trim(), password, firstName.trim(), lastName.trim());
+      await signUp(
+        email.trim(), 
+        password, 
+        firstName.trim(), 
+        lastName.trim(), 
+        phoneNumber.trim(),
+        countryCode
+      );
       // Navigation will be handled automatically by auth state change
     } catch (error) {
       console.error('Sign up error:', error);
