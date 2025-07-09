@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { Platform } from 'react-native';
+import React, {createContext, useContext, useState, useEffect} from 'react';
+import {Platform} from 'react-native';
 import auth from '@react-native-firebase/auth';
 import firestore from '@react-native-firebase/firestore';
 
@@ -13,14 +13,17 @@ export const useAuth = () => {
   return context;
 };
 
-export const AuthProvider = ({ children }) => {
+export const AuthProvider = ({children}) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [initializing, setInitializing] = useState(true);
 
   // Handle user state changes
-  const onAuthStateChanged = (user) => {
-    console.log('Auth state changed:', user ? 'User logged in' : 'User logged out');
+  const onAuthStateChanged = user => {
+    console.log(
+      'Auth state changed:',
+      user ? 'User logged in' : 'User logged out',
+    );
     setUser(user);
     if (initializing) setInitializing(false);
     setLoading(false);
@@ -39,15 +42,25 @@ export const AuthProvider = ({ children }) => {
   }, [initializing]);
 
   // Sign up with email and password (Android only)
-  const signUp = async (email, password, firstName, lastName, phoneNumber = '', countryCode = '+91') => {
+  const signUp = async (
+    email,
+    password,
+    firstName,
+    lastName,
+    phoneNumber = '',
+    countryCode = '+91',
+  ) => {
     if (Platform.OS !== 'android') {
       throw new Error('Firebase Auth is only available on Android');
     }
 
     try {
       setLoading(true);
-      const userCredential = await auth().createUserWithEmailAndPassword(email, password);
-      
+      const userCredential = await auth().createUserWithEmailAndPassword(
+        email,
+        password,
+      );
+
       // Update user profile with display name
       await userCredential.user.updateProfile({
         displayName: `${firstName} ${lastName}`,
@@ -60,13 +73,18 @@ export const AuthProvider = ({ children }) => {
         firstName: firstName.trim(),
         lastName: lastName.trim(),
         displayName: `${firstName.trim()} ${lastName.trim()}`,
-        phoneNumber: phoneNumber.trim() ? `${countryCode}${phoneNumber.trim()}` : null,
+        phoneNumber: phoneNumber.trim()
+          ? `${countryCode}${phoneNumber.trim()}`
+          : null,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
 
       // Save to Firestore users collection
-      await firestore().collection('users').doc(userCredential.user.uid).set(userData);
+      await firestore()
+        .collection('users')
+        .doc(userCredential.user.uid)
+        .set(userData);
 
       console.log('User account created & signed in!');
       console.log('User data stored in Firestore:', userData);
@@ -87,7 +105,10 @@ export const AuthProvider = ({ children }) => {
 
     try {
       setLoading(true);
-      const userCredential = await auth().signInWithEmailAndPassword(email, password);
+      const userCredential = await auth().signInWithEmailAndPassword(
+        email,
+        password,
+      );
       console.log('User signed in!');
       return userCredential.user;
     } catch (error) {
@@ -117,7 +138,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   // Send password reset email (Android only)
-  const resetPassword = async (email) => {
+  const resetPassword = async email => {
     if (Platform.OS !== 'android') {
       throw new Error('Firebase Auth is only available on Android');
     }
@@ -132,7 +153,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   // Get Firebase Auth error message
-  const getErrorMessage = (error) => {
+  const getErrorMessage = error => {
     switch (error.code) {
       case 'auth/email-already-in-use':
         return 'This email address is already in use by another account.';
@@ -155,7 +176,9 @@ export const AuthProvider = ({ children }) => {
       case 'auth/network-request-failed':
         return 'Network error. Please check your internet connection.';
       default:
-        return error.message || 'An unexpected error occurred. Please try again.';
+        return (
+          error.message || 'An unexpected error occurred. Please try again.'
+        );
     }
   };
 
@@ -171,9 +194,5 @@ export const AuthProvider = ({ children }) => {
     isAndroid: Platform.OS === 'android',
   };
 
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

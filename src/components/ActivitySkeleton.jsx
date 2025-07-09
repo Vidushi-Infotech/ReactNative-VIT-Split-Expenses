@@ -1,11 +1,11 @@
-import React, { useEffect, useRef } from 'react';
-import { View, StyleSheet, Animated, Dimensions } from 'react-native';
-import { useTheme } from '../context/ThemeContext';
+import React, {useEffect, useRef} from 'react';
+import {View, StyleSheet, Animated, Dimensions} from 'react-native';
+import {useTheme} from '../context/ThemeContext';
 
-const { width } = Dimensions.get('window');
+const {width} = Dimensions.get('window');
 
 const ActivitySkeleton = () => {
-  const { theme } = useTheme();
+  const {theme} = useTheme();
   const animatedValue = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -27,14 +27,19 @@ const ActivitySkeleton = () => {
     outputRange: [-width, width],
   });
 
-  const SkeletonBox = ({ width, height, style }) => (
-    <View style={[styles.skeletonBox, { width, height, backgroundColor: theme.colors.skeletonBase }, style]}>
+  const SkeletonBox = ({width, height, style}) => (
+    <View
+      style={[
+        styles.skeletonBox,
+        {width, height, backgroundColor: theme.colors.skeletonBase},
+        style,
+      ]}>
       <Animated.View
         style={[
           styles.skeletonShimmer,
           {
             backgroundColor: theme.colors.skeletonHighlight,
-            transform: [{ translateX }],
+            transform: [{translateX}],
           },
         ]}
       />
@@ -42,30 +47,53 @@ const ActivitySkeleton = () => {
   );
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+    <View
+      style={[styles.container, {backgroundColor: theme.colors.background}]}>
       {/* Header */}
-      <View style={[styles.header, { backgroundColor: theme.colors.surface, borderBottomColor: theme.colors.border }]}>
+      <View
+        style={[
+          styles.header,
+          {
+            backgroundColor: theme.colors.surface,
+            borderBottomColor: theme.colors.border,
+          },
+        ]}>
         <SkeletonBox width={180} height={24} style={styles.headerTitle} />
       </View>
 
       <View style={styles.content}>
-        
         {/* Activity Items */}
-        {[1, 2, 3, 4, 5, 6, 7, 8].map((item) => (
+        {[1, 2, 3, 4, 5, 6, 7, 8].map(item => (
           <View key={item} style={styles.activityCard}>
             <View style={styles.activityHeader}>
               {/* Activity Icon */}
               <SkeletonBox width={40} height={40} style={styles.activityIcon} />
-              
+
               {/* Activity Content */}
               <View style={styles.activityContent}>
-                <SkeletonBox width={200} height={16} style={styles.activityTitle} />
-                <SkeletonBox width={120} height={14} style={styles.activityGroup} />
-                <SkeletonBox width={80} height={12} style={styles.activityTime} />
+                <SkeletonBox
+                  width={200}
+                  height={16}
+                  style={styles.activityTitle}
+                />
+                <SkeletonBox
+                  width={120}
+                  height={14}
+                  style={styles.activityGroup}
+                />
+                <SkeletonBox
+                  width={80}
+                  height={12}
+                  style={styles.activityTime}
+                />
               </View>
-              
+
               {/* Activity Amount */}
-              <SkeletonBox width={60} height={16} style={styles.activityAmount} />
+              <SkeletonBox
+                width={60}
+                height={16}
+                style={styles.activityAmount}
+              />
             </View>
           </View>
         ))}

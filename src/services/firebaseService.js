@@ -18,30 +18,28 @@ class FirebaseService {
       }
 
       const groupRef = this.firestore.collection('groups').doc();
-      
+
       // Prepare members with roles
       const selectedMemberIds = groupData.members || [];
-      console.log('Selected member IDs for group creation:', selectedMemberIds);
-      
+
       // Filter and validate member IDs
-      const validMemberIds = selectedMemberIds.filter(id => 
-        id && typeof id === 'string' && id.trim() !== ''
+      const validMemberIds = selectedMemberIds.filter(
+        id => id && typeof id === 'string' && id.trim() !== '',
       );
-      console.log('Valid member IDs after filtering:', validMemberIds);
-      
+
       // Create members array with role information
       const members = [];
       const memberRoles = {};
-      
+
       // Add creator as admin
       members.push(user.uid);
       memberRoles[user.uid] = {
         role: 'admin',
         joinedAt: firestore.FieldValue.serverTimestamp(),
         addedBy: user.uid,
-        status: 'active'
+        status: 'active',
       };
-      
+
       // Add selected members as regular members
       validMemberIds.forEach(memberId => {
         if (memberId !== user.uid && !members.includes(memberId)) {
@@ -50,12 +48,10 @@ class FirebaseService {
             role: 'member',
             joinedAt: firestore.FieldValue.serverTimestamp(),
             addedBy: user.uid,
-            status: 'active'
+            status: 'active',
           };
         }
       });
-      
-      console.log('Final members array:', members);
 
       const group = {
         id: groupRef.id,
@@ -71,11 +67,11 @@ class FirebaseService {
         totalExpenses: 0,
         memberCount: members.length,
         isActive: true,
-        currency: 'INR'
+        currency: 'INR',
       };
 
       await groupRef.set(group);
-      return { ...group, id: groupRef.id };
+      return {...group, id: groupRef.id};
     } catch (error) {
       console.error('Error creating group:', error);
       throw error;
@@ -89,12 +85,9 @@ class FirebaseService {
         throw new Error('User not authenticated');
       }
 
-      console.log('Storing group cover image locally for group:', groupId);
-      console.log('Image URI:', imageUri);
-
       // Since we're using free Firebase, we'll store the local image URI directly
       // In a production app with billing, you would upload to Firebase Storage
-      
+
       // For now, just return the local image URI
       return imageUri;
     } catch (error) {
@@ -115,7 +108,7 @@ class FirebaseService {
       const groups = snapshot.docs
         .map(doc => ({
           id: doc.id,
-          ...doc.data()
+          ...doc.data(),
         }))
         .filter(group => group.isActive === true)
         .sort((a, b) => {
@@ -139,10 +132,13 @@ class FirebaseService {
         throw new Error('User not authenticated');
       }
 
-      await this.firestore.collection('groups').doc(groupId).update({
-        ...updates,
-        updatedAt: firestore.FieldValue.serverTimestamp()
-      });
+      await this.firestore
+        .collection('groups')
+        .doc(groupId)
+        .update({
+          ...updates,
+          updatedAt: firestore.FieldValue.serverTimestamp(),
+        });
     } catch (error) {
       console.error('Error updating group:', error);
       throw error;
@@ -158,7 +154,7 @@ class FirebaseService {
 
       await this.firestore.collection('groups').doc(groupId).update({
         isActive: false,
-        updatedAt: firestore.FieldValue.serverTimestamp()
+        updatedAt: firestore.FieldValue.serverTimestamp(),
       });
     } catch (error) {
       console.error('Error deleting group:', error);
@@ -177,33 +173,32 @@ class FirebaseService {
         throw new Error('No members to add');
       }
 
-      console.log('👥 Adding members to group:', { groupId, memberUserIds });
-
       const groupRef = this.firestore.collection('groups').doc(groupId);
       const groupDoc = await groupRef.get();
-      
+
       if (!groupDoc.exists) {
         throw new Error('Group not found');
       }
 
       const groupData = groupDoc.data();
       const currentMembers = groupData.members || [];
-      
+
       // Filter out users who are already members
-      const newMembers = memberUserIds.filter(userId => !currentMembers.includes(userId));
-      
+      const newMembers = memberUserIds.filter(
+        userId => !currentMembers.includes(userId),
+      );
+
       if (newMembers.length === 0) {
-        console.log('👥 All selected users are already group members');
         return;
       }
 
       // Prepare batch updates
       const batch = this.firestore.batch();
-      
+
       // Update group with new members
       batch.update(groupRef, {
         members: firestore.FieldValue.arrayUnion(...newMembers),
-        updatedAt: firestore.FieldValue.serverTimestamp()
+        updatedAt: firestore.FieldValue.serverTimestamp(),
       });
 
       // Add member roles for new members (default: member role)
@@ -211,7 +206,7 @@ class FirebaseService {
       newMembers.forEach(userId => {
         memberRoleUpdates[`memberRoles.${userId}`] = {
           role: 'member',
-          joinedAt: firestore.FieldValue.serverTimestamp()
+          joinedAt: firestore.FieldValue.serverTimestamp(),
         };
       });
 
@@ -221,8 +216,6 @@ class FirebaseService {
 
       // Commit the batch
       await batch.commit();
-      console.log('👥 Successfully added', newMembers.length, 'new members to group');
-
       return newMembers;
     } catch (error) {
       console.error('👥 Error adding members to group:', error);
@@ -241,8 +234,6 @@ class FirebaseService {
         throw new Error('No member ID provided');
       }
 
-      console.log('🗑️ Removing member from group:', { groupId, memberUserId });
-
       // Check if current user is admin
       const isAdmin = await this.isGroupAdmin(groupId, user.uid);
       if (!isAdmin) {
@@ -251,14 +242,14 @@ class FirebaseService {
 
       const groupRef = this.firestore.collection('groups').doc(groupId);
       const groupDoc = await groupRef.get();
-      
+
       if (!groupDoc.exists) {
         throw new Error('Group not found');
       }
 
       const groupData = groupDoc.data();
       const currentMembers = groupData.members || [];
-      
+
       // Check if member is actually in the group
       if (!currentMembers.includes(memberUserId)) {
         throw new Error('User is not a member of this group');
@@ -267,7 +258,9 @@ class FirebaseService {
       // Prevent removing the last admin
       const memberRole = groupData.memberRoles?.[memberUserId]?.role;
       if (memberRole === 'admin') {
-        const adminCount = Object.values(groupData.memberRoles || {}).filter(role => role.role === 'admin').length;
+        const adminCount = Object.values(groupData.memberRoles || {}).filter(
+          role => role.role === 'admin',
+        ).length;
         if (adminCount <= 1) {
           throw new Error('Cannot remove the last admin from the group');
         }
@@ -275,35 +268,34 @@ class FirebaseService {
 
       // Check if member has any settled transactions
       const settlements = await this.getGroupSettlements(groupId);
-      const hasSettledTransactions = settlements.some(settlement => 
-        settlement.fromUserId === memberUserId || settlement.toUserId === memberUserId
+      const hasSettledTransactions = settlements.some(
+        settlement =>
+          settlement.fromUserId === memberUserId ||
+          settlement.toUserId === memberUserId,
       );
-
-      console.log('🗑️ Member has settled transactions:', hasSettledTransactions);
 
       // Prepare batch updates
       const batch = this.firestore.batch();
-      
+
       // Remove member from group
       batch.update(groupRef, {
         members: firestore.FieldValue.arrayRemove(memberUserId),
         [`memberRoles.${memberUserId}`]: firestore.FieldValue.delete(),
         adminIds: firestore.FieldValue.arrayRemove(memberUserId), // Remove from admin list if they were admin
-        updatedAt: firestore.FieldValue.serverTimestamp()
+        updatedAt: firestore.FieldValue.serverTimestamp(),
       });
 
       // Recalculate expenses if member hasn't settled all their dues
       if (!hasSettledTransactions) {
-        console.log('🗑️ Recalculating expenses for removed member without settlements');
-        await this.recalculateExpensesAfterMemberRemoval(groupId, memberUserId, batch);
-      } else {
-        console.log('🗑️ Member has settlements, keeping expense history intact');
+        await this.recalculateExpensesAfterMemberRemoval(
+          groupId,
+          memberUserId,
+          batch,
+        );
       }
 
       // Commit the batch
       await batch.commit();
-      console.log('🗑️ Successfully removed member from group');
-
       return true;
     } catch (error) {
       console.error('🗑️ Error removing member from group:', error);
@@ -314,110 +306,117 @@ class FirebaseService {
   // Recalculate expenses after member removal
   async recalculateExpensesAfterMemberRemoval(groupId, removedUserId, batch) {
     try {
-      console.log('🧮 Recalculating expenses after member removal:', { groupId, removedUserId });
-
       // Get all group expenses
       const expenses = await this.getGroupExpenses(groupId);
-      console.log('🧮 Found', expenses.length, 'expenses to recalculate');
 
       // Get current group members (before removal)
-      const groupDoc = await this.firestore.collection('groups').doc(groupId).get();
+      const groupDoc = await this.firestore
+        .collection('groups')
+        .doc(groupId)
+        .get();
       const groupData = groupDoc.data();
       const currentMembers = groupData.members || [];
-      
+
       // Calculate remaining members after removal
-      const remainingMembers = currentMembers.filter(memberId => memberId !== removedUserId);
-      console.log('🧮 Remaining members after removal:', remainingMembers.length);
+      const remainingMembers = currentMembers.filter(
+        memberId => memberId !== removedUserId,
+      );
 
       if (remainingMembers.length === 0) {
-        console.log('🧮 No remaining members, skipping expense recalculation');
         return;
       }
 
       // Process each expense
       for (const expense of expenses) {
         // Check if removed user was involved in this expense
-        const wasParticipant = expense.participants.some(p => p.userId === removedUserId);
-        
+        const wasParticipant = expense.participants.some(
+          p => p.userId === removedUserId,
+        );
+
         if (!wasParticipant) {
-          console.log('🧮 Expense', expense.id, '- removed user was not a participant, skipping');
           continue;
         }
 
-        console.log('🧮 Processing expense:', expense.id, 'amount:', expense.amount);
-
         // Get the removed user's participation
-        const removedUserParticipation = expense.participants.find(p => p.userId === removedUserId);
-        const removedUserAmount = removedUserParticipation ? removedUserParticipation.amount : 0;
-
-        console.log('🧮 Removed user contribution:', removedUserAmount);
+        const removedUserParticipation = expense.participants.find(
+          p => p.userId === removedUserId,
+        );
+        const removedUserAmount = removedUserParticipation
+          ? removedUserParticipation.amount
+          : 0;
 
         // Filter out the removed user from participants
-        const remainingParticipants = expense.participants.filter(p => p.userId !== removedUserId);
-        
+        const remainingParticipants = expense.participants.filter(
+          p => p.userId !== removedUserId,
+        );
+
         if (remainingParticipants.length === 0) {
-          console.log('🧮 No remaining participants, skipping expense:', expense.id);
           continue;
         }
 
         // Recalculate split based on expense splitType
         let newParticipants = [];
-        
+
         if (expense.splitType === 'equal') {
           // For equal split, redistribute removed user's amount equally among remaining participants
-          const newAmountPerPerson = expense.amount / remainingParticipants.length;
-          
+          const newAmountPerPerson =
+            expense.amount / remainingParticipants.length;
+
           newParticipants = remainingParticipants.map(participant => ({
             ...participant,
-            amount: newAmountPerPerson
+            amount: newAmountPerPerson,
           }));
-          
-          console.log('🧮 Equal split recalculated - new amount per person:', newAmountPerPerson);
         } else if (expense.splitType === 'percentage') {
           // For percentage split, need to recalculate percentages
-          const totalRemainingPercentage = remainingParticipants.reduce((sum, p) => sum + (p.percentage || 0), 0);
-          
+          const totalRemainingPercentage = remainingParticipants.reduce(
+            (sum, p) => sum + (p.percentage || 0),
+            0,
+          );
+
           if (totalRemainingPercentage > 0) {
             const scaleFactor = 100 / totalRemainingPercentage;
-            
+
             newParticipants = remainingParticipants.map(participant => {
               const newPercentage = (participant.percentage || 0) * scaleFactor;
               const newAmount = (expense.amount * newPercentage) / 100;
               return {
                 ...participant,
                 percentage: newPercentage,
-                amount: newAmount
+                amount: newAmount,
               };
             });
           } else {
             // Fallback to equal split if no valid percentages
-            const newAmountPerPerson = expense.amount / remainingParticipants.length;
+            const newAmountPerPerson =
+              expense.amount / remainingParticipants.length;
             newParticipants = remainingParticipants.map(participant => ({
               ...participant,
               percentage: 100 / remainingParticipants.length,
-              amount: newAmountPerPerson
+              amount: newAmountPerPerson,
             }));
           }
-          
-          console.log('🧮 Percentage split recalculated');
         } else if (expense.splitType === 'shares') {
           // For shares split, redistribute based on existing shares
-          const totalRemainingShares = remainingParticipants.reduce((sum, p) => sum + (p.shares || 1), 0);
-          
+          const totalRemainingShares = remainingParticipants.reduce(
+            (sum, p) => sum + (p.shares || 1),
+            0,
+          );
+
           newParticipants = remainingParticipants.map(participant => {
             const shares = participant.shares || 1;
             const newAmount = (expense.amount * shares) / totalRemainingShares;
             return {
               ...participant,
-              amount: newAmount
+              amount: newAmount,
             };
           });
-          
-          console.log('🧮 Shares split recalculated');
         } else {
           // For custom/amount split, keep existing amounts but ensure they don't exceed total
-          const totalRemainingAmounts = remainingParticipants.reduce((sum, p) => sum + (p.amount || 0), 0);
-          
+          const totalRemainingAmounts = remainingParticipants.reduce(
+            (sum, p) => sum + (p.amount || 0),
+            0,
+          );
+
           if (totalRemainingAmounts <= expense.amount) {
             newParticipants = remainingParticipants;
           } else {
@@ -425,28 +424,27 @@ class FirebaseService {
             const scaleFactor = expense.amount / totalRemainingAmounts;
             newParticipants = remainingParticipants.map(participant => ({
               ...participant,
-              amount: (participant.amount || 0) * scaleFactor
+              amount: (participant.amount || 0) * scaleFactor,
             }));
           }
-          
-          console.log('🧮 Custom split recalculated');
         }
 
         // Update expense with new participants
-        const expenseRef = this.firestore.collection('expenses').doc(expense.id);
+        const expenseRef = this.firestore
+          .collection('expenses')
+          .doc(expense.id);
         batch.update(expenseRef, {
           participants: newParticipants,
           updatedAt: firestore.FieldValue.serverTimestamp(),
           recalculatedAt: firestore.FieldValue.serverTimestamp(),
-          recalculatedReason: `Member removed: ${removedUserId}`
+          recalculatedReason: `Member removed: ${removedUserId}`,
         });
-
-        console.log('🧮 Updated expense', expense.id, 'with', newParticipants.length, 'participants');
       }
-
-      console.log('🧮 Expense recalculation completed');
     } catch (error) {
-      console.error('🧮 Error recalculating expenses after member removal:', error);
+      console.error(
+        '🧮 Error recalculating expenses after member removal:',
+        error,
+      );
       throw error;
     }
   }
@@ -460,11 +458,11 @@ class FirebaseService {
       }
 
       const groupRef = this.firestore.collection('groups').doc(groupId);
-      
+
       await groupRef.update({
         [`memberRoles.${userId}.role`]: 'admin',
         adminIds: firestore.FieldValue.arrayUnion(userId),
-        updatedAt: firestore.FieldValue.serverTimestamp()
+        updatedAt: firestore.FieldValue.serverTimestamp(),
       });
     } catch (error) {
       console.error('Error adding group admin:', error);
@@ -480,11 +478,11 @@ class FirebaseService {
       }
 
       const groupRef = this.firestore.collection('groups').doc(groupId);
-      
+
       await groupRef.update({
         [`memberRoles.${userId}.role`]: 'member',
         adminIds: firestore.FieldValue.arrayRemove(userId),
-        updatedAt: firestore.FieldValue.serverTimestamp()
+        updatedAt: firestore.FieldValue.serverTimestamp(),
       });
     } catch (error) {
       console.error('Error removing group admin:', error);
@@ -494,11 +492,14 @@ class FirebaseService {
 
   async isGroupAdmin(groupId, userId) {
     try {
-      const groupDoc = await this.firestore.collection('groups').doc(groupId).get();
+      const groupDoc = await this.firestore
+        .collection('groups')
+        .doc(groupId)
+        .get();
       if (!groupDoc.exists) {
         return false;
       }
-      
+
       const groupData = groupDoc.data();
       return groupData.adminIds?.includes(userId) || false;
     } catch (error) {
@@ -516,7 +517,7 @@ class FirebaseService {
       }
 
       const expenseRef = this.firestore.collection('expenses').doc();
-      
+
       const expense = {
         id: expenseRef.id,
         groupId: groupId,
@@ -532,7 +533,7 @@ class FirebaseService {
         createdBy: user.uid,
         createdAt: firestore.FieldValue.serverTimestamp(),
         updatedAt: firestore.FieldValue.serverTimestamp(),
-        isActive: true
+        isActive: true,
       };
 
       await expenseRef.set(expense);
@@ -540,7 +541,7 @@ class FirebaseService {
       // Update group's total expenses
       await this.updateGroupTotalExpenses(groupId);
 
-      return { ...expense, id: expenseRef.id };
+      return {...expense, id: expenseRef.id};
     } catch (error) {
       console.error('Error creating expense:', error);
       throw error;
@@ -559,7 +560,7 @@ class FirebaseService {
       const expenses = snapshot.docs
         .map(doc => ({
           id: doc.id,
-          ...doc.data()
+          ...doc.data(),
         }))
         .filter(expense => expense.isActive === true)
         .sort((a, b) => {
@@ -583,14 +584,20 @@ class FirebaseService {
         throw new Error('User not authenticated');
       }
 
-      await this.firestore.collection('expenses').doc(expenseId).update({
-        ...updates,
-        updatedAt: firestore.FieldValue.serverTimestamp()
-      });
+      await this.firestore
+        .collection('expenses')
+        .doc(expenseId)
+        .update({
+          ...updates,
+          updatedAt: firestore.FieldValue.serverTimestamp(),
+        });
 
       // Update group's total expenses if amount changed
       if (updates.amount !== undefined) {
-        const expenseDoc = await this.firestore.collection('expenses').doc(expenseId).get();
+        const expenseDoc = await this.firestore
+          .collection('expenses')
+          .doc(expenseId)
+          .get();
         if (expenseDoc.exists) {
           const expenseData = expenseDoc.data();
           await this.updateGroupTotalExpenses(expenseData.groupId);
@@ -610,16 +617,19 @@ class FirebaseService {
       }
 
       // Get expense data before deletion to update group totals
-      const expenseDoc = await this.firestore.collection('expenses').doc(expenseId).get();
+      const expenseDoc = await this.firestore
+        .collection('expenses')
+        .doc(expenseId)
+        .get();
       if (!expenseDoc.exists) {
         throw new Error('Expense not found');
       }
-      
+
       const expenseData = expenseDoc.data();
 
       await this.firestore.collection('expenses').doc(expenseId).update({
         isActive: false,
-        updatedAt: firestore.FieldValue.serverTimestamp()
+        updatedAt: firestore.FieldValue.serverTimestamp(),
       });
 
       // Update group's total expenses
@@ -648,7 +658,7 @@ class FirebaseService {
 
       await this.firestore.collection('groups').doc(groupId).update({
         totalExpenses: totalExpenses,
-        updatedAt: firestore.FieldValue.serverTimestamp()
+        updatedAt: firestore.FieldValue.serverTimestamp(),
       });
     } catch (error) {
       console.error('Error updating group total expenses:', error);
@@ -659,19 +669,22 @@ class FirebaseService {
   async calculateGroupBalances(groupId) {
     try {
       const expenses = await this.getGroupExpenses(groupId);
-      const groupDoc = await this.firestore.collection('groups').doc(groupId).get();
-      
+      const groupDoc = await this.firestore
+        .collection('groups')
+        .doc(groupId)
+        .get();
+
       if (!groupDoc.exists) {
         throw new Error('Group not found');
       }
 
       const groupData = groupDoc.data();
       const members = groupData.members || [];
-      
+
       // Initialize balance object for each member (only current members)
       const balances = {};
       members.forEach(memberId => {
-        balances[memberId] = { paid: 0, owes: 0, net: 0 };
+        balances[memberId] = {paid: 0, owes: 0, net: 0};
       });
 
       // Calculate balances from expenses
@@ -691,10 +704,10 @@ class FirebaseService {
 
       // Calculate net balances (positive means person is owed money, negative means they owe money)
       Object.keys(balances).forEach(memberId => {
-        balances[memberId].net = balances[memberId].paid - balances[memberId].owes;
+        balances[memberId].net =
+          balances[memberId].paid - balances[memberId].owes;
       });
 
-      console.log('💰 Group balances calculated for', members.length, 'members:', balances);
       return balances;
     } catch (error) {
       console.error('Error calculating group balances:', error);
@@ -705,48 +718,53 @@ class FirebaseService {
   // Get group members with their profile data
   async getGroupMembersWithProfiles(groupId) {
     try {
-      console.log('Fetching group members for groupId:', groupId);
-      
       if (!groupId || typeof groupId !== 'string') {
         throw new Error('Invalid groupId provided');
       }
-      
-      const groupDoc = await this.firestore.collection('groups').doc(groupId).get();
-      
+
+      const groupDoc = await this.firestore
+        .collection('groups')
+        .doc(groupId)
+        .get();
+
       if (!groupDoc.exists) {
         throw new Error('Group not found');
       }
 
       const groupData = groupDoc.data();
-      console.log('Group data:', groupData);
-      
       const memberIds = groupData.members || [];
-      console.log('Member IDs:', memberIds);
-      
+
       // Filter out invalid member IDs
-      const validMemberIds = memberIds.filter(id => id && typeof id === 'string' && id.trim() !== '');
-      console.log('Valid member IDs:', validMemberIds);
-      
+      const validMemberIds = memberIds.filter(
+        id => id && typeof id === 'string' && id.trim() !== '',
+      );
+
       const membersWithProfiles = await Promise.all(
-        validMemberIds.map(async (memberId) => {
+        validMemberIds.map(async memberId => {
           try {
-            console.log('Fetching profile for member:', memberId);
             const userProfile = await this.getUserProfile(memberId);
-            console.log('User profile for', memberId, ':', userProfile);
-            
+
             return {
               userId: memberId,
               id: memberId, // For compatibility
-              name: userProfile ? `${userProfile.firstName || ''} ${userProfile.lastName || ''}`.trim() : 'Unknown User',
+              name: userProfile
+                ? `${userProfile.firstName || ''} ${
+                    userProfile.lastName || ''
+                  }`.trim()
+                : 'Unknown User',
               displayName: userProfile?.displayName || 'Unknown User',
               avatar: userProfile?.profileImageUrl || null,
               email: userProfile?.email || '',
               phoneNumber: userProfile?.phoneNumber || '',
               isYou: memberId === this.auth.currentUser?.uid,
-              role: groupData.memberRoles?.[memberId]?.role || 'member'
+              role: groupData.memberRoles?.[memberId]?.role || 'member',
             };
           } catch (memberError) {
-            console.error('Error fetching profile for member:', memberId, memberError);
+            console.error(
+              'Error fetching profile for member:',
+              memberId,
+              memberError,
+            );
             // Return a fallback member object
             return {
               userId: memberId,
@@ -757,13 +775,12 @@ class FirebaseService {
               email: '',
               phoneNumber: '',
               isYou: memberId === this.auth.currentUser?.uid,
-              role: groupData.memberRoles?.[memberId]?.role || 'member'
+              role: groupData.memberRoles?.[memberId]?.role || 'member',
             };
           }
-        })
+        }),
       );
 
-      console.log('Final members with profiles:', membersWithProfiles);
       return membersWithProfiles;
     } catch (error) {
       console.error('Error fetching group members with profiles:', error);
@@ -779,15 +796,16 @@ class FirebaseService {
         throw new Error('User not authenticated');
       }
 
-      console.log('Firebase Service: Updating profile for user:', user.uid);
-      console.log('Firebase Service: User data to update:', userData);
-
-      await this.firestore.collection('users').doc(user.uid).set({
-        ...userData,
-        updatedAt: firestore.FieldValue.serverTimestamp()
-      }, { merge: true });
-      
-      console.log('Firebase Service: Profile update successful');
+      await this.firestore
+        .collection('users')
+        .doc(user.uid)
+        .set(
+          {
+            ...userData,
+            updatedAt: firestore.FieldValue.serverTimestamp(),
+          },
+          {merge: true},
+        );
     } catch (error) {
       console.error('Firebase Service: Error updating user profile:', error);
       throw error;
@@ -796,17 +814,15 @@ class FirebaseService {
 
   async getUserProfile(userId) {
     try {
-      console.log('Getting user profile for userId:', userId, 'type:', typeof userId);
-      
       if (!userId || typeof userId !== 'string' || userId.trim() === '') {
-        console.error('Invalid userId provided to getUserProfile:', userId);
         return null;
       }
-      
-      const doc = await this.firestore.collection('users').doc(userId.trim()).get();
-      const result = doc.exists ? { id: doc.id, ...doc.data() } : null;
-      console.log('User profile result:', result);
-      return result;
+
+      const doc = await this.firestore
+        .collection('users')
+        .doc(userId.trim())
+        .get();
+      return doc.exists ? {id: doc.id, ...doc.data()} : null;
     } catch (error) {
       console.error('Error fetching user profile for userId:', userId, error);
       throw error;
@@ -815,23 +831,21 @@ class FirebaseService {
 
   async findUserByPhone(phoneNumber) {
     try {
-      console.log('Looking up user by phone:', phoneNumber);
-      
       if (!phoneNumber || typeof phoneNumber !== 'string') {
         return null;
       }
-      
+
       const snapshot = await this.firestore
         .collection('users')
         .where('phoneNumber', '==', phoneNumber.trim())
         .limit(1)
         .get();
-      
+
       if (!snapshot.empty) {
         const doc = snapshot.docs[0];
-        return { id: doc.id, uid: doc.id, ...doc.data() };
+        return {id: doc.id, uid: doc.id, ...doc.data()};
       }
-      
+
       return null;
     } catch (error) {
       console.log('Error finding user by phone:', phoneNumber, error.message);
@@ -841,23 +855,21 @@ class FirebaseService {
 
   async findUserByEmail(email) {
     try {
-      console.log('Looking up user by email:', email);
-      
       if (!email || typeof email !== 'string') {
         return null;
       }
-      
+
       const snapshot = await this.firestore
         .collection('users')
         .where('email', '==', email.toLowerCase().trim())
         .limit(1)
         .get();
-      
+
       if (!snapshot.empty) {
         const doc = snapshot.docs[0];
-        return { id: doc.id, uid: doc.id, ...doc.data() };
+        return {id: doc.id, uid: doc.id, ...doc.data()};
       }
-      
+
       return null;
     } catch (error) {
       console.log('Error finding user by email:', email, error.message);
@@ -872,12 +884,9 @@ class FirebaseService {
         throw new Error('User not authenticated');
       }
 
-      console.log('Storing profile image locally for user:', userId);
-      console.log('Image URI:', imageUri);
-
       // Since we're using free Firebase, we'll store the local image URI directly
       // In a production app with billing, you would upload to Firebase Storage
-      
+
       // For now, just return the local image URI
       // You can copy selected images to app's local storage if needed
       return imageUri;
@@ -890,12 +899,9 @@ class FirebaseService {
   // Calculate overall balance across all user's groups
   async calculateOverallBalance(userId) {
     try {
-      console.log('📊 Calculating overall balance for user:', userId);
-      
       // Get all user's groups
       const userGroups = await this.getUserGroups(userId);
-      console.log('📊 Found', userGroups.length, 'groups for balance calculation');
-      
+
       let totalYouOwe = 0;
       let totalYouAreOwed = 0;
       let groupBalanceDetails = [];
@@ -905,10 +911,10 @@ class FirebaseService {
         try {
           const groupBalances = await this.calculateGroupBalances(group.id);
           const userBalance = groupBalances[userId];
-          
+
           if (userBalance) {
             const netBalance = userBalance.net;
-            
+
             if (netBalance > 0) {
               // User is owed money
               totalYouAreOwed += netBalance;
@@ -916,7 +922,7 @@ class FirebaseService {
                 groupId: group.id,
                 groupName: group.name,
                 type: 'owed',
-                amount: netBalance
+                amount: netBalance,
               });
             } else if (netBalance < 0) {
               // User owes money
@@ -925,29 +931,32 @@ class FirebaseService {
                 groupId: group.id,
                 groupName: group.name,
                 type: 'owe',
-                amount: Math.abs(netBalance)
+                amount: Math.abs(netBalance),
               });
             }
           }
         } catch (groupError) {
-          console.error('📊 Error calculating balance for group:', group.id, groupError);
+          console.error(
+            'Error calculating balance for group:',
+            group.id,
+            groupError,
+          );
           // Continue with other groups
         }
       }
 
       const netBalance = totalYouAreOwed - totalYouOwe;
-      
+
       const overallBalance = {
         netBalance,
         totalYouOwe,
         totalYouAreOwed,
-        groupBalanceDetails
+        groupBalanceDetails,
       };
-      
-      console.log('📊 Overall balance calculated:', overallBalance);
+
       return overallBalance;
     } catch (error) {
-      console.error('📊 Error calculating overall balance:', error);
+      console.error('Error calculating overall balance:', error);
       throw error;
     }
   }
@@ -956,7 +965,7 @@ class FirebaseService {
   async getGroupBalancesWithDetails(userId) {
     try {
       console.log('📊 Getting group balances with details for user:', userId);
-      
+
       const userGroups = await this.getUserGroups(userId);
       const groupBalances = [];
 
@@ -964,7 +973,7 @@ class FirebaseService {
         try {
           const balances = await this.calculateGroupBalances(group.id);
           const userBalance = balances[userId];
-          
+
           if (userBalance) {
             groupBalances.push({
               groupId: group.id,
@@ -973,11 +982,15 @@ class FirebaseService {
               youOwe: userBalance.net < 0 ? Math.abs(userBalance.net) : 0,
               youAreOwed: userBalance.net > 0 ? userBalance.net : 0,
               netBalance: userBalance.net,
-              totalExpenses: group.totalExpenses || 0
+              totalExpenses: group.totalExpenses || 0,
             });
           }
         } catch (groupError) {
-          console.error('📊 Error getting balance for group:', group.id, groupError);
+          console.error(
+            '📊 Error getting balance for group:',
+            group.id,
+            groupError,
+          );
           // Add group with zero balance if error occurs
           groupBalances.push({
             groupId: group.id,
@@ -986,7 +999,7 @@ class FirebaseService {
             youOwe: 0,
             youAreOwed: 0,
             netBalance: 0,
-            totalExpenses: group.totalExpenses || 0
+            totalExpenses: group.totalExpenses || 0,
           });
         }
       }
@@ -1010,7 +1023,7 @@ class FirebaseService {
       console.log('💳 Creating settlement:', settlementData);
 
       const settlementRef = this.firestore.collection('settlements').doc();
-      
+
       const settlement = {
         id: settlementRef.id,
         groupId: groupId,
@@ -1024,13 +1037,13 @@ class FirebaseService {
         settledAt: firestore.FieldValue.serverTimestamp(),
         createdAt: firestore.FieldValue.serverTimestamp(),
         updatedAt: firestore.FieldValue.serverTimestamp(),
-        isActive: true
+        isActive: true,
       };
 
       await settlementRef.set(settlement);
       console.log('💳 Settlement saved to database:', settlement);
 
-      return { ...settlement, id: settlementRef.id };
+      return {...settlement, id: settlementRef.id};
     } catch (error) {
       console.error('💳 Error creating settlement:', error);
       throw error;
@@ -1040,7 +1053,7 @@ class FirebaseService {
   async getGroupSettlements(groupId) {
     try {
       console.log('💳 Fetching settlements for group:', groupId);
-      
+
       const snapshot = await this.firestore
         .collection('settlements')
         .where('groupId', '==', groupId)
@@ -1049,7 +1062,7 @@ class FirebaseService {
 
       const settlements = snapshot.docs.map(doc => ({
         id: doc.id,
-        ...doc.data()
+        ...doc.data(),
       }));
 
       console.log('💳 Found', settlements.length, 'settlements for group');
@@ -1064,11 +1077,11 @@ class FirebaseService {
   async calculateGroupSettlements(groupId) {
     try {
       console.log('🧮 Calculating group settlements for:', groupId);
-      
+
       // Get current balances and existing settlements
       const [balances, existingSettlements] = await Promise.all([
         this.calculateGroupBalances(groupId),
-        this.getGroupSettlements(groupId)
+        this.getGroupSettlements(groupId),
       ]);
 
       console.log('🧮 Balances:', balances);
@@ -1090,20 +1103,23 @@ class FirebaseService {
           // This user owes money
           Object.entries(balances).forEach(([creditorId, creditorBalance]) => {
             if (creditorId !== userId && creditorBalance.net > 0) {
-              const settleAmount = Math.min(Math.abs(balance.net), creditorBalance.net);
-              
+              const settleAmount = Math.min(
+                Math.abs(balance.net),
+                creditorBalance.net,
+              );
+
               // Check how much has already been settled between these users
               const settledKey = `${userId}-${creditorId}`;
               const alreadySettled = settledAmounts[settledKey] || 0;
               const remainingAmount = settleAmount - alreadySettled;
-              
+
               if (remainingAmount > 0) {
                 pendingSettlements.push({
                   id: `pending-${userId}-${creditorId}`,
                   fromUserId: userId,
                   toUserId: creditorId,
                   amount: remainingAmount,
-                  type: 'pending'
+                  type: 'pending',
                 });
               }
             }
@@ -1114,11 +1130,154 @@ class FirebaseService {
       console.log('🧮 Pending settlements:', pendingSettlements);
       return {
         pendingSettlements,
-        settledTransactions: existingSettlements
+        settledTransactions: existingSettlements,
       };
     } catch (error) {
       console.error('🧮 Error calculating group settlements:', error);
       throw error;
+    }
+  }
+
+  // Referral System Operations
+  async processReferralCode(newUserId, referralCode, newUserName) {
+    try {
+      if (!referralCode || !referralCode.trim()) {
+        return null;
+      }
+
+      // Find the user who owns this referral code
+      const referrerQuery = await this.firestore.collection('users').get();
+
+      let referrerUser = null;
+
+      // Check each user to see if their generated code matches
+      for (const doc of referrerQuery.docs) {
+        const userData = doc.data();
+        const userName =
+          userData.firstName && userData.lastName
+            ? `${userData.firstName} ${userData.lastName}`.trim()
+            : 'User';
+
+        // Generate expected referral code for this user
+        const namePrefix = userName.substring(0, 2).toUpperCase();
+        const userIdSuffix = doc.id.substring(doc.id.length - 6).toUpperCase();
+        const expectedCode = `${namePrefix}${userIdSuffix}`;
+
+        if (expectedCode === referralCode.toUpperCase()) {
+          referrerUser = {id: doc.id, ...userData};
+          break;
+        }
+      }
+
+      if (!referrerUser) {
+        return null;
+      }
+
+      if (referrerUser.id === newUserId) {
+        return null;
+      }
+
+      // Create referral record
+      const referralRef = this.firestore.collection('referrals').doc();
+      const referralData = {
+        id: referralRef.id,
+        referrerId: referrerUser.id,
+        referredUserId: newUserId,
+        referredUserName: newUserName || 'New User',
+        referralCode: referralCode.toUpperCase(),
+        status: 'completed',
+        createdAt: firestore.FieldValue.serverTimestamp(),
+        updatedAt: firestore.FieldValue.serverTimestamp(),
+      };
+
+      await referralRef.set(referralData);
+      return referralData;
+    } catch (error) {
+      console.error('Error processing referral code:', error);
+      return null;
+    }
+  }
+
+  async getUserReferralStats(userId) {
+    try {
+      console.log('🎁 Getting referral stats for user:', userId);
+
+      const snapshot = await this.firestore
+        .collection('referrals')
+        .where('referrerId', '==', userId)
+        .get();
+
+      const referrals = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+
+      const stats = {
+        totalReferrals: referrals.length,
+        successfulReferrals: referrals.filter(r => r.status === 'completed')
+          .length,
+        pendingReferrals: referrals.filter(r => r.status === 'pending').length,
+        failedReferrals: referrals.filter(r => r.status === 'failed').length,
+      };
+
+      console.log('🎁 Referral stats:', stats);
+      return stats;
+    } catch (error) {
+      console.error('🎁 Error getting referral stats:', error);
+      return {
+        totalReferrals: 0,
+        successfulReferrals: 0,
+        pendingReferrals: 0,
+        failedReferrals: 0,
+      };
+    }
+  }
+
+  async getReferralHistory(userId) {
+    try {
+      console.log('🎁 Getting referral history for user:', userId);
+
+      // Simplified query without orderBy to avoid composite index requirement
+      const snapshot = await this.firestore
+        .collection('referrals')
+        .where('referrerId', '==', userId)
+        .get();
+
+      // Sort in JavaScript to avoid composite index
+      const referrals = snapshot.docs
+        .map(doc => ({
+          id: doc.id,
+          ...doc.data(),
+        }))
+        .sort((a, b) => {
+          // Sort by createdAt desc, handle null/undefined dates
+          const aTime = a.createdAt?.toDate?.() || new Date(0);
+          const bTime = b.createdAt?.toDate?.() || new Date(0);
+          return bTime - aTime;
+        });
+
+      console.log('🎁 Referral history:', referrals);
+      return referrals;
+    } catch (error) {
+      console.error('🎁 Error getting referral history:', error);
+      return [];
+    }
+  }
+
+  async updateReferralStatus(referralId, status) {
+    try {
+      console.log('🎁 Updating referral status:', referralId, 'to', status);
+
+      await this.firestore.collection('referrals').doc(referralId).update({
+        status: status,
+        updatedAt: firestore.FieldValue.serverTimestamp(),
+      });
+
+      console.log('🎁 Referral status updated');
+      return true;
+    } catch (error) {
+      console.error('🎁 Error updating referral status:', error);
+      return false;
     }
   }
 }

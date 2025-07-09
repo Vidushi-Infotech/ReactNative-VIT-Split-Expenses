@@ -15,6 +15,7 @@ import {
 import EditProfileScreen from './EditProfileScreen';
 import ThemeSettingsScreen from './ThemeSettingsScreen';
 import PaymentHistoryScreen from './PaymentHistoryScreen';
+import ReferralSystemScreen from './ReferralSystemScreen';
 import ThemedAlert from '../components/ThemedAlert';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
@@ -29,6 +30,7 @@ const ProfileScreen = ({ navigation }) => {
   const [showEditProfile, setShowEditProfile] = useState(false);
   const [showThemeSettings, setShowThemeSettings] = useState(false);
   const [showPaymentHistory, setShowPaymentHistory] = useState(false);
+  const [showReferralSystem, setShowReferralSystem] = useState(false);
   const [showLogoutAlert, setShowLogoutAlert] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [userProfile, setUserProfile] = useState(null);
@@ -179,7 +181,7 @@ const ProfileScreen = ({ navigation }) => {
       id: 4,
       title: 'Referral System',
       iconComponent: <FontAwesome name="gift" size={20} color={theme.colors.icon} />,
-      onPress: () => console.log('Referral System pressed'),
+      onPress: () => setShowReferralSystem(true),
     },
     {
       id: 5,
@@ -337,6 +339,15 @@ const ProfileScreen = ({ navigation }) => {
         presentationStyle="pageSheet"
       >
         <PaymentHistoryScreen onClose={() => setShowPaymentHistory(false)} />
+      </Modal>
+
+      {/* Referral System Modal */}
+      <Modal
+        visible={showReferralSystem}
+        animationType="slide"
+        presentationStyle="pageSheet"
+      >
+        <ReferralSystemScreen onClose={() => setShowReferralSystem(false)} />
       </Modal>
 
       {/* Themed Logout Alert */}

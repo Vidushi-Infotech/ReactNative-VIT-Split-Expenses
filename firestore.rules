@@ -52,5 +52,25 @@ service cloud.firestore {
         && (request.auth.uid == resource.data.settledBy
         || request.auth.uid in get(/databases/$(database)/documents/groups/$(resource.data.groupId)).data.adminIds);
     }
+
+    // Referrals rules
+    match /referrals/{referralId} {
+      // Allow users to read referrals where they are the referrer
+      allow read: if request.auth != null
+        && request.auth.uid == resource.data.referrerId;
+      
+      // Allow users to read referrals where they are the referred user
+      allow read: if request.auth != null
+        && request.auth.uid == resource.data.referredUserId;
+      
+      // Allow authenticated users to create referrals
+      allow create: if request.auth != null
+        && request.auth.uid == request.resource.data.referredUserId;
+      
+      // Allow referrer or referred user to update referral status
+      allow update: if request.auth != null
+        && (request.auth.uid == resource.data.referrerId
+        || request.auth.uid == resource.data.referredUserId);
+    }
   }
 }

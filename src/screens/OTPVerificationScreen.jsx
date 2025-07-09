@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, {useState, useEffect, useRef} from 'react';
 import {
   View,
   Text,
@@ -9,11 +9,11 @@ import {
   Image,
   ScrollView,
 } from 'react-native';
-import { useTheme } from '../context/ThemeContext';
+import {useTheme} from '../context/ThemeContext';
 import ThemedAlert from '../components/ThemedAlert';
 
-const OTPVerificationScreen = ({ navigation, route }) => {
-  const { theme } = useTheme();
+const OTPVerificationScreen = ({navigation, route}) => {
+  const {theme} = useTheme();
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [timer, setTimer] = useState(23);
   const [canResend, setCanResend] = useState(false);
@@ -27,7 +27,7 @@ const OTPVerificationScreen = ({ navigation, route }) => {
   const isFromForgotPassword = route?.params?.isFromForgotPassword || false;
 
   // Helper function to show themed alerts
-  const showThemedAlert = (title, message, buttons = [{ text: 'OK' }]) => {
+  const showThemedAlert = (title, message, buttons = [{text: 'OK'}]) => {
     setAlertConfig({
       title,
       message,
@@ -36,8 +36,8 @@ const OTPVerificationScreen = ({ navigation, route }) => {
         onPress: () => {
           setAlertVisible(false);
           if (button.onPress) button.onPress();
-        }
-      }))
+        },
+      })),
     });
     setAlertVisible(true);
   };
@@ -45,7 +45,7 @@ const OTPVerificationScreen = ({ navigation, route }) => {
   useEffect(() => {
     // Start countdown timer
     const interval = setInterval(() => {
-      setTimer((prevTimer) => {
+      setTimer(prevTimer => {
         if (prevTimer <= 1) {
           setCanResend(true);
           clearInterval(interval);
@@ -61,7 +61,7 @@ const OTPVerificationScreen = ({ navigation, route }) => {
   const handleOtpChange = (value, index) => {
     // Only allow numeric input
     const numericValue = value.replace(/[^0-9]/g, '');
-    
+
     if (numericValue.length <= 1) {
       const newOtp = [...otp];
       newOtp[index] = numericValue;
@@ -98,7 +98,10 @@ const OTPVerificationScreen = ({ navigation, route }) => {
           navigation.replace('Main');
         }
       } else {
-        showThemedAlert('Invalid OTP', 'Please enter 123456 for demo purposes.');
+        showThemedAlert(
+          'Invalid OTP',
+          'Please enter 123456 for demo purposes.',
+        );
       }
     } else {
       showThemedAlert('Incomplete OTP', 'Please enter complete 6-digit OTP');
@@ -111,10 +114,10 @@ const OTPVerificationScreen = ({ navigation, route }) => {
       setTimer(23);
       setCanResend(false);
       setOtp(['', '', '', '', '', '']);
-      
+
       // Restart timer
       const interval = setInterval(() => {
-        setTimer((prevTimer) => {
+        setTimer(prevTimer => {
           if (prevTimer <= 1) {
             setCanResend(true);
             clearInterval(interval);
@@ -123,7 +126,7 @@ const OTPVerificationScreen = ({ navigation, route }) => {
           return prevTimer - 1;
         });
       }, 1000);
-      
+
       if (email) {
         console.log('Resending OTP to email:', email);
       } else {
@@ -132,17 +135,21 @@ const OTPVerificationScreen = ({ navigation, route }) => {
     }
   };
 
-  const formatTime = (seconds) => {
+  const formatTime = seconds => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    return `${mins.toString().padStart(2, '0')}:${secs
+      .toString()
+      .padStart(2, '0')}`;
   };
 
   const styles = createStyles(theme);
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}>
         {/* Illustration */}
         <View style={styles.illustrationContainer}>
           <Image
@@ -162,14 +169,11 @@ const OTPVerificationScreen = ({ navigation, route }) => {
           {otp.map((digit, index) => (
             <TextInput
               key={index}
-              ref={(ref) => (inputRefs.current[index] = ref)}
-              style={[
-                styles.otpInput,
-                digit ? styles.otpInputFilled : null
-              ]}
+              ref={ref => (inputRefs.current[index] = ref)}
+              style={[styles.otpInput, digit ? styles.otpInputFilled : null]}
               value={digit}
-              onChangeText={(value) => handleOtpChange(value, index)}
-              onKeyPress={(e) => handleKeyPress(e, index)}
+              onChangeText={value => handleOtpChange(value, index)}
+              onKeyPress={e => handleKeyPress(e, index)}
               keyboardType="numeric"
               maxLength={1}
               textAlign="center"
@@ -179,13 +183,14 @@ const OTPVerificationScreen = ({ navigation, route }) => {
         </View>
 
         {/* Verify Button */}
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[
             styles.verifyButton,
-            otp.join('').length === 6 ? styles.verifyButtonActive : styles.verifyButtonInactive
-          ]} 
-          onPress={handleVerifyOTP}
-        >
+            otp.join('').length === 6
+              ? styles.verifyButtonActive
+              : styles.verifyButtonInactive,
+          ]}
+          onPress={handleVerifyOTP}>
           <Text style={styles.verifyButtonText}>Verify OTP</Text>
         </TouchableOpacity>
 
@@ -214,89 +219,90 @@ const OTPVerificationScreen = ({ navigation, route }) => {
   );
 };
 
-const createStyles = (theme) => StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: theme.colors.background,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    paddingHorizontal: 32,
-    paddingTop: 60,
-    paddingBottom: 40,
-    alignItems: 'center',
-  },
-  illustrationContainer: {
-    alignItems: 'center',
-    marginBottom: 40,
-    paddingHorizontal: 20,
-  },
-  verifyOTPImage: {
-    width: 200,
-    height: 200,
-    marginBottom: 20,
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: theme.colors.text,
-    textAlign: 'center',
-    marginBottom: 40,
-  },
-  otpContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 40,
-    width: '100%',
-    paddingHorizontal: 10,
-  },
-  otpInput: {
-    width: 45,
-    height: 50,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: 8,
-    backgroundColor: theme.colors.surface,
-    fontSize: 18,
-    fontWeight: '600',
-    color: theme.colors.text,
-  },
-  otpInputFilled: {
-    borderColor: theme.colors.primary,
-    backgroundColor: theme.colors.primaryBackground || theme.colors.surface,
-  },
-  verifyButton: {
-    width: '100%',
-    paddingVertical: 16,
-    borderRadius: 8,
-    marginBottom: 24,
-  },
-  verifyButtonActive: {
-    backgroundColor: theme.colors.primary,
-  },
-  verifyButtonInactive: {
-    backgroundColor: theme.colors.disabled || theme.colors.border,
-  },
-  verifyButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  resendContainer: {
-    alignItems: 'center',
-  },
-  resendText: {
-    fontSize: 16,
-    color: theme.colors.primary,
-    fontWeight: '500',
-    textDecorationLine: 'underline',
-  },
-  timerText: {
-    fontSize: 16,
-    color: theme.colors.textSecondary,
-    fontWeight: '400',
-  },
-});
+const createStyles = theme =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: theme.colors.background,
+    },
+    scrollContent: {
+      flexGrow: 1,
+      paddingHorizontal: 32,
+      paddingTop: 60,
+      paddingBottom: 40,
+      alignItems: 'center',
+    },
+    illustrationContainer: {
+      alignItems: 'center',
+      marginBottom: 40,
+      paddingHorizontal: 20,
+    },
+    verifyOTPImage: {
+      width: 200,
+      height: 200,
+      marginBottom: 20,
+    },
+    title: {
+      fontSize: 20,
+      fontWeight: '600',
+      color: theme.colors.text,
+      textAlign: 'center',
+      marginBottom: 40,
+    },
+    otpContainer: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      marginBottom: 40,
+      width: '100%',
+      paddingHorizontal: 10,
+    },
+    otpInput: {
+      width: 45,
+      height: 50,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      borderRadius: 8,
+      backgroundColor: theme.colors.surface,
+      fontSize: 18,
+      fontWeight: '600',
+      color: theme.colors.text,
+    },
+    otpInputFilled: {
+      borderColor: theme.colors.primary,
+      backgroundColor: theme.colors.primaryBackground || theme.colors.surface,
+    },
+    verifyButton: {
+      width: '100%',
+      paddingVertical: 16,
+      borderRadius: 8,
+      marginBottom: 24,
+    },
+    verifyButtonActive: {
+      backgroundColor: theme.colors.primary,
+    },
+    verifyButtonInactive: {
+      backgroundColor: theme.colors.disabled || theme.colors.border,
+    },
+    verifyButtonText: {
+      color: '#FFFFFF',
+      fontSize: 16,
+      fontWeight: '600',
+      textAlign: 'center',
+    },
+    resendContainer: {
+      alignItems: 'center',
+    },
+    resendText: {
+      fontSize: 16,
+      color: theme.colors.primary,
+      fontWeight: '500',
+      textDecorationLine: 'underline',
+    },
+    timerText: {
+      fontSize: 16,
+      color: theme.colors.textSecondary,
+      fontWeight: '400',
+    },
+  });
 
 export default OTPVerificationScreen;

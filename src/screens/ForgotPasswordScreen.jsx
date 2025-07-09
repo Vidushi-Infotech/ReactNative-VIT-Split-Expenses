@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, {useState} from 'react';
 import {
   View,
   Text,
@@ -11,13 +11,13 @@ import {
   ActivityIndicator,
   Platform,
 } from 'react-native';
-import { useAuth } from '../context/AuthContext';
-import { useTheme } from '../context/ThemeContext';
+import {useAuth} from '../context/AuthContext';
+import {useTheme} from '../context/ThemeContext';
 import ThemedAlert from '../components/ThemedAlert';
 
-const ForgotPasswordScreen = ({ navigation }) => {
-  const { resetPassword, getErrorMessage, isAndroid } = useAuth();
-  const { theme } = useTheme();
+const ForgotPasswordScreen = ({navigation}) => {
+  const {resetPassword, getErrorMessage, isAndroid} = useAuth();
+  const {theme} = useTheme();
   const [mobileOrEmail, setMobileOrEmail] = useState('');
   const [inputError, setInputError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -29,7 +29,13 @@ const ForgotPasswordScreen = ({ navigation }) => {
   const [alertButtons, setAlertButtons] = useState([]);
 
   // Helper function to show themed alerts
-  const showThemedAlert = (title, message, buttons = [{ text: 'OK', style: 'default', onPress: () => setShowAlert(false) }]) => {
+  const showThemedAlert = (
+    title,
+    message,
+    buttons = [
+      {text: 'OK', style: 'default', onPress: () => setShowAlert(false)},
+    ],
+  ) => {
     setAlertTitle(title);
     setAlertMessage(message);
     setAlertButtons(buttons);
@@ -37,19 +43,19 @@ const ForgotPasswordScreen = ({ navigation }) => {
   };
 
   // Validate email format
-  const isValidEmail = (email) => {
+  const isValidEmail = email => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return emailRegex.test(email);
   };
 
   // Validate phone number (10 digits)
-  const isValidPhoneNumber = (phone) => {
+  const isValidPhoneNumber = phone => {
     const phoneRegex = /^[0-9]{10}$/;
     return phoneRegex.test(phone);
   };
 
   // Handle input change
-  const handleInputChange = (text) => {
+  const handleInputChange = text => {
     setMobileOrEmail(text);
     // Clear error when user starts typing
     if (inputError) {
@@ -79,13 +85,13 @@ const ForgotPasswordScreen = ({ navigation }) => {
       navigation.navigate('OTPVerification', {
         phoneNumber: mobileOrEmail,
         countryCode: '+91',
-        isFromForgotPassword: true
+        isFromForgotPassword: true,
       });
 
       // Show success message
       showThemedAlert(
         'OTP Sent',
-        `A verification code has been sent to ${mobileOrEmail}`
+        `A verification code has been sent to ${mobileOrEmail}`,
       );
     } else {
       // For email addresses
@@ -109,9 +115,9 @@ const ForgotPasswordScreen = ({ navigation }) => {
                 onPress: () => {
                   setShowAlert(false);
                   navigation.goBack();
-                }
-              }
-            ]
+                },
+              },
+            ],
           );
         } catch (error) {
           console.error('Password reset error:', error);
@@ -124,13 +130,13 @@ const ForgotPasswordScreen = ({ navigation }) => {
         console.log('Sending OTP to email:', mobileOrEmail);
         navigation.navigate('OTPVerification', {
           email: mobileOrEmail,
-          isFromForgotPassword: true
+          isFromForgotPassword: true,
         });
 
         // Show success message
         showThemedAlert(
           'OTP Sent',
-          `A verification code has been sent to ${mobileOrEmail}`
+          `A verification code has been sent to ${mobileOrEmail}`,
         );
       }
     }
@@ -144,7 +150,9 @@ const ForgotPasswordScreen = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}>
         {/* Header Image */}
         <View style={styles.imageContainer}>
           <Image
@@ -159,9 +167,8 @@ const ForgotPasswordScreen = ({ navigation }) => {
 
         {/* Description */}
         <Text style={styles.description}>
-          To reset your password, enter your mobile number/
-          Email Address. We'll send you a one-time password
-          (OTP).
+          To reset your password, enter your mobile number/ Email Address. We'll
+          send you a one-time password (OTP).
         </Text>
 
         {/* Input Field */}
@@ -170,7 +177,7 @@ const ForgotPasswordScreen = ({ navigation }) => {
           <TextInput
             style={[
               styles.textInput,
-              inputError ? styles.textInputError : null
+              inputError ? styles.textInputError : null,
             ]}
             placeholder="Enter Your Mobile Number/ Email ID"
             placeholderTextColor={theme.colors.textSecondary}
@@ -189,22 +196,27 @@ const ForgotPasswordScreen = ({ navigation }) => {
         <TouchableOpacity
           style={[
             styles.sendOTPButton,
-            (mobileOrEmail.trim() && !isLoading) ? styles.sendOTPButtonActive : styles.sendOTPButtonInactive
+            mobileOrEmail.trim() && !isLoading
+              ? styles.sendOTPButtonActive
+              : styles.sendOTPButtonInactive,
           ]}
           onPress={handleSendOTP}
-          disabled={!mobileOrEmail.trim() || isLoading}
-        >
+          disabled={!mobileOrEmail.trim() || isLoading}>
           {isLoading ? (
             <ActivityIndicator color="#FFFFFF" size="small" />
           ) : (
             <Text style={styles.sendOTPButtonText}>
-              {isAndroid && !(/^[0-9]+$/.test(mobileOrEmail.trim())) ? 'Send Reset Email' : 'Send OTP'}
+              {isAndroid && !/^[0-9]+$/.test(mobileOrEmail.trim())
+                ? 'Send Reset Email'
+                : 'Send OTP'}
             </Text>
           )}
         </TouchableOpacity>
 
         {/* Back to Login */}
-        <TouchableOpacity style={styles.backToLogin} onPress={handleBackToLogin}>
+        <TouchableOpacity
+          style={styles.backToLogin}
+          onPress={handleBackToLogin}>
           <Text style={styles.backToLoginText}>Back to Login</Text>
         </TouchableOpacity>
       </ScrollView>
@@ -221,93 +233,94 @@ const ForgotPasswordScreen = ({ navigation }) => {
   );
 };
 
-const createStyles = (theme) => StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: theme.colors.background,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    paddingHorizontal: 32,
-    paddingTop: 60,
-    paddingBottom: 40,
-    justifyContent: 'center',
-  },
-  imageContainer: {
-    alignItems: 'center',
-    marginBottom: 40,
-  },
-  forgotImage: {
-    width: 120,
-    height: 120,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: theme.colors.text,
-    textAlign: 'center',
-    marginBottom: 16,
-  },
-  description: {
-    fontSize: 14,
-    color: theme.colors.textSecondary,
-    textAlign: 'center',
-    lineHeight: 20,
-    marginBottom: 40,
-    paddingHorizontal: 20,
-  },
-  inputContainer: {
-    marginBottom: 32,
-  },
-  inputLabel: {
-    fontSize: 14,
-    color: theme.colors.textSecondary,
-    marginBottom: 8,
-    fontWeight: '500',
-  },
-  textInput: {
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 16,
-    color: theme.colors.text,
-    backgroundColor: theme.colors.surface,
-  },
-  textInputError: {
-    borderColor: theme.colors.error,
-  },
-  errorText: {
-    fontSize: 12,
-    color: theme.colors.error,
-    marginTop: 4,
-  },
-  sendOTPButton: {
-    borderRadius: 8,
-    paddingVertical: 16,
-    marginBottom: 24,
-  },
-  sendOTPButtonActive: {
-    backgroundColor: theme.colors.primary,
-  },
-  sendOTPButtonInactive: {
-    backgroundColor: theme.colors.disabled,
-  },
-  sendOTPButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  backToLogin: {
-    alignSelf: 'center',
-  },
-  backToLoginText: {
-    fontSize: 14,
-    color: theme.colors.primary,
-    fontWeight: '500',
-  },
-});
+const createStyles = theme =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: theme.colors.background,
+    },
+    scrollContent: {
+      flexGrow: 1,
+      paddingHorizontal: 32,
+      paddingTop: 60,
+      paddingBottom: 40,
+      justifyContent: 'center',
+    },
+    imageContainer: {
+      alignItems: 'center',
+      marginBottom: 40,
+    },
+    forgotImage: {
+      width: 120,
+      height: 120,
+    },
+    title: {
+      fontSize: 24,
+      fontWeight: 'bold',
+      color: theme.colors.text,
+      textAlign: 'center',
+      marginBottom: 16,
+    },
+    description: {
+      fontSize: 14,
+      color: theme.colors.textSecondary,
+      textAlign: 'center',
+      lineHeight: 20,
+      marginBottom: 40,
+      paddingHorizontal: 20,
+    },
+    inputContainer: {
+      marginBottom: 32,
+    },
+    inputLabel: {
+      fontSize: 14,
+      color: theme.colors.textSecondary,
+      marginBottom: 8,
+      fontWeight: '500',
+    },
+    textInput: {
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      borderRadius: 8,
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      fontSize: 16,
+      color: theme.colors.text,
+      backgroundColor: theme.colors.surface,
+    },
+    textInputError: {
+      borderColor: theme.colors.error,
+    },
+    errorText: {
+      fontSize: 12,
+      color: theme.colors.error,
+      marginTop: 4,
+    },
+    sendOTPButton: {
+      borderRadius: 8,
+      paddingVertical: 16,
+      marginBottom: 24,
+    },
+    sendOTPButtonActive: {
+      backgroundColor: theme.colors.primary,
+    },
+    sendOTPButtonInactive: {
+      backgroundColor: theme.colors.disabled,
+    },
+    sendOTPButtonText: {
+      color: '#FFFFFF',
+      fontSize: 16,
+      fontWeight: '600',
+      textAlign: 'center',
+    },
+    backToLogin: {
+      alignSelf: 'center',
+    },
+    backToLoginText: {
+      fontSize: 14,
+      color: theme.colors.primary,
+      fontWeight: '500',
+    },
+  });
 
 export default ForgotPasswordScreen;

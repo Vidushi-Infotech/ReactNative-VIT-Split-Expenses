@@ -1,11 +1,11 @@
-import React, { useEffect, useRef } from 'react';
-import { View, StyleSheet, Animated, Dimensions } from 'react-native';
-import { useTheme } from '../context/ThemeContext';
+import React, {useEffect, useRef} from 'react';
+import {View, StyleSheet, Animated, Dimensions} from 'react-native';
+import {useTheme} from '../context/ThemeContext';
 
-const { width } = Dimensions.get('window');
+const {width} = Dimensions.get('window');
 
 const HomeSkeleton = () => {
-  const { theme } = useTheme();
+  const {theme} = useTheme();
   const animatedValue = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -27,14 +27,19 @@ const HomeSkeleton = () => {
     outputRange: [-width, width],
   });
 
-  const SkeletonBox = ({ width, height, style }) => (
-    <View style={[styles.skeletonBox, { width, height, backgroundColor: theme.colors.skeletonBase }, style]}>
+  const SkeletonBox = ({width, height, style}) => (
+    <View
+      style={[
+        styles.skeletonBox,
+        {width, height, backgroundColor: theme.colors.skeletonBase},
+        style,
+      ]}>
       <Animated.View
         style={[
           styles.skeletonShimmer,
           {
             backgroundColor: theme.colors.skeletonHighlight,
-            transform: [{ translateX }],
+            transform: [{translateX}],
           },
         ]}
       />
@@ -42,7 +47,8 @@ const HomeSkeleton = () => {
   );
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+    <View
+      style={[styles.container, {backgroundColor: theme.colors.background}]}>
       {/* Header Section */}
       <View style={styles.headerSection}>
         <SkeletonBox width={120} height={20} style={styles.welcomeText} />
@@ -73,9 +79,9 @@ const HomeSkeleton = () => {
       {/* Groups Section */}
       <View style={styles.groupsSection}>
         <SkeletonBox width={100} height={20} style={styles.sectionTitle} />
-        
+
         {/* Group Items */}
-        {[1, 2, 3, 4].map((item) => (
+        {[1, 2, 3, 4].map(item => (
           <View key={item} style={styles.groupItem}>
             <SkeletonBox width={50} height={50} style={styles.groupAvatar} />
             <View style={styles.groupInfo}>
@@ -84,7 +90,11 @@ const HomeSkeleton = () => {
             </View>
             <View style={styles.groupBalance}>
               <SkeletonBox width={60} height={16} style={styles.balanceText} />
-              <SkeletonBox width={50} height={14} style={styles.balanceSubtext} />
+              <SkeletonBox
+                width={50}
+                height={14}
+                style={styles.balanceSubtext}
+              />
             </View>
           </View>
         ))}

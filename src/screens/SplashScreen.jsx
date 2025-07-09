@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, {useEffect} from 'react';
 import {
   View,
   Text,
@@ -10,9 +10,9 @@ import {
   Image,
 } from 'react-native';
 
-const { width, height } = Dimensions.get('window');
+const {width, height} = Dimensions.get('window');
 
-const SplashScreen = ({ navigation }) => {
+const SplashScreen = ({navigation}) => {
   const fadeAnim = new Animated.Value(0);
   const scaleAnim = new Animated.Value(0.8);
   const pulseAnim = new Animated.Value(1);
@@ -46,7 +46,7 @@ const SplashScreen = ({ navigation }) => {
           duration: 1000,
           useNativeDriver: true,
         }),
-      ])
+      ]),
     );
 
     pulseAnimation.start();
@@ -73,10 +73,9 @@ const SplashScreen = ({ navigation }) => {
             styles.logoContainer,
             {
               opacity: fadeAnim,
-              transform: [{ scale: scaleAnim }, { scale: pulseAnim }],
+              transform: [{scale: scaleAnim}, {scale: pulseAnim}],
             },
-          ]}
-        >
+          ]}>
           <Image
             source={require('../Assets/Logo.png')}
             style={styles.logo}
@@ -90,8 +89,7 @@ const SplashScreen = ({ navigation }) => {
             {
               opacity: fadeAnim,
             },
-          ]}
-        >
+          ]}>
           <Text style={styles.tagline}>Split expenses easily</Text>
           <Text style={styles.subtitle}>with friends and family</Text>
 
@@ -107,8 +105,7 @@ const SplashScreen = ({ navigation }) => {
             {
               opacity: fadeAnim,
             },
-          ]}
-        >
+          ]}>
           <Text style={styles.version}>Version 1.0.0</Text>
         </Animated.View>
       </View>

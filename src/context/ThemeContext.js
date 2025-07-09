@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { Appearance, StatusBar } from 'react-native';
+import React, {createContext, useContext, useState, useEffect} from 'react';
+import {Appearance, StatusBar} from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const ThemeContext = createContext({});
@@ -20,34 +20,34 @@ export const lightTheme = {
     background: '#FFFFFF',
     surface: '#F8F9FA',
     card: '#FFFFFF',
-    
+
     // Text colors
     text: '#2D3748',
     textSecondary: '#6B7280',
     textMuted: '#9CA3AF',
-    
+
     // Primary colors
     primary: '#4A90E2',
     primaryLight: '#E3F2FD',
-    
+
     // Status colors
     success: '#48BB78',
     error: '#EF4444',
     warning: '#F59E0B',
     info: '#3B82F6',
-    
+
     // Border colors
     border: '#E5E7EB',
     borderLight: '#F3F4F6',
-    
+
     // Icon colors
     icon: '#6B7280',
     iconActive: '#4A90E2',
-    
+
     // Skeleton colors
     skeletonBase: '#E5E7EB',
     skeletonHighlight: '#F3F4F6',
-    
+
     // Status bar
     statusBarStyle: 'dark-content',
     statusBarBackground: '#FFFFFF',
@@ -61,43 +61,45 @@ export const darkTheme = {
     background: '#1A202C',
     surface: '#2D3748',
     card: '#2D3748',
-    
+
     // Text colors
     text: '#F7FAFC',
     textSecondary: '#CBD5E0',
     textMuted: '#A0AEC0',
-    
+
     // Primary colors
     primary: '#63B3ED',
     primaryLight: '#2A4A6B',
-    
+
     // Status colors
     success: '#68D391',
     error: '#FC8181',
     warning: '#F6AD55',
     info: '#63B3ED',
-    
+
     // Border colors
     border: '#4A5568',
     borderLight: '#2D3748',
-    
+
     // Icon colors
     icon: '#CBD5E0',
     iconActive: '#63B3ED',
-    
+
     // Skeleton colors
     skeletonBase: '#4A5568',
     skeletonHighlight: '#2D3748',
-    
+
     // Status bar
     statusBarStyle: 'light-content',
     statusBarBackground: '#1A202C',
   },
 };
 
-export const ThemeProvider = ({ children }) => {
+export const ThemeProvider = ({children}) => {
   const [themeMode, setThemeMode] = useState('system'); // 'light', 'dark', 'system'
-  const [systemTheme, setSystemTheme] = useState(Appearance.getColorScheme() || 'light');
+  const [systemTheme, setSystemTheme] = useState(
+    Appearance.getColorScheme() || 'light',
+  );
   const [isLoading, setIsLoading] = useState(true);
 
   // Get the current active theme
@@ -136,7 +138,7 @@ export const ThemeProvider = ({ children }) => {
 
   // Listen to system theme changes
   useEffect(() => {
-    const subscription = Appearance.addChangeListener(({ colorScheme }) => {
+    const subscription = Appearance.addChangeListener(({colorScheme}) => {
       setSystemTheme(colorScheme || 'light');
     });
 
@@ -150,7 +152,7 @@ export const ThemeProvider = ({ children }) => {
   }, [currentTheme]);
 
   // Save theme preference
-  const saveThemePreference = async (mode) => {
+  const saveThemePreference = async mode => {
     try {
       await AsyncStorage.setItem('themeMode', mode);
     } catch (error) {
@@ -159,7 +161,7 @@ export const ThemeProvider = ({ children }) => {
   };
 
   // Change theme mode
-  const setTheme = (mode) => {
+  const setTheme = mode => {
     console.log('🎨 Setting theme to:', mode);
     if (['light', 'dark', 'system'].includes(mode)) {
       setThemeMode(mode);
@@ -171,7 +173,7 @@ export const ThemeProvider = ({ children }) => {
   };
 
   // Get theme display name
-  const getThemeDisplayName = (mode) => {
+  const getThemeDisplayName = mode => {
     switch (mode) {
       case 'light':
         return 'Light';
@@ -185,7 +187,7 @@ export const ThemeProvider = ({ children }) => {
   };
 
   // Get theme icon
-  const getThemeIcon = (mode) => {
+  const getThemeIcon = mode => {
     switch (mode) {
       case 'light':
         return 'sunny';
@@ -211,8 +213,6 @@ export const ThemeProvider = ({ children }) => {
   };
 
   return (
-    <ThemeContext.Provider value={value}>
-      {children}
-    </ThemeContext.Provider>
+    <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
   );
 };
