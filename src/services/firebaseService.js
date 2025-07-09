@@ -166,6 +166,135 @@ class FirebaseService {
     }
   }
 
+  async addMembersToGroup(groupId, memberUserIds) {
+    try {
+      const user = this.auth.currentUser;
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+
+      if (!memberUserIds || memberUserIds.length === 0) {
+        throw new Error('No members to add');
+      }
+
+      console.log('👥 Adding members to group:', { groupId, memberUserIds });
+
+      const groupRef = this.firestore.collection('groups').doc(groupId);
+      const groupDoc = await groupRef.get();
+      
+      if (!groupDoc.exists) {
+        throw new Error('Group not found');
+      }
+
+      const groupData = groupDoc.data();
+      const currentMembers = groupData.members || [];
+      
+      // Filter out users who are already members
+      const newMembers = memberUserIds.filter(userId => !currentMembers.includes(userId));
+      
+      if (newMembers.length === 0) {
+        console.log('👥 All selected users are already group members');
+        return;
+      }
+
+      // Prepare batch updates
+      const batch = this.firestore.batch();
+      
+      // Update group with new members
+      batch.update(groupRef, {
+        members: firestore.FieldValue.arrayUnion(...newMembers),
+        updatedAt: firestore.FieldValue.serverTimestamp()
+      });
+
+      // Add member roles for new members (default: member role)
+      const memberRoleUpdates = {};
+      newMembers.forEach(userId => {
+        memberRoleUpdates[`memberRoles.${userId}`] = {
+          role: 'member',
+          joinedAt: firestore.FieldValue.serverTimestamp()
+        };
+      });
+
+      if (Object.keys(memberRoleUpdates).length > 0) {
+        batch.update(groupRef, memberRoleUpdates);
+      }
+
+      // Commit the batch
+      await batch.commit();
+      console.log('👥 Successfully added', newMembers.length, 'new members to group');
+
+      return newMembers;
+    } catch (error) {
+      console.error('👥 Error adding members to group:', error);
+      throw error;
+    }
+  }
+
+  async removeMemberFromGroup(groupId, memberUserId) {
+    try {
+      const user = this.auth.currentUser;
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+
+      if (!memberUserId) {
+        throw new Error('No member ID provided');
+      }
+
+      console.log('🗑️ Removing member from group:', { groupId, memberUserId });
+
+      // Check if current user is admin
+      const isAdmin = await this.isGroupAdmin(groupId, user.uid);
+      if (!isAdmin) {
+        throw new Error('Only group admins can remove members');
+      }
+
+      const groupRef = this.firestore.collection('groups').doc(groupId);
+      const groupDoc = await groupRef.get();
+      
+      if (!groupDoc.exists) {
+        throw new Error('Group not found');
+      }
+
+      const groupData = groupDoc.data();
+      const currentMembers = groupData.members || [];
+      
+      // Check if member is actually in the group
+      if (!currentMembers.includes(memberUserId)) {
+        throw new Error('User is not a member of this group');
+      }
+
+      // Prevent removing the last admin
+      const memberRole = groupData.memberRoles?.[memberUserId]?.role;
+      if (memberRole === 'admin') {
+        const adminCount = Object.values(groupData.memberRoles || {}).filter(role => role.role === 'admin').length;
+        if (adminCount <= 1) {
+          throw new Error('Cannot remove the last admin from the group');
+        }
+      }
+
+      // Prepare batch updates
+      const batch = this.firestore.batch();
+      
+      // Remove member from group
+      batch.update(groupRef, {
+        members: firestore.FieldValue.arrayRemove(memberUserId),
+        [`memberRoles.${memberUserId}`]: firestore.FieldValue.delete(),
+        adminIds: firestore.FieldValue.arrayRemove(memberUserId), // Remove from admin list if they were admin
+        updatedAt: firestore.FieldValue.serverTimestamp()
+      });
+
+      // Commit the batch
+      await batch.commit();
+      console.log('🗑️ Successfully removed member from group');
+
+      return true;
+    } catch (error) {
+      console.error('🗑️ Error removing member from group:', error);
+      throw error;
+    }
+  }
+
   // Group Admin Operations
   async addGroupAdmin(groupId, userId) {
     try {

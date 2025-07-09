@@ -32,6 +32,7 @@ const GroupDetailScreen = ({ route, navigation }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [expandedUsers, setExpandedUsers] = useState({});
   const [settlements, setSettlements] = useState({ pending: [], settled: [] });
+  const [isGroupAdmin, setIsGroupAdmin] = useState(false);
 
 
   const calculateSettlements = () => {
@@ -85,8 +86,22 @@ const GroupDetailScreen = ({ route, navigation }) => {
   };
 
   useEffect(() => {
+    console.log('🔍 GroupDetailScreen: Group data received:', {
+      id: group.id,
+      name: group.name,
+      coverImageUrl: group.coverImageUrl,
+      avatar: group.avatar
+    });
     loadGroupData();
   }, [group]);
+
+  // Listen for route parameter changes to trigger reload
+  useEffect(() => {
+    if (route.params?.reload) {
+      console.log('🔄 GroupDetailScreen: Reload triggered from route params');
+      loadGroupData();
+    }
+  }, [route.params?.reload, route.params?.timestamp]);
 
   const loadGroupData = async () => {
     setLoading(true);
@@ -95,7 +110,8 @@ const GroupDetailScreen = ({ route, navigation }) => {
         loadGroupExpenses(),
         loadGroupMembers(),
         loadGroupBalances(),
-        loadGroupSettlements()
+        loadGroupSettlements(),
+        checkAdminStatus()
       ]);
     } catch (error) {
       console.error('Error loading group data:', error);
@@ -152,6 +168,18 @@ const GroupDetailScreen = ({ route, navigation }) => {
     }
   };
 
+  const checkAdminStatus = async () => {
+    try {
+      console.log('🔒 Checking admin status for user:', user?.uid, 'in group:', group.id);
+      const adminStatus = await firebaseService.isGroupAdmin(group.id, user?.uid);
+      console.log('🔒 User admin status:', adminStatus);
+      setIsGroupAdmin(adminStatus);
+    } catch (error) {
+      console.error('🔒 Error checking admin status:', error);
+      setIsGroupAdmin(false);
+    }
+  };
+
   const onRefresh = async () => {
     setRefreshing(true);
     try {
@@ -172,16 +200,166 @@ const GroupDetailScreen = ({ route, navigation }) => {
     navigation.navigate('ManageGroup', { group });
   };
 
+  const handleAddMember = () => {
+    setShowGroupOptions(false);
+    navigation.navigate('AddMember', { group });
+  };
+
   const handleDeleteGroup = () => {
     setShowGroupOptions(false);
-    // Handle delete group
-    console.log('Delete group');
+    
+    Alert.alert(
+      'Delete Group',
+      `Are you sure you want to delete "${group.name}"? This action cannot be undone and will remove all expenses and data.`,
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              console.log('🗑️ Deleting group:', group.id);
+              await firebaseService.deleteGroup(group.id);
+              
+              // Navigate back to home screen and trigger reload
+              navigation.reset({
+                index: 0,
+                routes: [
+                  {
+                    name: 'Home',
+                    params: { reload: true, timestamp: Date.now() }
+                  }
+                ],
+              });
+              
+              // Show success message after navigation
+              setTimeout(() => {
+                Alert.alert(
+                  'Group Deleted',
+                  `"${group.name}" has been deleted successfully.`,
+                  [{ text: 'OK' }]
+                );
+              }, 500);
+            } catch (error) {
+              console.error('🗑️ Error deleting group:', error);
+              Alert.alert('Error', 'Failed to delete group. Please try again.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const checkUserPendingSettlements = () => {
+    // Check if user has any pending settlements (either owes money or is owed money)
+    if (!user?.uid || !balances[user.uid]) {
+      return { hasPendingSettlements: false, settlementDetails: [] };
+    }
+
+    const userBalance = balances[user.uid];
+    const pendingSettlements = createSettlementList();
+    
+    // Find settlements involving current user
+    const userSettlements = pendingSettlements.filter(settlement => 
+      settlement.fromUserId === user.uid || settlement.toUserId === user.uid
+    );
+
+    // Check if user has any non-zero balance or pending settlements
+    const hasPendingSettlements = userBalance.net !== 0 || userSettlements.length > 0;
+    
+    console.log('💰 Settlement check for user:', {
+      userId: user.uid,
+      userBalance: userBalance.net,
+      pendingSettlements: userSettlements.length,
+      hasPendingSettlements
+    });
+
+    return {
+      hasPendingSettlements,
+      settlementDetails: userSettlements,
+      balance: userBalance.net
+    };
   };
 
   const handleLeaveGroup = () => {
     setShowGroupOptions(false);
-    // Handle leave group
-    console.log('Leave group');
+    
+    if (isGroupAdmin) {
+      Alert.alert('Error', 'Group admins cannot leave the group. Please transfer admin rights or delete the group.');
+      return;
+    }
+
+    // Check if user has pending settlements
+    const settlementCheck = checkUserPendingSettlements();
+    
+    if (settlementCheck.hasPendingSettlements) {
+      const balance = settlementCheck.balance;
+      let message = '';
+      
+      if (balance > 0) {
+        message = `You cannot leave the group because you are owed ₹${Math.abs(balance).toFixed(0)}. Please settle all pending amounts before leaving.`;
+      } else if (balance < 0) {
+        message = `You cannot leave the group because you owe ₹${Math.abs(balance).toFixed(0)}. Please settle all pending amounts before leaving.`;
+      } else if (settlementCheck.settlementDetails.length > 0) {
+        message = 'You cannot leave the group because you have pending settlements. Please settle all amounts before leaving.';
+      }
+      
+      Alert.alert(
+        'Cannot Leave Group',
+        message,
+        [
+          { text: 'OK', style: 'default' },
+          { 
+            text: 'View Settlements', 
+            onPress: () => setActiveTab('Settlement')
+          }
+        ]
+      );
+      return;
+    }
+
+    // Show confirmation dialog if no pending settlements
+    Alert.alert(
+      'Leave Group',
+      `Are you sure you want to leave "${group.name}"? You will lose access to all group data and expenses.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Leave Group',
+          style: 'destructive',
+          onPress: confirmLeaveGroup
+        }
+      ]
+    );
+  };
+
+  const confirmLeaveGroup = async () => {
+    try {
+      console.log('🚪 User leaving group:', { groupId: group.id, userId: user.uid });
+      
+      // Remove user from group using Firebase service
+      await firebaseService.removeMemberFromGroup(group.id, user.uid);
+      
+      Alert.alert(
+        'Left Group',
+        `You have successfully left "${group.name}".`,
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              // Navigate back to home screen
+              navigation.navigate('HomeMain');
+            }
+          }
+        ]
+      );
+    } catch (error) {
+      console.error('🚪 Error leaving group:', error);
+      Alert.alert('Error', 'Failed to leave group. Please try again.');
+    }
   };
 
   const renderExpenses = () => (
@@ -524,7 +702,17 @@ const GroupDetailScreen = ({ route, navigation }) => {
     // Don't create settlement list if group members haven't loaded yet
     if (loading || groupMembers.length === 0) {
       return (
-        <ScrollView style={styles.tabContent}>
+        <ScrollView 
+          style={styles.tabContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={[theme.colors.primary]}
+              tintColor={theme.colors.primary}
+            />
+          }
+        >
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color={theme.colors.primary} />
             <Text style={styles.loadingText}>Loading settlements...</Text>
@@ -638,14 +826,29 @@ const GroupDetailScreen = ({ route, navigation }) => {
       {/* Group Info */}
       <View style={styles.groupInfo}>
         <View style={styles.groupImageContainer}>
-          <Text style={styles.groupAvatar}>{group.avatar}</Text>
+          {group.coverImageUrl ? (
+            <Image source={{ uri: group.coverImageUrl }} style={styles.groupCoverImage} />
+          ) : (
+            <View style={styles.groupAvatarContainer}>
+              <Text style={styles.groupAvatar}>{group.avatar || '🎭'}</Text>
+            </View>
+          )}
           <View style={styles.membersPreview}>
             {groupMembers.slice(0, 3).map((member, index) => (
-              <Image
-                key={member.id}
-                source={{ uri: member.avatar }}
-                style={[styles.memberAvatar, { marginLeft: index * -8 }]}
-              />
+              <View key={member.id || index} style={[styles.memberAvatarContainer, { marginLeft: index * -8 }]}>
+                {member.avatar ? (
+                  <Image
+                    source={{ uri: member.avatar }}
+                    style={styles.memberAvatar}
+                  />
+                ) : (
+                  <View style={styles.memberAvatarPlaceholder}>
+                    <Text style={styles.memberAvatarText}>
+                      {member.name?.charAt(0).toUpperCase() || 'U'}
+                    </Text>
+                  </View>
+                )}
+              </View>
             ))}
           </View>
         </View>
@@ -734,18 +937,28 @@ const GroupDetailScreen = ({ route, navigation }) => {
           onPress={() => setShowGroupOptions(false)}
         >
           <View style={styles.optionsMenu}>
-            <TouchableOpacity style={styles.optionItem} onPress={handleManageGroup}>
-              <MaterialIcons name="group" size={16} color="#6B7280" style={styles.optionIconStyle} />
-              <Text style={styles.optionText}>Manage Group</Text>
+            <TouchableOpacity style={styles.optionItem} onPress={handleAddMember}>
+              <MaterialIcons name="person-add" size={16} color="#6B7280" style={styles.optionIconStyle} />
+              <Text style={styles.optionText}>Add Member</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.optionItem} onPress={handleDeleteGroup}>
-              <MaterialIcons name="delete" size={16} color="#6B7280" style={styles.optionIconStyle} />
-              <Text style={styles.optionText}>Delete Group</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.optionItem} onPress={handleLeaveGroup}>
-              <MaterialIcons name="logout" size={16} color="#EF4444" style={styles.optionIconStyle} />
-              <Text style={[styles.optionText, styles.leaveText]}>Leave Group</Text>
-            </TouchableOpacity>
+            {isGroupAdmin && (
+              <TouchableOpacity style={styles.optionItem} onPress={handleManageGroup}>
+                <MaterialIcons name="group" size={16} color="#6B7280" style={styles.optionIconStyle} />
+                <Text style={styles.optionText}>Manage Group</Text>
+              </TouchableOpacity>
+            )}
+            {isGroupAdmin && (
+              <TouchableOpacity style={styles.optionItem} onPress={handleDeleteGroup}>
+                <MaterialIcons name="delete" size={16} color="#EF4444" style={styles.optionIconStyle} />
+                <Text style={[styles.optionText, styles.deleteText]}>Delete Group</Text>
+              </TouchableOpacity>
+            )}
+            {!isGroupAdmin && (
+              <TouchableOpacity style={styles.optionItem} onPress={handleLeaveGroup}>
+                <MaterialIcons name="logout" size={16} color="#EF4444" style={styles.optionIconStyle} />
+                <Text style={[styles.optionText, styles.leaveText]}>Leave Group</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </TouchableOpacity>
       </Modal>
@@ -779,14 +992,22 @@ const createStyles = (theme) => StyleSheet.create({
     position: 'relative',
     marginBottom: 12,
   },
-  groupAvatar: {
-    fontSize: 40,
+  groupCoverImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+  },
+  groupAvatarContainer: {
     width: 80,
     height: 80,
     borderRadius: 40,
     backgroundColor: '#E5E7EB',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  groupAvatar: {
+    fontSize: 40,
     textAlign: 'center',
-    lineHeight: 80,
   },
   membersPreview: {
     flexDirection: 'row',
@@ -794,12 +1015,31 @@ const createStyles = (theme) => StyleSheet.create({
     bottom: -10,
     right: -10,
   },
-  memberAvatar: {
+  memberAvatarContainer: {
     width: 24,
     height: 24,
     borderRadius: 12,
     borderWidth: 2,
     borderColor: '#FFFFFF',
+    backgroundColor: '#FFFFFF',
+  },
+  memberAvatar: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+  },
+  memberAvatarPlaceholder: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: theme.colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  memberAvatarText: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
   },
   groupName: {
     fontSize: 20,
@@ -1089,6 +1329,10 @@ const createStyles = (theme) => StyleSheet.create({
   },
   leaveText: {
     color: '#EF4444',
+  },
+  deleteText: {
+    color: '#EF4444',
+    fontWeight: '600',
   },
   loadingContainer: {
     alignItems: 'center',

@@ -17,6 +17,7 @@ import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import firebaseService from '../services/firebaseService';
 import { launchImageLibrary } from 'react-native-image-picker';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 
 const AddExpenseScreen = ({ route, navigation }) => {
   const { group } = route.params || {};
@@ -357,8 +358,8 @@ const AddExpenseScreen = ({ route, navigation }) => {
     <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.backButton}>←</Text>
+        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+          <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Add Expense</Text>
         <View style={styles.headerRight} />
@@ -517,8 +518,8 @@ const createStyles = (theme) => StyleSheet.create({
     borderBottomColor: theme.colors.border,
   },
   backButton: {
-    fontSize: 24,
-    color: theme.colors.text,
+    padding: 8,
+    borderRadius: 8,
   },
   headerTitle: {
     fontSize: 18,

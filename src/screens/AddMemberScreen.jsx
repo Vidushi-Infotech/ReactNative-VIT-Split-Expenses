@@ -14,21 +14,15 @@ import {
 } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
-import { launchImageLibrary } from 'react-native-image-picker';
 import { request, PERMISSIONS, RESULTS } from 'react-native-permissions';
 import Contacts from 'react-native-contacts';
 import firebaseService from '../services/firebaseService';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 
-const CreateNewGroupScreen = ({ onClose, onSave }) => {
+const AddMemberScreen = ({ route, navigation }) => {
+  const { group } = route.params || {};
   const { theme } = useTheme();
   const { user } = useAuth();
-  const [groupData, setGroupData] = useState({
-    name: '',
-    description: '',
-    coverImage: null,
-    coverImageUrl: null,
-  });
   
   const [selectedMembers, setSelectedMembers] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -38,6 +32,7 @@ const CreateNewGroupScreen = ({ onClose, onSave }) => {
   const [hasContactsPermission, setHasContactsPermission] = useState(false);
   const [registeredUsers, setRegisteredUsers] = useState([]);
   const [registeredUsersLoading, setRegisteredUsersLoading] = useState(true);
+  const [existingMembers, setExistingMembers] = useState([]);
 
   useEffect(() => {
     initializeData();
@@ -53,15 +48,34 @@ const CreateNewGroupScreen = ({ onClose, onSave }) => {
 
   const initializeData = async () => {
     try {
-      console.log('🚀 Initializing CreateNewGroupScreen data...');
+      console.log('🚀 Initializing AddMemberScreen data...');
       
-      // First load registered users, then request permissions
+      // Load existing group members first
+      await loadExistingMembers();
+      
+      // Then load registered users and request permissions
       await loadRegisteredUsers();
       await requestContactsPermission();
       
       console.log('✅ Initialization complete');
     } catch (error) {
       console.error('❌ Error initializing data:', error);
+    }
+  };
+
+  const loadExistingMembers = async () => {
+    if (!group?.id) {
+      console.log('No group ID provided');
+      return;
+    }
+    
+    try {
+      console.log('📋 Loading existing group members...');
+      const members = await firebaseService.getGroupMembersWithProfiles(group.id);
+      console.log('✅ Loaded existing members:', members);
+      setExistingMembers(members);
+    } catch (error) {
+      console.error('❌ Error loading existing members:', error);
     }
   };
 
@@ -110,7 +124,6 @@ const CreateNewGroupScreen = ({ onClose, onSave }) => {
       if (permissionResult === RESULTS.GRANTED) {
         console.log('✅ Contacts permission granted');
         setHasContactsPermission(true);
-        // Don't load contacts here - let useEffect handle it when both conditions are met
       } else {
         console.log('❌ Contacts permission denied');
         setHasContactsPermission(false);
@@ -154,7 +167,11 @@ const CreateNewGroupScreen = ({ onClose, onSave }) => {
       const contactsList = await Contacts.getAll();
       console.log('📱 Loaded', contactsList.length, 'local contacts');
       
-      // Filter contacts to show only registered users
+      // Get existing member IDs to filter them out
+      const existingMemberIds = existingMembers.map(member => member.userId);
+      console.log('👥 Existing member IDs:', existingMemberIds);
+      
+      // Filter contacts to show only registered users who are NOT already in the group
       const filteredContacts = contactsList
         .filter(contact => {
           if (!contact.displayName || contact.displayName.trim() === '') return false;
@@ -164,8 +181,13 @@ const CreateNewGroupScreen = ({ onClose, onSave }) => {
           const emailAddresses = contact.emailAddresses || [];
           
           return registeredUsers.some(registeredUser => {
-            // Exclude current user from contacts list (group creator)
+            // Exclude current user from contacts list
             if (user && registeredUser.uid === user.uid) {
+              return false;
+            }
+            
+            // Exclude users who are already group members
+            if (existingMemberIds.includes(registeredUser.uid)) {
               return false;
             }
             
@@ -179,40 +201,24 @@ const CreateNewGroupScreen = ({ onClose, onSave }) => {
               const localDigits = localNumber.replace(/\D/g, '');
               const dbDigits = dbNumber.replace(/\D/g, '');
               
-              // Case 1: Exact match with country code
-              if (localNumber === dbNumber) {
-                return true;
-              }
+              // Various matching cases
+              if (localNumber === dbNumber) return true;
+              if (localDigits === dbDigits) return true;
               
-              // Case 2: Both have digits only - exact match
-              if (localDigits === dbDigits) {
-                return true;
-              }
-              
-              // Case 3: Database has country code, local doesn't
-              // Remove country code from database number and compare
               if (dbNumber.startsWith('+91') && dbDigits.length >= 12) {
-                const dbWithoutCountry = dbDigits.substring(2); // Remove '91'
-                if (localDigits === dbWithoutCountry) {
-                  return true;
-                }
+                const dbWithoutCountry = dbDigits.substring(2);
+                if (localDigits === dbWithoutCountry) return true;
               }
               
-              // Case 4: Local has country code, database doesn't
               if (localNumber.startsWith('+91') && localDigits.length >= 12) {
-                const localWithoutCountry = localDigits.substring(2); // Remove '91'
-                if (dbDigits === localWithoutCountry) {
-                  return true;
-                }
+                const localWithoutCountry = localDigits.substring(2);
+                if (dbDigits === localWithoutCountry) return true;
               }
               
-              // Case 5: Both have country codes but different formats
               if (dbDigits.startsWith('91') && localDigits.startsWith('91')) {
                 const dbMain = dbDigits.substring(2);
                 const localMain = localDigits.substring(2);
-                if (dbMain === localMain) {
-                  return true;
-                }
+                if (dbMain === localMain) return true;
               }
               
               return false;
@@ -232,12 +238,11 @@ const CreateNewGroupScreen = ({ onClose, onSave }) => {
           });
         })
         .map(contact => {
-          // Find the matching registered user info (excluding current user)
+          // Find the matching registered user info
           const matchingUser = registeredUsers.find(registeredUser => {
-            // Exclude current user
-            if (user && registeredUser.uid === user.uid) {
-              return false;
-            }
+            // Exclude current user and existing members
+            if (user && registeredUser.uid === user.uid) return false;
+            if (existingMemberIds.includes(registeredUser.uid)) return false;
             
             const phoneNumbers = contact.phoneNumbers || [];
             const emailAddresses = contact.emailAddresses || [];
@@ -298,7 +303,7 @@ const CreateNewGroupScreen = ({ onClose, onSave }) => {
         })
         .sort((a, b) => a.displayName.localeCompare(b.displayName));
       
-      console.log('✅ Filtered', filteredContacts.length, 'matching contacts');
+      console.log('✅ Filtered', filteredContacts.length, 'new contacts to add');
       setContacts(filteredContacts);
     } catch (error) {
       console.error('❌ Error loading contacts:', error);
@@ -325,13 +330,6 @@ const CreateNewGroupScreen = ({ onClose, onSave }) => {
     }
   };
 
-  const handleInputChange = (field, value) => {
-    setGroupData(prev => ({
-      ...prev,
-      [field]: value
-    }));
-  };
-
   const handleSelectMember = (contact) => {
     const isSelected = selectedMembers.find(member => member.recordID === contact.recordID);
     
@@ -342,82 +340,40 @@ const CreateNewGroupScreen = ({ onClose, onSave }) => {
     }
   };
 
-  const handleUploadCoverImage = () => {
-    // Simply open the image picker - it will handle permissions internally
-    openImagePicker();
-  };
-
-  const openImagePicker = () => {
-    const options = {
-      mediaType: 'photo',
-      quality: 0.8,
-      maxWidth: 1000,
-      maxHeight: 1000,
-    };
-
-    launchImageLibrary(options, (response) => {
-      if (response.didCancel) {
-        console.log('User cancelled image picker');
-      } else if (response.errorMessage) {
-        console.log('ImagePicker Error: ', response.errorMessage);
-        Alert.alert('Error', 'Failed to select image');
-      } else if (response.assets && response.assets[0]) {
-        const asset = response.assets[0];
-        setGroupData(prev => ({
-          ...prev,
-          coverImage: asset.uri,
-        }));
-      }
-    });
-  };
-
-  const handleSave = async () => {
-    if (!groupData.name.trim()) {
-      Alert.alert('Error', 'Please enter a group name');
+  const handleAddMembers = async () => {
+    if (selectedMembers.length === 0) {
+      Alert.alert('Error', 'Please select at least one member to add');
       return;
     }
 
     setLoading(true);
     try {
-      let coverImageUrl = null;
-      
-      // Upload cover image if selected
-      if (groupData.coverImage) {
-        const groupId = `group_${Date.now()}`;
-        coverImageUrl = await firebaseService.uploadGroupCoverImage(groupData.coverImage, groupId);
-      }
-
       // Extract member user IDs for Firebase
       const memberUserIds = selectedMembers
         .map(member => member.userId)
         .filter(userId => userId && typeof userId === 'string' && userId.trim() !== '');
       
-      console.log('Selected members for group creation:', selectedMembers);
-      console.log('Extracted member user IDs:', memberUserIds);
+      console.log('Adding members to group:', memberUserIds);
       
-      // Prepare group data for Firebase
-      const groupDataForFirebase = {
-        name: groupData.name.trim(),
-        description: groupData.description.trim(),
-        coverImageUrl,
-        members: memberUserIds, // Pass user IDs instead of contact objects
-      };
-
-      // Create group in Firebase
-      const newGroup = await firebaseService.createGroup(groupDataForFirebase);
+      // Add members to the group
+      await firebaseService.addMembersToGroup(group.id, memberUserIds);
       
-      Alert.alert('Success', 'Group created successfully!');
-      
-      if (onSave) {
-        onSave(newGroup);
-      }
-      
-      if (onClose) {
-        onClose();
-      }
+      Alert.alert('Success', `${selectedMembers.length} member(s) added successfully!`, [
+        { 
+          text: 'OK', 
+          onPress: () => {
+            // Navigate back to GroupDetail and trigger refresh
+            navigation.navigate('GroupDetail', { 
+              group: { ...group }, 
+              reload: true, 
+              timestamp: Date.now() 
+            });
+          }
+        }
+      ]);
     } catch (error) {
-      console.error('Error creating group:', error);
-      Alert.alert('Error', 'Failed to create group. Please try again.');
+      console.error('Error adding members:', error);
+      Alert.alert('Error', 'Failed to add members. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -433,100 +389,64 @@ const CreateNewGroupScreen = ({ onClose, onSave }) => {
     <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={onClose}>
+        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Create New Group</Text>
+        <Text style={styles.headerTitle}>Add Members</Text>
         <View style={styles.placeholder} />
       </View>
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/* Cover Image Upload */}
-        <View style={styles.coverImageSection}>
-          <TouchableOpacity style={styles.coverImageContainer} onPress={handleUploadCoverImage}>
-            {groupData.coverImage ? (
-              <Image source={{ uri: groupData.coverImage }} style={styles.coverImage} />
-            ) : (
-              <>
-                <View style={styles.uploadIcon}>
-                  <Ionicons name="camera" size={24} color="#FFFFFF" />
-                </View>
-                <Text style={styles.uploadText}>Upload cover image</Text>
-              </>
-            )}
-          </TouchableOpacity>
+        {/* Group Info */}
+        <View style={styles.groupInfo}>
+          <Text style={styles.groupName}>{group?.name}</Text>
+          <Text style={styles.groupDescription}>
+            Add new members to this group
+          </Text>
         </View>
 
-        {/* Group Name */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Group Name</Text>
+        {/* Search Bar */}
+        <View style={styles.searchContainer}>
+          <Ionicons name="search" size={20} color={theme.colors.textMuted} style={styles.searchIcon} />
           <TextInput
-            style={styles.input}
-            value={groupData.name}
-            onChangeText={(value) => handleInputChange('name', value)}
-            placeholder="Trip to Busan 🚗"
-            placeholderTextColor="#9CA3AF"
+            style={styles.searchInput}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="Search Person or Phone Number"
+            placeholderTextColor={theme.colors.textMuted}
           />
         </View>
 
-        {/* Group Description */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Group Description</Text>
-          <TextInput
-            style={[styles.input, styles.descriptionInput]}
-            value={groupData.description}
-            onChangeText={(value) => handleInputChange('description', value)}
-            placeholder="Add short description"
-            placeholderTextColor="#9CA3AF"
-            multiline
-            numberOfLines={4}
-          />
-        </View>
-
-        {/* Add Members Section */}
-        <View style={styles.membersSection}>
-          <Text style={styles.sectionTitle}>Add Members</Text>
-          
-          {/* Search Bar */}
-          <View style={styles.searchContainer}>
-            <Ionicons name="search" size={20} color="#9CA3AF" style={styles.searchIcon} />
-            <TextInput
-              style={styles.searchInput}
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              placeholder="Search Person or Phone Number"
-              placeholderTextColor="#9CA3AF"
-            />
+        {/* Selected Members */}
+        {selectedMembers.length > 0 && (
+          <View style={styles.selectedMembersContainer}>
+            <Text style={styles.sectionTitle}>Selected ({selectedMembers.length})</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              {selectedMembers.map((member) => (
+                <TouchableOpacity
+                  key={member.recordID}
+                  style={styles.selectedMember}
+                  onPress={() => handleSelectMember(member)}
+                >
+                  <Image
+                    source={{
+                      uri: member.thumbnailPath || 'https://via.placeholder.com/50x50/333/fff?text=' + member.displayName.charAt(0)
+                    }}
+                    style={styles.selectedMemberImage}
+                  />
+                  <View style={styles.removeIcon}>
+                    <Text style={styles.removeIconText}>×</Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
           </View>
+        )}
 
-          {/* Selected Members */}
-          {selectedMembers.length > 0 && (
-            <View style={styles.selectedMembersContainer}>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                {selectedMembers.map((member) => (
-                  <TouchableOpacity
-                    key={member.recordID}
-                    style={styles.selectedMember}
-                    onPress={() => handleSelectMember(member)}
-                  >
-                    <Image
-                      source={{
-                        uri: member.thumbnailPath || 'https://via.placeholder.com/50x50/333/fff?text=' + member.displayName.charAt(0)
-                      }}
-                      style={styles.selectedMemberImage}
-                    />
-                    <View style={styles.removeIcon}>
-                      <Text style={styles.removeIconText}>×</Text>
-                    </View>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </View>
-          )}
-
-          {/* Contacts Section */}
+        {/* Available Contacts Section */}
+        <View style={styles.contactsSection}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.suggestedTitle}>Add Registered Friends</Text>
+            <Text style={styles.sectionTitle}>Available Friends</Text>
             <TouchableOpacity 
               style={styles.refreshButton} 
               onPress={() => {
@@ -560,7 +480,7 @@ const CreateNewGroupScreen = ({ onClose, onSave }) => {
             </View>
           ) : !hasContactsPermission ? (
             <View style={styles.permissionContainer}>
-              <Ionicons name="person-add" size={48} color="#9CA3AF" />
+              <Ionicons name="person-add" size={48} color={theme.colors.textMuted} />
               <Text style={styles.permissionText}>Contact access required</Text>
               <Text style={styles.permissionSubtext}>Allow access to find your registered friends</Text>
               <TouchableOpacity style={styles.permissionButton} onPress={requestContactsPermission}>
@@ -574,10 +494,10 @@ const CreateNewGroupScreen = ({ onClose, onSave }) => {
             </View>
           ) : filteredContacts.length === 0 ? (
             <View style={styles.noContactsContainer}>
-              <Ionicons name="people" size={48} color="#9CA3AF" />
-              <Text style={styles.noContactsText}>No registered friends found</Text>
+              <Ionicons name="people" size={48} color={theme.colors.textMuted} />
+              <Text style={styles.noContactsText}>No new friends to add</Text>
               <Text style={styles.noContactsSubtext}>
-                {searchQuery ? 'Try different search terms' : 'None of your contacts are registered users yet'}
+                {searchQuery ? 'Try different search terms' : 'All your registered friends are already in this group'}
               </Text>
             </View>
           ) : (
@@ -620,20 +540,26 @@ const CreateNewGroupScreen = ({ onClose, onSave }) => {
             ))
           )}
         </View>
-
-        {/* Save Button */}
-        <TouchableOpacity 
-          style={[styles.saveButton, loading && styles.saveButtonDisabled]} 
-          onPress={handleSave}
-          disabled={loading}
-        >
-          {loading ? (
-            <ActivityIndicator color="#FFFFFF" />
-          ) : (
-            <Text style={styles.saveButtonText}>Save</Text>
-          )}
-        </TouchableOpacity>
       </ScrollView>
+
+      {/* Add Button */}
+      {selectedMembers.length > 0 && (
+        <View style={styles.footer}>
+          <TouchableOpacity 
+            style={[styles.addButton, loading && styles.addButtonDisabled]} 
+            onPress={handleAddMembers}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <Text style={styles.addButtonText}>
+                Add {selectedMembers.length} Member{selectedMembers.length > 1 ? 's' : ''}
+              </Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      )}
     </SafeAreaView>
   );
 };
@@ -667,74 +593,21 @@ const createStyles = (theme) => StyleSheet.create({
   scrollView: {
     flex: 1,
   },
-  coverImageSection: {
-    alignItems: 'center',
-    paddingVertical: 32,
+  groupInfo: {
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.borderLight,
   },
-  coverImageContainer: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: theme.colors.borderLight,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  uploadIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: theme.colors.textMuted,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  uploadIconText: {
+  groupName: {
     fontSize: 20,
-    color: '#FFFFFF',
-  },
-  uploadText: {
-    fontSize: 14,
-    color: theme.colors.textSecondary,
-    textAlign: 'center',
-  },
-  coverImage: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-  },
-  inputGroup: {
-    paddingHorizontal: 16,
-    marginBottom: 20,
-  },
-  label: {
-    fontSize: 14,
-    color: theme.colors.textSecondary,
-    marginBottom: 8,
-    fontWeight: '500',
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 16,
-    color: theme.colors.text,
-    backgroundColor: theme.colors.surface,
-  },
-  descriptionInput: {
-    height: 100,
-    textAlignVertical: 'top',
-  },
-  membersSection: {
-    paddingHorizontal: 16,
-    marginBottom: 24,
-  },
-  sectionTitle: {
-    fontSize: 16,
     fontWeight: '600',
     color: theme.colors.text,
-    marginBottom: 16,
+    marginBottom: 4,
+  },
+  groupDescription: {
+    fontSize: 14,
+    color: theme.colors.textSecondary,
   },
   searchContainer: {
     flexDirection: 'row',
@@ -743,7 +616,7 @@ const createStyles = (theme) => StyleSheet.create({
     borderRadius: 25,
     paddingHorizontal: 16,
     paddingVertical: 12,
-    marginBottom: 16,
+    margin: 16,
   },
   searchInput: {
     flex: 1,
@@ -755,6 +628,7 @@ const createStyles = (theme) => StyleSheet.create({
     marginRight: 8,
   },
   selectedMembersContainer: {
+    paddingHorizontal: 16,
     marginBottom: 16,
   },
   selectedMember: {
@@ -782,7 +656,11 @@ const createStyles = (theme) => StyleSheet.create({
     color: '#FFFFFF',
     fontWeight: 'bold',
   },
-  suggestedTitle: {
+  contactsSection: {
+    paddingHorizontal: 16,
+    paddingBottom: 100, // Space for floating button
+  },
+  sectionTitle: {
     fontSize: 16,
     fontWeight: '600',
     color: theme.colors.text,
@@ -849,25 +727,25 @@ const createStyles = (theme) => StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  selectedIndicatorText: {
-    fontSize: 12,
-    color: '#FFFFFF',
-    fontWeight: 'bold',
+  footer: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: theme.colors.surface,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.border,
   },
-  saveButton: {
+  addButton: {
     backgroundColor: theme.colors.primary,
-    marginHorizontal: 16,
-    marginVertical: 24,
-    paddingVertical: 16,
     borderRadius: 8,
+    paddingVertical: 16,
     alignItems: 'center',
   },
-  saveButtonText: {
-    color: '#FFFFFF',
+  addButtonText: {
     fontSize: 16,
     fontWeight: '600',
+    color: '#FFFFFF',
   },
-  saveButtonDisabled: {
+  addButtonDisabled: {
     opacity: 0.6,
   },
   permissionContainer: {
@@ -922,55 +800,6 @@ const createStyles = (theme) => StyleSheet.create({
     color: theme.colors.textMuted,
     textAlign: 'center',
     marginTop: 8,
-  },
-  addMemberForm: {
-    backgroundColor: theme.colors.borderLight,
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 16,
-  },
-  memberInput: {
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 16,
-    color: theme.colors.text,
-    backgroundColor: theme.colors.surface,
-    marginBottom: 12,
-  },
-  formButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
-  cancelButton: {
-    flex: 1,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    alignItems: 'center',
-  },
-  cancelButtonText: {
-    color: theme.colors.textSecondary,
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  addButton: {
-    flex: 1,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    backgroundColor: theme.colors.primary,
-    alignItems: 'center',
-  },
-  addButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
   },
   // Skeleton Loading Styles
   skeletonContainer: {
@@ -1027,4 +856,4 @@ const createStyles = (theme) => StyleSheet.create({
   },
 });
 
-export default CreateNewGroupScreen;
+export default AddMemberScreen;

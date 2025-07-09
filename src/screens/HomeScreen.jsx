@@ -20,7 +20,7 @@ import { useTheme } from '../context/ThemeContext';
 import firebaseService from '../services/firebaseService';
 import auth from '@react-native-firebase/auth';
 
-const HomeScreen = ({ navigation }) => {
+const HomeScreen = ({ navigation, route }) => {
   const { theme } = useTheme();
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [showSearchBar, setShowSearchBar] = useState(false);
@@ -53,6 +53,19 @@ const HomeScreen = ({ navigation }) => {
 
     return unsubscribe;
   }, []);
+
+  // Listen for route parameter changes to trigger reload
+  useEffect(() => {
+    if (route.params?.reload && user) {
+      console.log('🔄 HomeScreen: Reload triggered from route params');
+      Promise.all([
+        loadUserGroups(user.uid),
+        loadOverallBalance(user.uid)
+      ]).catch(error => {
+        console.error('Error reloading data:', error);
+      });
+    }
+  }, [route.params?.reload, route.params?.timestamp, user]);
 
   const loadUserGroups = async (userId) => {
     setLoading(true);

@@ -30,6 +30,7 @@ import EditProfileScreen from './src/screens/EditProfileScreen';
 import GroupDetailScreen from './src/screens/GroupDetailScreen';
 import ManageGroupScreen from './src/screens/ManageGroupScreen';
 import AddExpenseScreen from './src/screens/AddExpenseScreen';
+import AddMemberScreen from './src/screens/AddMemberScreen';
 
 // Simple placeholder screens to test navigation
 const OnboardingScreen = ({ navigation }) => (
@@ -120,6 +121,7 @@ const HomeStackNavigator = () => {
       <Stack.Screen name="GroupDetail" component={GroupDetailScreen} />
       <Stack.Screen name="ManageGroup" component={ManageGroupScreen} />
       <Stack.Screen name="AddExpense" component={AddExpenseScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="AddMember" component={AddMemberScreen} options={{ headerShown: false }} />
     </Stack.Navigator>
   );
 };
