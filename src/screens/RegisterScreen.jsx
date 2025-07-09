@@ -306,9 +306,9 @@ const RegisterScreen = ({navigation}) => {
         </View>
 
         {/* Social Login Section */}
-        <Text style={styles.socialTitle}>Or Sign in With</Text>
+        {/* <Text style={styles.socialTitle}>Or Sign in With</Text> */}
 
-        <View style={styles.socialContainer}>
+        {/* <View style={styles.socialContainer}>
           <TouchableOpacity
             style={styles.socialButton}
             onPress={handleGoogleSignUp}>
@@ -328,7 +328,7 @@ const RegisterScreen = ({navigation}) => {
               resizeMode="contain"
             />
           </TouchableOpacity>
-        </View>
+        </View> */}
       </ScrollView>
     </SafeAreaView>
   );

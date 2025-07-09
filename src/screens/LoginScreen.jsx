@@ -163,11 +163,11 @@ const LoginScreen = ({navigation}) => {
         </TouchableOpacity>
 
         {/* Phone Login Button */}
-        <TouchableOpacity
+        {/* <TouchableOpacity
           style={styles.phoneLoginButton}
           onPress={handlePhoneLogin}>
           <Text style={styles.phoneLoginText}>Login With Phone Number</Text>
-        </TouchableOpacity>
+        </TouchableOpacity> */}
 
         {/* Sign Up Link */}
         <View style={styles.signupContainer}>
@@ -178,9 +178,9 @@ const LoginScreen = ({navigation}) => {
         </View>
 
         {/* Social Login Section */}
-        <Text style={styles.socialTitle}>Or Sign in With</Text>
+        {/* <Text style={styles.socialTitle}>Or Sign in With</Text> */}
 
-        <View style={styles.socialContainer}>
+        {/* <View style={styles.socialContainer}>
           <TouchableOpacity
             style={styles.socialButton}
             onPress={handleGoogleLogin}>
@@ -200,7 +200,7 @@ const LoginScreen = ({navigation}) => {
               resizeMode="contain"
             />
           </TouchableOpacity>
-        </View>
+        </View> */}
       </ScrollView>
 
       {/* Themed Alert */}
