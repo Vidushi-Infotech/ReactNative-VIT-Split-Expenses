@@ -273,6 +273,14 @@ class FirebaseService {
         }
       }
 
+      // Check if member has any settled transactions
+      const settlements = await this.getGroupSettlements(groupId);
+      const hasSettledTransactions = settlements.some(settlement => 
+        settlement.fromUserId === memberUserId || settlement.toUserId === memberUserId
+      );
+
+      console.log('🗑️ Member has settled transactions:', hasSettledTransactions);
+
       // Prepare batch updates
       const batch = this.firestore.batch();
       
@@ -284,6 +292,14 @@ class FirebaseService {
         updatedAt: firestore.FieldValue.serverTimestamp()
       });
 
+      // Recalculate expenses if member hasn't settled all their dues
+      if (!hasSettledTransactions) {
+        console.log('🗑️ Recalculating expenses for removed member without settlements');
+        await this.recalculateExpensesAfterMemberRemoval(groupId, memberUserId, batch);
+      } else {
+        console.log('🗑️ Member has settlements, keeping expense history intact');
+      }
+
       // Commit the batch
       await batch.commit();
       console.log('🗑️ Successfully removed member from group');
@@ -291,6 +307,146 @@ class FirebaseService {
       return true;
     } catch (error) {
       console.error('🗑️ Error removing member from group:', error);
+      throw error;
+    }
+  }
+
+  // Recalculate expenses after member removal
+  async recalculateExpensesAfterMemberRemoval(groupId, removedUserId, batch) {
+    try {
+      console.log('🧮 Recalculating expenses after member removal:', { groupId, removedUserId });
+
+      // Get all group expenses
+      const expenses = await this.getGroupExpenses(groupId);
+      console.log('🧮 Found', expenses.length, 'expenses to recalculate');
+
+      // Get current group members (before removal)
+      const groupDoc = await this.firestore.collection('groups').doc(groupId).get();
+      const groupData = groupDoc.data();
+      const currentMembers = groupData.members || [];
+      
+      // Calculate remaining members after removal
+      const remainingMembers = currentMembers.filter(memberId => memberId !== removedUserId);
+      console.log('🧮 Remaining members after removal:', remainingMembers.length);
+
+      if (remainingMembers.length === 0) {
+        console.log('🧮 No remaining members, skipping expense recalculation');
+        return;
+      }
+
+      // Process each expense
+      for (const expense of expenses) {
+        // Check if removed user was involved in this expense
+        const wasParticipant = expense.participants.some(p => p.userId === removedUserId);
+        
+        if (!wasParticipant) {
+          console.log('🧮 Expense', expense.id, '- removed user was not a participant, skipping');
+          continue;
+        }
+
+        console.log('🧮 Processing expense:', expense.id, 'amount:', expense.amount);
+
+        // Get the removed user's participation
+        const removedUserParticipation = expense.participants.find(p => p.userId === removedUserId);
+        const removedUserAmount = removedUserParticipation ? removedUserParticipation.amount : 0;
+
+        console.log('🧮 Removed user contribution:', removedUserAmount);
+
+        // Filter out the removed user from participants
+        const remainingParticipants = expense.participants.filter(p => p.userId !== removedUserId);
+        
+        if (remainingParticipants.length === 0) {
+          console.log('🧮 No remaining participants, skipping expense:', expense.id);
+          continue;
+        }
+
+        // Recalculate split based on expense splitType
+        let newParticipants = [];
+        
+        if (expense.splitType === 'equal') {
+          // For equal split, redistribute removed user's amount equally among remaining participants
+          const newAmountPerPerson = expense.amount / remainingParticipants.length;
+          
+          newParticipants = remainingParticipants.map(participant => ({
+            ...participant,
+            amount: newAmountPerPerson
+          }));
+          
+          console.log('🧮 Equal split recalculated - new amount per person:', newAmountPerPerson);
+        } else if (expense.splitType === 'percentage') {
+          // For percentage split, need to recalculate percentages
+          const totalRemainingPercentage = remainingParticipants.reduce((sum, p) => sum + (p.percentage || 0), 0);
+          
+          if (totalRemainingPercentage > 0) {
+            const scaleFactor = 100 / totalRemainingPercentage;
+            
+            newParticipants = remainingParticipants.map(participant => {
+              const newPercentage = (participant.percentage || 0) * scaleFactor;
+              const newAmount = (expense.amount * newPercentage) / 100;
+              return {
+                ...participant,
+                percentage: newPercentage,
+                amount: newAmount
+              };
+            });
+          } else {
+            // Fallback to equal split if no valid percentages
+            const newAmountPerPerson = expense.amount / remainingParticipants.length;
+            newParticipants = remainingParticipants.map(participant => ({
+              ...participant,
+              percentage: 100 / remainingParticipants.length,
+              amount: newAmountPerPerson
+            }));
+          }
+          
+          console.log('🧮 Percentage split recalculated');
+        } else if (expense.splitType === 'shares') {
+          // For shares split, redistribute based on existing shares
+          const totalRemainingShares = remainingParticipants.reduce((sum, p) => sum + (p.shares || 1), 0);
+          
+          newParticipants = remainingParticipants.map(participant => {
+            const shares = participant.shares || 1;
+            const newAmount = (expense.amount * shares) / totalRemainingShares;
+            return {
+              ...participant,
+              amount: newAmount
+            };
+          });
+          
+          console.log('🧮 Shares split recalculated');
+        } else {
+          // For custom/amount split, keep existing amounts but ensure they don't exceed total
+          const totalRemainingAmounts = remainingParticipants.reduce((sum, p) => sum + (p.amount || 0), 0);
+          
+          if (totalRemainingAmounts <= expense.amount) {
+            newParticipants = remainingParticipants;
+          } else {
+            // Scale down amounts proportionally
+            const scaleFactor = expense.amount / totalRemainingAmounts;
+            newParticipants = remainingParticipants.map(participant => ({
+              ...participant,
+              amount: (participant.amount || 0) * scaleFactor
+            }));
+          }
+          
+          console.log('🧮 Custom split recalculated');
+        }
+
+        // Update expense with new participants
+        const expenseRef = this.firestore.collection('expenses').doc(expense.id);
+        batch.update(expenseRef, {
+          participants: newParticipants,
+          updatedAt: firestore.FieldValue.serverTimestamp(),
+          recalculatedAt: firestore.FieldValue.serverTimestamp(),
+          recalculatedReason: `Member removed: ${removedUserId}`
+        });
+
+        console.log('🧮 Updated expense', expense.id, 'with', newParticipants.length, 'participants');
+      }
+
+      console.log('🧮 Expense recalculation completed');
+    } catch (error) {
+      console.error('🧮 Error recalculating expenses after member removal:', error);
       throw error;
     }
   }
@@ -512,7 +668,7 @@ class FirebaseService {
       const groupData = groupDoc.data();
       const members = groupData.members || [];
       
-      // Initialize balance object for each member
+      // Initialize balance object for each member (only current members)
       const balances = {};
       members.forEach(memberId => {
         balances[memberId] = { paid: 0, owes: 0, net: 0 };
@@ -520,12 +676,12 @@ class FirebaseService {
 
       // Calculate balances from expenses
       expenses.forEach(expense => {
-        // Add to paidBy member's paid amount
+        // Add to paidBy member's paid amount (only if they're still a member)
         if (balances[expense.paidBy]) {
           balances[expense.paidBy].paid += expense.amount;
         }
 
-        // Add to each participant's owes amount
+        // Add to each participant's owes amount (only if they're still a member)
         expense.participants.forEach(participant => {
           if (balances[participant.userId]) {
             balances[participant.userId].owes += participant.amount;
@@ -538,6 +694,7 @@ class FirebaseService {
         balances[memberId].net = balances[memberId].paid - balances[memberId].owes;
       });
 
+      console.log('💰 Group balances calculated for', members.length, 'members:', balances);
       return balances;
     } catch (error) {
       console.error('Error calculating group balances:', error);

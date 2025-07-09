@@ -224,6 +224,7 @@ const GroupDetailScreen = ({ route, navigation }) => {
               console.log('🗑️ Deleting group:', group.id);
               await firebaseService.deleteGroup(group.id);
               
+              
               // Navigate back to home screen and trigger reload
               navigation.reset({
                 index: 0,

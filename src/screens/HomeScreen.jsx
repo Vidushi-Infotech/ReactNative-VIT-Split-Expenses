@@ -14,6 +14,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import CreateNewGroupScreen from './CreateNewGroupScreen';
+import HomeSkeleton from '../components/HomeSkeleton';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { useTheme } from '../context/ThemeContext';
@@ -27,6 +28,7 @@ const HomeScreen = ({ navigation, route }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [user, setUser] = useState(null);
   const [overallBalance, setOverallBalance] = useState({
@@ -47,7 +49,11 @@ const HomeScreen = ({ navigation, route }) => {
           loadOverallBalance(user.uid)
         ]).catch(error => {
           console.error('Error loading initial data:', error);
+        }).finally(() => {
+          setInitialLoading(false);
         });
+      } else {
+        setInitialLoading(false);
       }
     });
 
@@ -247,6 +253,11 @@ const HomeScreen = ({ navigation, route }) => {
   );
 
   const styles = createStyles(theme);
+
+  // Show skeleton during initial loading
+  if (initialLoading) {
+    return <HomeSkeleton />;
+  }
 
   return (
     <SafeAreaView style={styles.container}>

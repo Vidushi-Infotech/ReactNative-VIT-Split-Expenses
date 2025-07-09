@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import EditProfileScreen from './EditProfileScreen';
 import ThemeSettingsScreen from './ThemeSettingsScreen';
+import PaymentHistoryScreen from './PaymentHistoryScreen';
 import ThemedAlert from '../components/ThemedAlert';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
@@ -27,6 +28,7 @@ const ProfileScreen = ({ navigation }) => {
   const { theme, themeMode, getThemeDisplayName, getThemeIcon, setTheme } = useTheme();
   const [showEditProfile, setShowEditProfile] = useState(false);
   const [showThemeSettings, setShowThemeSettings] = useState(false);
+  const [showPaymentHistory, setShowPaymentHistory] = useState(false);
   const [showLogoutAlert, setShowLogoutAlert] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [userProfile, setUserProfile] = useState(null);
@@ -165,7 +167,7 @@ const ProfileScreen = ({ navigation }) => {
       id: 2,
       title: 'Payments',
       iconComponent: <Ionicons name="card" size={20} color={theme.colors.icon} />,
-      onPress: () => console.log('Payments pressed'),
+      onPress: () => setShowPaymentHistory(true),
     },
     {
       id: 3,
@@ -326,6 +328,15 @@ const ProfileScreen = ({ navigation }) => {
         presentationStyle="pageSheet"
       >
         <ThemeSettingsScreen onClose={handleCloseThemeSettings} />
+      </Modal>
+
+      {/* Payment History Modal */}
+      <Modal
+        visible={showPaymentHistory}
+        animationType="slide"
+        presentationStyle="pageSheet"
+      >
+        <PaymentHistoryScreen onClose={() => setShowPaymentHistory(false)} />
       </Modal>
 
       {/* Themed Logout Alert */}

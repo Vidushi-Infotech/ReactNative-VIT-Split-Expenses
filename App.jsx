@@ -172,7 +172,7 @@ const MainTabNavigator = () => {
         component={ActivityScreen}
         options={{
           title: 'Activity',
-          headerTitle: 'Activity',
+          headerShown: false, // We'll use custom header in ActivityScreen
         }}
       />
       <Tab.Screen
@@ -180,7 +180,7 @@ const MainTabNavigator = () => {
         component={ProfileScreen}
         options={{
           title: 'Profile',
-          headerTitle: 'Profile',
+          headerShown: false, // We'll use custom header in ProfileScreen
         }}
       />
     </Tab.Navigator>

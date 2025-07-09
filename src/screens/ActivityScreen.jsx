@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
+import ActivitySkeleton from '../components/ActivitySkeleton';
 import firebaseService from '../services/firebaseService';
 
 const ActivityScreen = ({ navigation }) => {
@@ -18,11 +19,14 @@ const ActivityScreen = ({ navigation }) => {
   const { user } = useAuth();
   const [activities, setActivities] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     if (user) {
       loadRecentActivities();
+    } else {
+      setInitialLoading(false);
     }
   }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -125,6 +129,7 @@ const ActivityScreen = ({ navigation }) => {
       console.error('📱 Error loading recent activities:', error);
     } finally {
       setLoading(false);
+      setInitialLoading(false);
     }
   };
   
@@ -190,8 +195,18 @@ const ActivityScreen = ({ navigation }) => {
 
   const styles = createStyles(theme);
 
+  // Show skeleton during initial loading
+  if (initialLoading) {
+    return <ActivitySkeleton />;
+  }
+
   return (
     <SafeAreaView style={styles.container}>
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Recent Activity</Text>
+      </View>
+
       <ScrollView 
         style={styles.scrollView} 
         showsVerticalScrollIndicator={false}
@@ -205,7 +220,6 @@ const ActivityScreen = ({ navigation }) => {
         }
       >
         <View style={styles.content}>
-          <Text style={styles.title}>Recent Activity</Text>
           
           {loading ? (
             <View style={styles.loadingContainer}>
@@ -262,17 +276,23 @@ const createStyles = (theme) => StyleSheet.create({
     flex: 1,
     backgroundColor: theme.colors.background,
   },
+  header: {
+    backgroundColor: theme.colors.surface,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
+  },
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: theme.colors.text,
+  },
   scrollView: {
     flex: 1,
   },
   content: {
     padding: 16,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: theme.colors.text,
-    marginBottom: 20,
   },
   activityCard: {
     backgroundColor: theme.colors.surface,

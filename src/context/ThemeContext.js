@@ -44,6 +44,10 @@ export const lightTheme = {
     icon: '#6B7280',
     iconActive: '#4A90E2',
     
+    // Skeleton colors
+    skeletonBase: '#E5E7EB',
+    skeletonHighlight: '#F3F4F6',
+    
     // Status bar
     statusBarStyle: 'dark-content',
     statusBarBackground: '#FFFFFF',
@@ -80,6 +84,10 @@ export const darkTheme = {
     // Icon colors
     icon: '#CBD5E0',
     iconActive: '#63B3ED',
+    
+    // Skeleton colors
+    skeletonBase: '#4A5568',
+    skeletonHighlight: '#2D3748',
     
     // Status bar
     statusBarStyle: 'light-content',
