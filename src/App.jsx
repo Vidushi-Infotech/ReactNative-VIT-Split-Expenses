@@ -261,30 +261,30 @@ function HomePage() {
           </div>
         </section>
 
-        <section id="how-it-works" className="py-20 bg-white">
-          <div className="max-w-7xl mx-auto px-6">
-            <h2 className="text-5xl font-bold text-center text-gray-900 mb-16 scroll-animate">How It Works</h2>
-            <div className="grid md:grid-cols-3 gap-12">
+        <section id="how-it-works" className="py-12 sm:py-16 lg:py-20 bg-white">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6">
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-center text-gray-900 mb-12 sm:mb-16 scroll-animate">How It Works</h2>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-8 sm:gap-12">
               <div className="text-center group scroll-animate-scale">
-                <div className="w-20 h-20 bg-gradient-primary rounded-full flex items-center justify-center text-white text-2xl font-bold mx-auto mb-6 shadow-lg group-hover:scale-110 transition-transform duration-300">
+                <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gradient-primary rounded-full flex items-center justify-center text-white text-xl sm:text-2xl font-bold mx-auto mb-4 sm:mb-6 shadow-lg group-hover:scale-110 transition-transform duration-300">
                   1
                 </div>
-                <h3 className="text-2xl font-bold text-gray-900 mb-4">Create a Group</h3>
-                <p className="text-gray-600 leading-relaxed">Start by creating a group with your friends, family, or roommates.</p>
+                <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-3 sm:mb-4">Create a Group</h3>
+                <p className="text-gray-600 leading-relaxed text-sm sm:text-base">Start by creating a group with your friends, family, or roommates.</p>
               </div>
               <div className="text-center group scroll-animate-scale" style={{transitionDelay: '0.2s'}}>
-                <div className="w-20 h-20 bg-gradient-primary rounded-full flex items-center justify-center text-white text-2xl font-bold mx-auto mb-6 shadow-lg group-hover:scale-110 transition-transform duration-300">
+                <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gradient-primary rounded-full flex items-center justify-center text-white text-xl sm:text-2xl font-bold mx-auto mb-4 sm:mb-6 shadow-lg group-hover:scale-110 transition-transform duration-300">
                   2
                 </div>
-                <h3 className="text-2xl font-bold text-gray-900 mb-4">Add Expenses</h3>
-                <p className="text-gray-600 leading-relaxed">Add shared expenses and let Splitzy calculate everyone's fair share.</p>
+                <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-3 sm:mb-4">Add Expenses</h3>
+                <p className="text-gray-600 leading-relaxed text-sm sm:text-base">Add shared expenses and let Splitzy calculate everyone's fair share.</p>
               </div>
-              <div className="text-center group scroll-animate-scale" style={{transitionDelay: '0.4s'}}>
-                <div className="w-20 h-20 bg-gradient-primary rounded-full flex items-center justify-center text-white text-2xl font-bold mx-auto mb-6 shadow-lg group-hover:scale-110 transition-transform duration-300">
+              <div className="text-center group scroll-animate-scale sm:col-span-2 lg:col-span-1" style={{transitionDelay: '0.4s'}}>
+                <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gradient-primary rounded-full flex items-center justify-center text-white text-xl sm:text-2xl font-bold mx-auto mb-4 sm:mb-6 shadow-lg group-hover:scale-110 transition-transform duration-300">
                   3
                 </div>
-                <h3 className="text-2xl font-bold text-gray-900 mb-4">Track & Manage</h3>
-                <p className="text-gray-600 leading-relaxed">Keep track of all expenses and manage your shared costs easily.</p>
+                <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-3 sm:mb-4">Track & Manage</h3>
+                <p className="text-gray-600 leading-relaxed text-sm sm:text-base">Keep track of all expenses and manage your shared costs easily.</p>
               </div>
             </div>
           </div>
