@@ -23,6 +23,7 @@ import FontAwesome from 'react-native-vector-icons/FontAwesome';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import firebaseService from '../services/firebaseService';
+import Settings from './Settings';
 
 const ProfileScreen = ({ navigation }) => {
   const { signOut, user, isAndroid, loading } = useAuth();
@@ -35,6 +36,7 @@ const ProfileScreen = ({ navigation }) => {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [userProfile, setUserProfile] = useState(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
+  const [showSettings, setShowSettings] = useState(false);
 
   // Debug theme context
   console.log('ProfileScreen - Theme Mode:', themeMode);
@@ -175,7 +177,7 @@ const ProfileScreen = ({ navigation }) => {
       id: 3,
       title: 'Settings',
       iconComponent: <Ionicons name="settings" size={20} color={theme.colors.icon} />,
-      onPress: () => console.log('Settings pressed'),
+      onPress: () => setShowSettings(true),
     },
     {
       id: 4,
@@ -348,6 +350,15 @@ const ProfileScreen = ({ navigation }) => {
         presentationStyle="pageSheet"
       >
         <ReferralSystemScreen onClose={() => setShowReferralSystem(false)} />
+      </Modal>
+
+      {/* Settings Modal */}
+      <Modal
+        visible={showSettings}
+        animationType="slide"
+        presentationStyle="pageSheet"
+      >
+        <Settings onClose={() => setShowSettings(false)} />
       </Modal>
 
       {/* Themed Logout Alert */}
