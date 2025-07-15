@@ -109,13 +109,20 @@ const AddExpenseScreen = ({route, navigation}) => {
 
   useEffect(() => {
     calculateSplit();
-  }, [amount, splitType, members]);
+  }, [amount, splitType]);
+
+  // Separate effect for member selection changes
+  useEffect(() => {
+    if (members.length > 0) {
+      calculateSplit();
+    }
+  }, [members.map(m => m.isSelected).join(',')]);
 
   const calculateSplit = () => {
     const totalAmount = parseFloat(amount) || 0;
     const selectedMembers = members.filter(m => m.isSelected);
 
-    if (totalAmount === 0 || selectedMembers.length === 0) return;
+    if (selectedMembers.length === 0) return;
 
     let updatedMembers = [...members];
 
@@ -128,26 +135,79 @@ const AddExpenseScreen = ({route, navigation}) => {
         }));
         break;
 
+      case 'Unequal':
+        // For unequal split, initialize with equal amounts if amounts are not set
+        updatedMembers = updatedMembers.map(member => {
+          if (member.isSelected) {
+            // If member amount is not set or is 0, set equal distribution
+            if (!member.amount || member.amount === 0) {
+              return {
+                ...member,
+                amount: totalAmount / selectedMembers.length,
+              };
+            }
+            return member;
+          }
+          return {
+            ...member,
+            amount: 0,
+          };
+        });
+        break;
+
       case 'By Percentage':
-        updatedMembers = updatedMembers.map(member => ({
-          ...member,
-          amount: member.isSelected
-            ? (totalAmount * member.percentage) / 100
-            : 0,
-        }));
+        updatedMembers = updatedMembers.map(member => {
+          if (member.isSelected) {
+            // Initialize with equal percentage if not set
+            if (!member.percentage || member.percentage === 0) {
+              const equalPercentage = 100 / selectedMembers.length;
+              return {
+                ...member,
+                percentage: equalPercentage,
+                amount: (totalAmount * equalPercentage) / 100,
+              };
+            }
+            return {
+              ...member,
+              amount: (totalAmount * member.percentage) / 100,
+            };
+          }
+          return {
+            ...member,
+            amount: 0,
+            percentage: 0,
+          };
+        });
         break;
 
       case 'By Share':
-        const totalShares = selectedMembers.reduce(
-          (sum, m) => sum + (m.shares || 1),
-          0,
-        );
-        updatedMembers = updatedMembers.map(member => ({
-          ...member,
-          amount: member.isSelected
-            ? (totalAmount * (member.shares || 1)) / totalShares
-            : 0,
-        }));
+        updatedMembers = updatedMembers.map(member => {
+          if (member.isSelected) {
+            // Initialize with 1 share if not set
+            if (!member.shares || member.shares === 0) {
+              const totalShares = selectedMembers.length; // Each gets 1 share initially
+              return {
+                ...member,
+                shares: 1,
+                amount: totalAmount / totalShares,
+              };
+            }
+            // Recalculate based on existing shares
+            const totalShares = selectedMembers.reduce(
+              (sum, m) => sum + (m.shares || 1),
+              0,
+            );
+            return {
+              ...member,
+              amount: (totalAmount * member.shares) / totalShares,
+            };
+          }
+          return {
+            ...member,
+            amount: 0,
+            shares: 0,
+          };
+        });
         break;
     }
 
@@ -164,12 +224,49 @@ const AddExpenseScreen = ({route, navigation}) => {
   };
 
   const handleMemberValueChange = (memberId, field, value) => {
-    const updatedMembers = members.map(member =>
-      member.id === memberId
-        ? {...member, [field]: parseFloat(value) || 0}
-        : member,
-    );
-    setMembers(updatedMembers);
+    const numericValue = parseFloat(value) || 0;
+    const totalAmount = parseFloat(amount) || 0;
+    
+    const updatedMembers = members.map(member => {
+      if (member.id === memberId) {
+        const updatedMember = {...member, [field]: numericValue};
+        
+        // For percentage and share modes, recalculate amount automatically
+        if (field === 'percentage' && totalAmount > 0) {
+          updatedMember.amount = (totalAmount * numericValue) / 100;
+        } else if (field === 'shares' && totalAmount > 0) {
+          // Calculate total shares to get the ratio
+          const selectedMembers = members.filter(m => m.isSelected);
+          const otherTotalShares = selectedMembers.reduce((sum, m) => {
+            return sum + (m.id === memberId ? numericValue : (m.shares || 1));
+          }, 0);
+          updatedMember.amount = (totalAmount * numericValue) / otherTotalShares;
+        }
+        
+        return updatedMember;
+      }
+      return member;
+    });
+    
+    // For share mode, recalculate all amounts when one share changes
+    if (field === 'shares' && totalAmount > 0) {
+      const selectedMembers = updatedMembers.filter(m => m.isSelected);
+      const totalShares = selectedMembers.reduce((sum, m) => sum + (m.shares || 1), 0);
+      
+      const finalMembers = updatedMembers.map(member => {
+        if (member.isSelected) {
+          return {
+            ...member,
+            amount: (totalAmount * (member.shares || 1)) / totalShares,
+          };
+        }
+        return member;
+      });
+      
+      setMembers(finalMembers);
+    } else {
+      setMembers(updatedMembers);
+    }
   };
 
   const handleUploadReceipt = () => {
@@ -262,8 +359,6 @@ const AddExpenseScreen = ({route, navigation}) => {
         participants,
         receiptUrl: receiptImage, // Store local image URI
       };
-
-      console.log('Creating expense:', expenseData);
 
       // Create expense in Firebase
       await firebaseService.createExpense(group.id, expenseData);
@@ -411,10 +506,10 @@ const AddExpenseScreen = ({route, navigation}) => {
               options={categories}
               placeholder="Category"
               style={styles.categoryDropdown}
-              renderItem={({item}) => (
+              renderItem={({item, onSelect}) => (
                 <TouchableOpacity
                   style={styles.categoryOption}
-                  onPress={() => setSelectedCategory(item)}>
+                  onPress={() => onSelect(item)}>
                   <View
                     style={[
                       styles.categoryIcon,
@@ -509,30 +604,30 @@ const AddExpenseScreen = ({route, navigation}) => {
             {amount || '0'}
           </Text>
         </View>
+
+        {/* Save Button */}
+        <View style={styles.buttonContainer}>
+          <TouchableOpacity
+            style={[styles.saveButton, loading && styles.saveButtonDisabled]}
+            onPress={handleSave}
+            disabled={loading}>
+            {loading ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <Text style={styles.saveButtonText}>Save</Text>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.uploadButton}
+            onPress={handleUploadReceipt}>
+            <Text style={styles.uploadIcon}>📎</Text>
+            <Text style={styles.uploadText}>
+              {receiptImage ? 'Receipt Added' : 'Upload Receipt'}
+            </Text>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
-
-      {/* Save Button */}
-      <View style={styles.footer}>
-        <TouchableOpacity
-          style={[styles.saveButton, loading && styles.saveButtonDisabled]}
-          onPress={handleSave}
-          disabled={loading}>
-          {loading ? (
-            <ActivityIndicator color="#FFFFFF" />
-          ) : (
-            <Text style={styles.saveButtonText}>Save</Text>
-          )}
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.uploadButton}
-          onPress={handleUploadReceipt}>
-          <Text style={styles.uploadIcon}>📎</Text>
-          <Text style={styles.uploadText}>
-            {receiptImage ? 'Receipt Added' : 'Upload Receipt'}
-          </Text>
-        </TouchableOpacity>
-      </View>
     </SafeAreaView>
   );
 };
@@ -787,12 +882,10 @@ const createStyles = theme =>
       fontWeight: '700',
       color: '#374151',
     },
-    footer: {
-      paddingHorizontal: 16,
-      paddingVertical: 12,
-      backgroundColor: theme.colors.surface,
-      borderTopWidth: 1,
-      borderTopColor: theme.colors.border,
+    buttonContainer: {
+      paddingHorizontal: 0,
+      paddingVertical: 16,
+      paddingBottom: 32,
     },
     saveButton: {
       backgroundColor: theme.colors.primary,

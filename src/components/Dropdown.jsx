@@ -89,7 +89,7 @@ const Dropdown = ({
 
             <FlatList
               data={options}
-              renderItem={renderItem || defaultRenderItem}
+              renderItem={renderItem ? (props) => renderItem({...props, onSelect: handleSelect}) : defaultRenderItem}
               keyExtractor={
                 keyExtractor ||
                 ((item, index) =>
