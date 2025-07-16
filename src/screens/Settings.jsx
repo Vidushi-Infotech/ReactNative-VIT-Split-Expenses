@@ -15,7 +15,6 @@ import {useTheme} from '../context/ThemeContext';
 import Notification from './Notification';
 import AccountPrivacy from './AccountPrivacy';
 import DevicePermission from './DevicePermission';
-import Language from './Language';
 import CurrencyPreference from './CurrencyPreference';
 import DeleteAccount from './DeleteAccount';
 
@@ -25,7 +24,6 @@ const Settings = ({navigation, onClose}) => {
     const [showNotification, setShowNotification] = useState(false);
     const [showAccountPrivacy, setShowAccountPrivacy] = useState(false);
     const [showDevicePermission, setShowDevicePermission] = useState(false);
-    const [showLanguage, setShowLanguage] = useState(false);
     const [showCurrencyPreference, setShowCurrencyPreference] = useState(false);
     const [showDeleteAccount, setShowDeleteAccount] = useState(false);
 
@@ -50,18 +48,12 @@ const Settings = ({navigation, onClose}) => {
     },
     {
       id: 4,
-      title: 'Language',
-      iconComponent: <Ionicons name="language" size={20} color={theme.colors.icon} />,
-      onPress: () => setShowLanguage(true),
-    },
-    {
-      id: 5,
       title: 'Currency Preference',
       iconComponent: <Ionicons name="logo-usd" size={20} color={theme.colors.icon} />,
       onPress: () => setShowCurrencyPreference(true),
     },
     {
-      id: 6,
+      id: 5,
       title: 'Delete Account',
       iconComponent: <Ionicons name="trash" size={20} color={theme.colors.icon} />,
       onPress: () => setShowDeleteAccount(true),
@@ -139,15 +131,6 @@ const Settings = ({navigation, onClose}) => {
       >
         <DevicePermission onClose={() => setShowDevicePermission(false)} />
       </Modal>
-
-      {/* Language Modal */}
-      <Modal
-        visible={showLanguage}
-        animationType="slide"
-        presentationStyle="pageSheet"
-      >
-        <Language onClose={() => setShowLanguage(false)} />
-            </Modal>
 
       {/* Currency Preference Modal */}
       <Modal

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, {useState} from 'react';
 import {
   View,
   Text,
@@ -7,57 +7,53 @@ import {
   ScrollView,
   TouchableOpacity,
   StatusBar,
-  Modal,
   Switch,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import {useTheme} from '../context/ThemeContext';
-import Camera from './Camera';
-import Photos from './Photos';
-import LocationServices from './LocationServices';
-import NotificationPermission from './NotificationPermission';
 
 const DevicePermission = ({onClose}) => {
   const {theme} = useTheme();
   const styles = createStyles(theme);
-  const [showCamera, setShowCamera] = useState(false);
-  const [showPhotos, setShowPhotos] = useState(false);
-  const [showLocationServices, setShowLocationServices] = useState(false);
-  const [showNotificationPermission, setShowNotificationPermission] = useState(false);
 
-  const Menu = [
+  const [permissions, setPermissions] = useState([
     {
       id: 1,
       title: 'Camera',
-      iconComponent: <Ionicons name="camera" size={20} color={theme.colors.icon} />,
-      onPress: () => setShowCamera(true),
+      icon: 'camera',
+      enabled: false,
     },
     {
       id: 2,
       title: 'Photos',
-      iconComponent: <Ionicons name="images" size={20} color={theme.colors.icon} />,
-      onPress: () => setShowPhotos(true),
-      disabled: false,
+      icon: 'images',
+      enabled: false,
     },
     {
       id: 3,
       title: 'Location Services',
-      iconComponent: <Ionicons name="location" size={20} color={theme.colors.icon} />,
-      onPress: () => setShowLocationServices(true),
-      disabled: false,
+      icon: 'location',
+      enabled: false,
     },
     {
       id: 4,
       title: 'Notification Permission',
-      iconComponent: <Ionicons name="notifications" size={20} color={theme.colors.icon} />,
-      onPress: () => setShowNotificationPermission(true),
-      disabled: false,
+      icon: 'notifications',
+      enabled: false,
     },
-  ]
+  ]);
+
+  const toggleSwitch = id => {
+    setPermissions(prev =>
+      prev.map(item =>
+        item.id === id ? {...item, enabled: !item.enabled} : item,
+      ),
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>
-        <StatusBar
+      <StatusBar
         barStyle={theme.colors.statusBarStyle}
         backgroundColor={theme.colors.statusBarBackground}
       />
@@ -72,147 +68,103 @@ const DevicePermission = ({onClose}) => {
       </View>
 
       <ScrollView style={styles.scrollView}>
-        <Text style = {styles.text}>Your Preferences</Text>
-        {Menu.map((item) => (
-          <TouchableOpacity
-            key={item.id}
-            style={styles.option}
-            onPress={item.onPress}
-            activeOpacity={0.7}
-            disabled={item.disabled}
-          >
+        <Text style={styles.text}>Your Preferences</Text>
+        {permissions.map(item => (
+          <View key={item.id} style={styles.option}>
             <View style={styles.optionLeft}>
               <View style={styles.optionIconContainer}>
-                {item.iconComponent}
+                <Ionicons
+                  name={item.icon}
+                  size={20}
+                  color={theme.colors.icon}
+                />
               </View>
               <View style={styles.optionTextContainer}>
-                <Text style={styles.optionTitle}>
-                  {item.title}
-                </Text>
+                <Text style={styles.optionTitle}>{item.title}</Text>
               </View>
             </View>
-            <Ionicons
-              name="chevron-forward"
-              size={20}
-              color={item.disabled ? "#E5E7EB" : "#CBD5E0"}
+            <Switch
+              value={item.enabled}
+              onValueChange={() => toggleSwitch(item.id)}
+              trackColor={{false: '#767577', true: '#1387c6cb'}}
+              thumbColor={item.enabled ? '#f4f3f3ff' : '#f4f3f3ff'}
+              ios_backgroundColor="#3e3e3e"
             />
-          </TouchableOpacity>
+          </View>
         ))}
-
-        {/*Camera Modal */}
-        <Modal
-          visible={showCamera}
-          animationType="slide"
-          presentationStyle="pageSheet"
-        >
-          <Camera onClose={() => setShowCamera(false)} />
-        </Modal>
-        
-        {/*Photos Modal */}
-        <Modal
-          visible={showPhotos}
-          animationType="slide"
-          presentationStyle="pageSheet"
-        >
-          <Photos onClose={() => setShowPhotos(false)} />
-        </Modal>
-
-        {/*Location Services Modal */}
-        <Modal
-          visible={showLocationServices}
-          animationType="slide"
-          presentationStyle="pageSheet"
-        >
-          <LocationServices onClose={() => setShowLocationServices(false)} />
-        </Modal>
-
-        {/*Notification Permission Modal */}
-        <Modal
-          visible={showNotificationPermission}
-          animationType="slide"
-          presentationStyle="pageSheet"
-        >
-          <NotificationPermission onClose={() => setShowNotificationPermission(false)} />
-        </Modal>
-
       </ScrollView>
     </SafeAreaView>
   );
 };
 
-
-const createStyles = (theme) => StyleSheet.create({
+const createStyles = theme =>
+  StyleSheet.create({
     container: {
       flex: 1,
       backgroundColor: theme.colors.background,
     },
     header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: 20,
-        paddingVertical: 16,
-        borderBottomWidth: 1,
-        borderBottomColor: theme.colors.border,
-        backgroundColor: theme.colors.background,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 20,
+      paddingVertical: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.border,
+      backgroundColor: theme.colors.background,
     },
     backButton: {
-        padding: 4,
+      padding: 4,
     },
     headerTitle: {
-        fontSize: 18,
-        fontWeight: '600',
-        color: theme.colors.text,
+      fontSize: 18,
+      fontWeight: '600',
+      color: theme.colors.text,
     },
     placeholder: {
-        width: 32,
+      width: 32,
     },
     scrollView: {
-        flex: 1,
+      flex: 1,
     },
     text: {
-        fontSize: 18,
-        fontWeight: '600',
-        color: theme.colors.text,
-        margin: 20,
-        position: 'relative',
+      fontSize: 16,
+      fontWeight: '600',
+      color: theme.colors.text,
+      marginBottom: 16,
+      margin: 20,
     },
     option: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: 20,
-        paddingVertical: 16,
-        borderBottomWidth: 1,
-        borderBottomColor: theme.colors.borderLight,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 20,
+      paddingVertical: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.borderLight,
     },
     optionLeft: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      flex: 1,
     },
     optionIconContainer: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: theme.colors.borderLight,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: 16,
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: theme.colors.borderLight,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginRight: 16,
     },
     optionTextContainer: {
-        flex: 1,
+      flex: 1,
     },
     optionTitle: {
-        fontSize: 16,
-        color: theme.colors.text,
-        fontWeight: '500',
-    },
-    optionSubtitle: {
-        fontSize: 14,
-        color: theme.colors.textSecondary,
-        marginTop: 2,
+      fontSize: 16,
+      color: theme.colors.text,
+      fontWeight: '500',
     },
   });
 
-export default  DevicePermission;
+export default DevicePermission;

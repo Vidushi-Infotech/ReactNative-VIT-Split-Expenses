@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect } from 'react';
+import React, {useState} from 'react';
 import {
   View,
   Text,
@@ -8,7 +7,6 @@ import {
   ScrollView,
   TouchableOpacity,
   StatusBar,
-  Modal,
   Switch,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
@@ -17,9 +15,9 @@ import {useTheme} from '../context/ThemeContext';
 const Notifications = ({onClose}) => {
   const {theme} = useTheme();
   const styles = createStyles(theme);
-  const [isEnabled, setIsEnabled] = useState(false);
 
-  const notifymeOptions = [
+  const [isEnabled, setIsEnabled] = useState(false);
+  const [notifymeOptions, setNotifyMeOptions] = useState([
     {
       id: 1,
       title: 'When I am added to a group',
@@ -35,16 +33,21 @@ const Notifications = ({onClose}) => {
       title: 'When a payment is Settled',
       isEnabled: false,
     },
-  ];
+  ]);
 
-  const toggleSwitch = () => setIsEnabled(previousState => !previousState);
-  const toggleNotifyMeSwitch = (item) => {
-    item.isEnabled(!item.isEnabled);
+  const toggleSwitch = () => setIsEnabled(prev => !prev);
+
+  const toggleNotifyMeSwitch = id => {
+    setNotifyMeOptions(prevOptions =>
+      prevOptions.map(item =>
+        item.id === id ? {...item, isEnabled: !item.isEnabled} : item,
+      ),
+    );
   };
 
   return (
     <SafeAreaView style={styles.container}>
-        <StatusBar
+      <StatusBar
         barStyle={theme.colors.statusBarStyle}
         backgroundColor={theme.colors.statusBarBackground}
       />
@@ -58,76 +61,102 @@ const Notifications = ({onClose}) => {
         <View style={styles.placeholder} />
       </View>
 
-      <ScrollView style={styles.scrollView}>
-        <Text style = {styles.text}>Enable Notifications         
-        <Switch style = {styles.switch}
-          trackColor={{ false: "#767577", true: theme.colors.primary }}
-          thumbColor={isEnabled ? "#f5dd4b" : "#f4f3f4"}
-          ios_backgroundColor="#3e3e3e"
-          onValueChange={toggleSwitch}
-          value={isEnabled}
-        />
-        </Text>
-        <Text style = {styles.text}>Notify Me</Text>
-        {notifymeOptions.map((item) => (
-          <Text key={item.id} style={styles.Subtext}>
-            <Text style={styles.SubtextTitle}>{item.title}</Text>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}>
+        {/* Global Notification Toggle */}
+        <View style={styles.row}>
+          <Text style={styles.text}>Enable Notifications</Text>
+          <Switch
+            style={styles.switch}
+            trackColor={{false: '#767577', true: '#1387c6cb'}}
+            thumbColor={isEnabled ? '#f4f3f3ff' : '#f4f3f3ff'}
+            ios_backgroundColor="#3e3e3e"
+            onValueChange={toggleSwitch}
+            value={isEnabled}
+          />
+        </View>
+
+        <Text style={styles.sectionTitle}>Notify Me</Text>
+
+        {/* Per-notification Toggles */}
+        {notifymeOptions.map(item => (
+          <View key={item.id} style={styles.Subtext}>
+            <Text
+              style={[
+                styles.SubtextTitle,
+                !isEnabled && {color: theme.colors.textSecondary},
+              ]}>
+              {item.title}
+            </Text>
             <Switch
               style={styles.SubtextSwitch}
-              trackColor={{ false: "#767577", true: theme.colors.primary }}
-              thumbColor={item.isEnabled ? "#f5dd4b" : "#f4f3f4"}
+              trackColor={{false: '#767577', true: '#1387c6cb'}}
+              thumbColor={item.isEnabled ? '#f4f3f4' : '#f4f3f4'}
               ios_backgroundColor="#3e3e3e"
-              onValueChange={() => toggleNotifyMeSwitch(item)}
+              onValueChange={() => toggleNotifyMeSwitch(item.id)}
               value={item.isEnabled}
+              disabled={!isEnabled}
             />
-          </Text>
-        ))}        
+          </View>
+        ))}
       </ScrollView>
     </SafeAreaView>
   );
 };
 
-
-const createStyles = (theme) => StyleSheet.create({
+const createStyles = theme =>
+  StyleSheet.create({
     container: {
-        flex: 1,
-        backgroundColor: theme.colors.background,
+      flex: 1,
+      backgroundColor: theme.colors.background,
     },
     header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: 20,
-        paddingVertical: 16,
-        borderBottomWidth: 1,
-        borderBottomColor: theme.colors.border,
-        backgroundColor: theme.colors.background,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 20,
+      paddingVertical: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.border,
+      backgroundColor: theme.colors.background,
     },
     backButton: {
-        padding: 4,
+      padding: 4,
     },
     headerTitle: {
-        fontSize: 18,
-        fontWeight: '600',
-        color: theme.colors.text,
+      fontSize: 18,
+      fontWeight: '600',
+      color: theme.colors.text,
     },
     placeholder: {
-        width: 32,
+      width: 32,
     },
     scrollView: {
-        flex: 1,
+      flex: 1,
+    },
+    scrollContent: {
+      padding: 20,
+    },
+    row: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 24,
     },
     text: {
       fontSize: 16,
       fontWeight: '600',
       color: theme.colors.text,
-      marginBottom: 16,
-      margin: 20,
     },
     switch: {
-      flex : 1,
-      alignItems: 'flex-end',
-      justifyContent: 'flex-end',
+      transform: [{scaleX: 1}, {scaleY: 1}],
+    },
+    sectionTitle: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: theme.colors.text,
+      marginBottom: 12,
     },
     Subtext: {
       flexDirection: 'row',
@@ -139,15 +168,26 @@ const createStyles = (theme) => StyleSheet.create({
       marginBottom: 12,
       borderWidth: 1,
       borderColor: theme.colors.border,
+      shadowColor: theme.colors.text,
+      shadowOffset: {
+        width: 0,
+        height: 2,
+      },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+      elevation: 3,
     },
     SubtextTitle: {
       fontSize: 16,
       fontWeight: '600',
       color: theme.colors.text,
+      flex: 1,
+      paddingRight: 8,
     },
     SubtextSwitch: {
-      padding : 4,
+      padding: 4,
     },
+    
   });
 
-export default  Notifications;
+export default Notifications;
