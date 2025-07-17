@@ -17,6 +17,8 @@ import auth from '@react-native-firebase/auth';
 import SplashScreen from './src/screens/SplashScreen';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
+import { BiometricProvider, useBiometrics } from './src/context/Biometrics';
+import { isBiometricAuthEnabled, promptBiometric } from './utils/biometrics';
 import LoginScreen from './src/screens/LoginScreen';
 import PhoneLoginScreen from './src/screens/PhoneLoginScreen';
 import OTPVerificationScreen from './src/screens/OTPVerificationScreen';
@@ -443,7 +445,9 @@ function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <AppContent />
+        <BiometricProvider>
+          <AppContent />
+        </BiometricProvider>
       </AuthProvider>
     </ThemeProvider>
   );

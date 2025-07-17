@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, {useState, useEffect} from 'react';
 import {
   View,
   Text,
@@ -8,14 +8,67 @@ import {
   TouchableOpacity,
   StatusBar,
   Switch,
+  Alert,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import {useTheme} from '../context/ThemeContext';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import ReactNativeBiometrics from 'react-native-biometrics';
 
 const FaceID = ({onClose}) => {
   const {theme} = useTheme();
   const styles = createStyles(theme);
   const [isEnabled, setIsEnabled] = useState(false);
+  const rnBiometrics = new ReactNativeBiometrics();
+  const [isFaceIdAvailable, setIsFaceIdAvailable] = useState(false);
+
+  useEffect(() => {
+    const checkFaceIdAvailability = async () => {
+      const { available, biometryType } = await rnBiometrics.isSensorAvailable();
+      setIsFaceIdAvailable(available && biometryType === 'FaceID');
+    };
+
+    checkFaceIdAvailability();
+  }, []);
+
+  const handleToggle = async () => {
+    if (!isFaceIdAvailable) {
+      Alert.alert('Face ID not available on this device');
+      return;
+    }
+
+    if (!isEnabled) {
+      try {
+        const { success } = await rnBiometrics.simplePrompt({
+          promptMessage: 'Authenticate with Face ID',
+        });
+
+        if (success) {
+          setIsEnabled(true);
+          await AsyncStorage.setItem('appLockEnabled', 'true');
+          Alert.alert('Face ID authentication enabled');
+        } else {
+          Alert.alert('Authentication cancelled');
+        }
+      } catch (error) {
+        Alert.alert('Authentication failed');
+      }
+    } else {
+      setIsEnabled(false);
+      await AsyncStorage.setItem('appLockEnabled', 'false');
+      Alert.alert('Face ID authentication disabled');
+    }
+  };
+
+  useEffect(() => {
+    const loadState = async () => {
+      const stored = await AsyncStorage.getItem('appLockEnabled');
+      if (stored === 'true') {
+        setIsEnabled(true);
+      }
+    };
+    loadState();
+  }, []);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -46,10 +99,10 @@ const FaceID = ({onClose}) => {
         <View style={styles.toggleRow}>
           <Text style={styles.toggleLabel}>Enable Face ID</Text>
           <Switch
-            trackColor={{ false: "#767577", true: theme.colors.primary }}
-            thumbColor={isEnabled ? "#f5dd4b" : "#f4f3f4"}
+            trackColor={{false: '#767577', true: theme.colors.primary}}
+            thumbColor={isEnabled ? '#f5dd4b' : '#f4f3f4'}
             ios_backgroundColor="#3e3e3e"
-            onValueChange={() => setIsEnabled(prev => !prev)}
+            onValueChange={handleToggle}
             value={isEnabled}
           />
         </View>
