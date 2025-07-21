@@ -13,7 +13,7 @@ import {
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import {useTheme} from '../context/ThemeContext';
 
-const HelpandSupport = ({onClose}) => {
+const Reportaproblem = ({onClose}) => {
   const {theme} = useTheme();
   const styles = createStyles(theme);
 
@@ -115,4 +115,4 @@ const createStyles = theme =>
     },
   });
 
-export default HelpandSupport;
+export default Reportaproblem;

@@ -13,7 +13,7 @@ import {
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import {useTheme} from '../context/ThemeContext';
 
-const HelpandSupport = ({onClose}) => {
+const AppVersion = ({onClose}) => {
   const {theme} = useTheme();
   const styles = createStyles(theme);
 
@@ -34,7 +34,7 @@ const HelpandSupport = ({onClose}) => {
       </View>
 
       <ScrollView style={styles.scrollView}>
-        <Text style={styles.text}></Text>
+        <Text style={styles.text}>App Version 1.0.0</Text>
 
       </ScrollView>
     </SafeAreaView>
@@ -115,4 +115,4 @@ const createStyles = theme =>
     },
   });
 
-export default HelpandSupport;
+export default AppVersion;

@@ -1,5 +1,4 @@
-
-import React, {useState} from 'react';
+import React from 'react';
 import {
   View,
   Text,
@@ -8,14 +7,18 @@ import {
   ScrollView,
   TouchableOpacity,
   StatusBar,
-  Alert,
+  Linking,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import {useTheme} from '../context/ThemeContext';
 
-const HelpandSupport = ({onClose}) => {
+const ContactSupport = ({onClose}) => {
   const {theme} = useTheme();
   const styles = createStyles(theme);
+
+  const handleEmailPress = () => {
+    Linking.openURL('mailto:support@splitzy.in');
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -34,8 +37,21 @@ const HelpandSupport = ({onClose}) => {
       </View>
 
       <ScrollView style={styles.scrollView}>
-        <Text style={styles.text}></Text>
+        <Text style={styles.text}>
+          For any queries or feedback, please reach us at:
+        </Text>
 
+        <TouchableOpacity onPress={handleEmailPress} activeOpacity={0.7}>
+          <View style={styles.emailContainer}>
+            <Ionicons
+              name="mail-outline"
+              size={20}
+              color={theme.colors.icon}
+              style={{ marginRight: 8 }}
+            />
+            <Text style={styles.emailText}>support@splitzy.in</Text>
+          </View>
+        </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
   );
@@ -74,45 +90,26 @@ const createStyles = theme =>
       fontSize: 16,
       fontWeight: '600',
       color: theme.colors.text,
-      marginBottom: 16,
-      margin: 20,
+      marginBottom: 12,
+      marginHorizontal: 20,
+      marginTop: 24,
     },
-    option: {
+    emailContainer: {
       flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'space-between',
-      paddingHorizontal: 20,
-      paddingVertical: 16,
-      borderBottomWidth: 1,
-      borderBottomColor: theme.colors.borderLight,
+      marginHorizontal: 20,
+      backgroundColor: theme.colors.surface,
+      padding: 12,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: theme.colors.borderLight,
     },
-    optionLeft: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      flex: 1,
-    },
-    optionIconContainer: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
-      backgroundColor: theme.colors.borderLight,
-      justifyContent: 'center',
-      alignItems: 'center',
-      marginRight: 16,
-    },
-    optionTextContainer: {
-      flex: 1,
-    },
-    optionTitle: {
+    emailText: {
       fontSize: 16,
-      color: theme.colors.text,
       fontWeight: '500',
-    },
-    currencyLogo: {
-      fontSize: 20,
-      fontWeight: '600',
-      color: theme.colors.text,
+      color: theme.colors.primary,
+      textDecorationLine: 'underline',
     },
   });
 
-export default HelpandSupport;
+export default ContactSupport;

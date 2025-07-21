@@ -1,4 +1,3 @@
-
 import React, {useState} from 'react';
 import {
   View,
@@ -13,7 +12,7 @@ import {
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import {useTheme} from '../context/ThemeContext';
 
-const HelpandSupport = ({onClose}) => {
+const FAQs = ({onClose}) => {
   const {theme} = useTheme();
   const styles = createStyles(theme);
 
@@ -34,8 +33,33 @@ const HelpandSupport = ({onClose}) => {
       </View>
 
       <ScrollView style={styles.scrollView}>
-        <Text style={styles.text}></Text>
+        <Text style={styles.text}>Frequently Asked Questions</Text>
 
+        <View style={styles.faqItem}>
+          <Text style={styles.question}>1. How does Splitzy work?</Text>
+          <Text style={styles.answer}>
+            Splitzy lets you manage group expenses and split bills easily with
+            friends or roommates.
+          </Text>
+        </View>
+
+        <View style={styles.faqItem}>
+          <Text style={styles.question}>
+            2. Can I use Splitzy without an account?
+          </Text>
+          <Text style={styles.answer}>
+            No, you need to create an account to track and sync your expenses
+            securely.
+          </Text>
+        </View>
+
+        <View style={styles.faqItem}>
+          <Text style={styles.question}>3. Is my data private?</Text>
+          <Text style={styles.answer}>
+            Yes. We do not share your data with third parties and your
+            information is stored securely.
+          </Text>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -113,6 +137,21 @@ const createStyles = theme =>
       fontWeight: '600',
       color: theme.colors.text,
     },
+    faqItem: {
+      marginBottom: 24,
+      marginHorizontal: 20,
+    },
+    question: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: theme.colors.text,
+      marginBottom: 8,
+    },
+    answer: {
+      fontSize: 14,
+      color: theme.colors.textSecondary,
+      marginBottom: 16,
+    },  
   });
 
-export default HelpandSupport;
+export default FAQs;
