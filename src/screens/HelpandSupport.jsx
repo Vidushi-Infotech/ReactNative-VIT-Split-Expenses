@@ -1,0 +1,213 @@
+import React, {useState} from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  SafeAreaView,
+  ScrollView,
+  TouchableOpacity,
+  StatusBar,
+  Modal,
+} from 'react-native';
+import Ionicons from 'react-native-vector-icons/Ionicons';
+import {useTheme} from '../context/ThemeContext';
+import FAQs from './FAQs';
+import ContactSupport from './ContactSupport';
+import Reportaproblem from './Reportaproblem';
+import AppVersion from './AppVersion';
+
+const HelpandSupport = ({onClose}) => {
+  const {theme} = useTheme();
+  const styles = createStyles(theme);
+  const [showFAQs, setShowFAQs] = useState(false);
+  const [showContactSupport, setShowContactSupport] = useState(false);
+  const [showReportaproblem, setShowReportaproblem] = useState(false);
+  const [showAppVersion, setShowAppVersion] = useState(false);
+
+  const Helpoptions = [
+    {
+      id: 1,
+      title: 'FAQs',
+      iconComponent: (
+        <Ionicons name="help-circle-outline" size={20} color={theme.colors.icon} />
+      ),
+      onPress: () => setShowFAQs(true),
+    },
+    {
+      id: 2,
+      title: 'Contact Support',
+      iconComponent: (
+        <Ionicons name="chatbox-elipses-outline" size={20} color={theme.colors.icon} />
+      ),
+      onPress: () => setShowContactSupport(true),
+    },
+    {
+      id: 3,
+      title: 'Report a problem',
+      iconComponent: (
+        <Ionicons name="alert-circle-outline" size={20} color={theme.colors.icon} />
+      ),
+      onPress: () => setShowReportaproblem(true),
+    },
+    {
+      id: 4,
+      title: 'App Version',
+      iconComponent: (
+        <Ionicons name="apps-outline" size={20} color={theme.colors.icon} />
+      ),
+      onPress: () => setShowAppVersion(true),
+    },
+  ];
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <StatusBar
+        barStyle={theme.colors.statusBarStyle}
+        backgroundColor={theme.colors.statusBarBackground}
+      />
+
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity style={styles.backButton} onPress={onClose}>
+          <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Help & Support</Text>
+        <View style={styles.placeholder} />
+      </View>
+
+      <ScrollView style={styles.scrollView}>
+        <Text style={styles.text}>Help info and Support</Text>
+        {Helpoptions.map(item => (
+          <TouchableOpacity
+            key={item.id}
+            style={styles.option}
+            onPress={item.onPress}
+            activeOpacity={0.7}>
+            <View style={styles.optionLeft}>
+              <View style={styles.optionIconContainer}>
+                {item.iconComponent}
+              </View>
+              <View style={styles.optionTextContainer}>
+                <Text style={styles.optionTitle}>{item.title}</Text>
+              </View>
+            </View>
+            <Ionicons
+              name="chevron-forward"
+              size={20}
+              color={theme.colors.icon}
+            />
+          </TouchableOpacity>
+        ))}
+
+        {/*FAQs Modal */}
+        <Modal
+          visible={showFAQs}
+          animationType="slide"
+          presentationStyle="pageSheet">
+          <FAQs onClose={() => setShowFAQs(false)} />
+        </Modal>
+
+        {/*Contact Support Modal */}
+        <Modal
+          visible={showContactSupport}
+          animationType="slide"
+          presentationStyle="pageSheet">
+          <ContactSupport onClose={() => setShowContactSupport(false)} />
+        </Modal>
+
+        {/*Report a problem Modal */}
+        <Modal
+          visible={showReportaproblem}
+          animationType="slide"
+          presentationStyle="pageSheet">
+          <Reportaproblem onClose={() => setShowReportaproblem(false)} />
+        </Modal>
+
+        {/*App Version Modal */}
+        <Modal
+          visible={showAppVersion}
+          animationType="slide"
+          presentationStyle="pageSheet">
+          <AppVersion onClose={() => setShowAppVersion(false)} />
+        </Modal>
+      </ScrollView>
+    </SafeAreaView>
+  );
+};
+
+const createStyles = theme =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: theme.colors.background,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 20,
+      paddingVertical: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.border,
+    },
+    backButton: {
+      padding: 4,
+    },
+    headerTitle: {
+      fontSize: 18,
+      fontWeight: '600',
+      color: theme.colors.text,
+    },
+    placeholder: {
+      width: 32,
+    },
+    scrollView: {
+      flex: 1,
+    },
+    text: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: theme.colors.text,
+      marginBottom: 16,
+      margin: 20,
+    },
+    option: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 20,
+      paddingVertical: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.borderLight,
+    },
+    optionLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flex: 1,
+    },
+    optionIconContainer: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: theme.colors.borderLight,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginRight: 16,
+    },
+    optionTextContainer: {
+      flex: 1,
+    },
+    optionTitle: {
+      fontSize: 16,
+      color: theme.colors.text,
+      fontWeight: '500',
+    },
+    currencyLogo: {
+      fontSize: 20,
+      fontWeight: '600',
+      color: theme.colors.text,
+    },
+
+  });
+
+export default HelpandSupport;

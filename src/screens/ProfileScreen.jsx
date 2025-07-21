@@ -24,6 +24,7 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import firebaseService from '../services/firebaseService';
 import Settings from './Settings';
+import HelpandSupport from './HelpandSupport';
 
 const ProfileScreen = ({ navigation }) => {
   const { signOut, user, isAndroid, loading } = useAuth();
@@ -37,6 +38,7 @@ const ProfileScreen = ({ navigation }) => {
   const [userProfile, setUserProfile] = useState(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
+  const [showHelpandSupport, setShowHelpandSupport] = useState(false);
 
   // Debug theme context
   console.log('ProfileScreen - Theme Mode:', themeMode);
@@ -189,7 +191,7 @@ const ProfileScreen = ({ navigation }) => {
       id: 5,
       title: 'Help & Support',
       iconComponent: <Ionicons name="help-circle" size={20} color={theme.colors.icon} />,
-      onPress: () => console.log('Help & Support pressed'),
+      onPress: () => setShowHelpandSupport(true),
     },
     {
       id: 6,
@@ -359,6 +361,15 @@ const ProfileScreen = ({ navigation }) => {
         presentationStyle="pageSheet"
       >
         <Settings onClose={() => setShowSettings(false)} />
+      </Modal>
+
+      {/* Help & Support Modal */}
+      <Modal
+        visible={showHelpandSupport}
+        animationType="slide"
+        presentationStyle="pageSheet"
+      >
+        <HelpandSupport onClose={() => setShowHelpandSupport(false)} />
       </Modal>
 
       {/* Themed Logout Alert */}
