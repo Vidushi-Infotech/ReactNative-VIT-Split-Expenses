@@ -233,6 +233,11 @@ const GroupDetailScreen = ({route, navigation}) => {
     navigation.navigate('AddMember', {group});
   };
 
+  const handleGroupDetails = () => {
+    setShowGroupOptions(false);
+    navigation.navigate('GroupDetails', {group});
+  };
+
   const handleDeleteGroup = () => {
     setShowGroupOptions(false);
 
@@ -396,16 +401,7 @@ const GroupDetailScreen = ({route, navigation}) => {
   };
 
   const renderExpenses = () => (
-    <ScrollView
-      style={styles.tabContent}
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={onRefresh}
-          colors={[theme.colors.primary]}
-          tintColor={theme.colors.primary}
-        />
-      }>
+    <>
       {loading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={theme.colors.primary} />
@@ -431,7 +427,10 @@ const GroupDetailScreen = ({route, navigation}) => {
             : 'Recent';
 
           return (
-            <View key={expense.id} style={styles.expenseItem}>
+            <TouchableOpacity
+              key={expense.id}
+              style={styles.expenseItem}
+              onPress={() => navigation.navigate('ExpenseDetail', {expense, group})}>
               <View
                 style={[styles.expenseIcon, {backgroundColor: category.color}]}>
                 <Text style={styles.expenseIconText}>{category.emoji}</Text>
@@ -450,11 +449,11 @@ const GroupDetailScreen = ({route, navigation}) => {
                 </Text>
                 <Text style={styles.expenseShare}>₹{yourShare.toFixed(0)}</Text>
               </View>
-            </View>
+            </TouchableOpacity>
           );
         })
       )}
-    </ScrollView>
+    </>
   );
 
   const toggleUserExpansion = userId => {
@@ -549,16 +548,7 @@ const GroupDetailScreen = ({route, navigation}) => {
       .filter(Boolean);
 
     return (
-      <ScrollView
-        style={styles.tabContent}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            colors={[theme.colors.primary]}
-            tintColor={theme.colors.primary}
-          />
-        }>
+      <>
         {loading ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color={theme.colors.primary} />
@@ -657,7 +647,7 @@ const GroupDetailScreen = ({route, navigation}) => {
             );
           })
         )}
-      </ScrollView>
+      </>
     );
   };
 
@@ -673,8 +663,12 @@ const GroupDetailScreen = ({route, navigation}) => {
         description: `Settlement between ${settlement.from} and ${settlement.to}`,
       });
 
-      // Reload settlements to get updated data
-      await loadGroupSettlements();
+      // Reload all group data to reflect settlements
+      await Promise.all([
+        loadGroupExpenses(),
+        loadGroupBalances(),
+        loadGroupSettlements(),
+      ]);
 
       // Show success message
       Alert.alert(
@@ -821,113 +815,258 @@ const GroupDetailScreen = ({route, navigation}) => {
     return calculatedSettlements;
   };
 
+  const createExpenseBasedSettlements = () => {
+    console.log('💰 Creating expense-based settlements...');
+    const expenseSettlements = [];
+
+    expenses.forEach(expense => {
+      const category = categoryMapping[expense.category?.id] || categoryMapping.default;
+      const paidByMember = groupMembers.find(m => m.userId === expense.paidBy);
+      
+      // Get participants who didn't pay
+      const participantsOwing = expense.participants?.filter(p => p.userId !== expense.paidBy) || [];
+      
+      participantsOwing.forEach(participant => {
+        const participantMember = groupMembers.find(m => m.userId === participant.userId);
+        const amount = participant.amount || 0;
+        
+        if (amount > 0 && participantMember && paidByMember) {
+          const settlementId = `${expense.id}-${participant.userId}`;
+          
+          // Check if this settlement has already been settled
+          const isAlreadySettled = settlements.settledTransactions?.some(settled => 
+            settled.fromUserId === participant.userId && 
+            settled.toUserId === expense.paidBy &&
+            settled.description?.includes(expense.description)
+          ) || false;
+          
+          // Only include if not already settled
+          if (!isAlreadySettled) {
+            expenseSettlements.push({
+              id: settlementId,
+              expenseId: expense.id,
+              expenseDescription: expense.description,
+              expenseCategory: category,
+              expenseDate: expense.createdAt?.toDate ? expense.createdAt.toDate().toLocaleDateString() : 'Recent',
+              fromUserId: participant.userId,
+              toUserId: expense.paidBy,
+              fromMember: participantMember,
+              toMember: paidByMember,
+              amount: amount,
+              isUserInvolved: participant.userId === user?.uid || expense.paidBy === user?.uid,
+            });
+          }
+        }
+      });
+    });
+
+    console.log('💰 Expense-based settlements (excluding settled):', expenseSettlements);
+    return expenseSettlements.filter(s => s.isUserInvolved);
+  };
+
+  const calculateTotalSettlements = (expenseSettlements) => {
+    const totals = {};
+    
+    expenseSettlements.forEach(settlement => {
+      const isYouOwe = settlement.fromUserId === user?.uid;
+      const otherPersonId = isYouOwe ? settlement.toUserId : settlement.fromUserId;
+      const otherPersonName = isYouOwe ? settlement.toMember?.name : settlement.fromMember?.name;
+      
+      if (!totals[otherPersonId]) {
+        totals[otherPersonId] = {
+          name: otherPersonName,
+          avatar: isYouOwe ? settlement.toMember?.avatar : settlement.fromMember?.avatar,
+          youOwe: 0,
+          owesYou: 0,
+          net: 0,
+        };
+      }
+      
+      if (isYouOwe) {
+        totals[otherPersonId].youOwe += settlement.amount;
+      } else {
+        totals[otherPersonId].owesYou += settlement.amount;
+      }
+      
+      totals[otherPersonId].net = totals[otherPersonId].owesYou - totals[otherPersonId].youOwe;
+    });
+    
+    return Object.entries(totals).map(([userId, data]) => ({
+      userId,
+      ...data,
+    })).filter(total => Math.abs(total.net) > 0.01);
+  };
+
+  const handleTotalSettle = async (totalSettlement) => {
+    console.log('💳 Settling total amount:', totalSettlement);
+    
+    try {
+      // Find all individual settlements for this person
+      const expenseSettlements = createExpenseBasedSettlements();
+      const relatedSettlements = expenseSettlements.filter(s => 
+        (s.fromUserId === user?.uid && s.toUserId === totalSettlement.userId) ||
+        (s.toUserId === user?.uid && s.fromUserId === totalSettlement.userId)
+      );
+      
+      // Settle all related settlements
+      for (const settlement of relatedSettlements) {
+        await firebaseService.createSettlement(group.id, {
+          fromUserId: settlement.fromUserId,
+          toUserId: settlement.toUserId,
+          amount: settlement.amount,
+          description: `Settlement for ${settlement.expenseDescription}`,
+        });
+      }
+      
+      // Reload all group data to reflect settlements
+      await Promise.all([
+        loadGroupExpenses(),
+        loadGroupBalances(),
+        loadGroupSettlements(),
+      ]);
+      
+      Alert.alert(
+        'All Settlements Completed',
+        `All payments between you and ${totalSettlement.name} have been marked as settled.`,
+        [{text: 'OK'}],
+      );
+    } catch (error) {
+      console.error('💳 Error settling total:', error);
+      Alert.alert('Error', 'Failed to settle all amounts. Please try again.');
+    }
+  };
+
   const renderSettlement = () => {
     // Don't create settlement list if group members haven't loaded yet
     if (loading || groupMembers.length === 0) {
       return (
-        <ScrollView
-          style={styles.tabContent}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              colors={[theme.colors.primary]}
-              tintColor={theme.colors.primary}
-            />
-          }>
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={theme.colors.primary} />
-            <Text style={styles.loadingText}>Loading settlements...</Text>
-          </View>
-        </ScrollView>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={theme.colors.primary} />
+          <Text style={styles.loadingText}>Loading settlements...</Text>
+        </View>
       );
     }
 
-    const pendingSettlements = createSettlementList();
-
-    console.log(
-      '⏳ Pending settlements with details:',
-      pendingSettlements.map(s => ({
-        id: s.id,
-        fromMember: s.fromMember?.name,
-        toMember: s.toMember?.name,
-        amount: s.amount,
-      })),
-    );
+    const expenseSettlements = createExpenseBasedSettlements();
+    const totalSettlements = calculateTotalSettlements(expenseSettlements);
 
     return (
-      <ScrollView
-        style={styles.tabContent}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            colors={[theme.colors.primary]}
-            tintColor={theme.colors.primary}
-          />
-        }>
+      <>
         {loading ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color={theme.colors.primary} />
             <Text style={styles.loadingText}>Loading settlements...</Text>
           </View>
-        ) : pendingSettlements.length === 0 ? (
+        ) : expenseSettlements.length === 0 ? (
           <View style={styles.noDataContainer}>
             <Ionicons name="checkmark-circle" size={48} color="#10B981" />
             <Text style={styles.noDataText}>All settled up!</Text>
             <Text style={styles.noDataSubtext}>No pending settlements</Text>
           </View>
         ) : (
-          pendingSettlements.map(settlement => {
-            const isYouOwe = settlement.fromUserId === user?.uid;
-            const avatarMember = isYouOwe
-              ? settlement.toMember
-              : settlement.fromMember;
-
-            return (
-              <View key={settlement.id} style={styles.settlementItem}>
-                {avatarMember?.avatar ? (
-                  <Image
-                    source={{uri: avatarMember.avatar}}
-                    style={styles.settlementAvatar}
-                  />
-                ) : (
-                  <View style={styles.settlementAvatarPlaceholder}>
-                    <Text style={styles.settlementAvatarText}>
-                      {avatarMember?.name?.charAt(0).toUpperCase() || 'U'}
-                    </Text>
-                  </View>
-                )}
-                <View style={styles.settlementDetails}>
-                  <Text style={styles.settlementText}>
-                    {isYouOwe ? (
-                      <>
-                        You owes{' '}
-                        <Text style={styles.settlementAmount}>
-                          ₹{settlement.amount.toFixed(0)}
-                        </Text>{' '}
-                        to {settlement.toMember?.name || 'Unknown User'}
-                      </>
+          <>
+            {/* Total Settlements Summary */}
+            {totalSettlements.length > 0 && (
+              <View style={styles.totalSettlementsSection}>
+                <Text style={styles.totalSettlementsTitle}>Settlement Summary</Text>
+                {totalSettlements.map(total => (
+                  <View key={total.userId} style={styles.totalSettlementItem}>
+                    {total.avatar ? (
+                      <Image source={{uri: total.avatar}} style={styles.totalSettlementAvatar} />
                     ) : (
-                      <>
-                        {settlement.fromMember?.name || 'Unknown User'} owes you{' '}
-                        <Text style={styles.settlementAmountGreen}>
-                          ₹{settlement.amount.toFixed(0)}
+                      <View style={styles.totalSettlementAvatarPlaceholder}>
+                        <Text style={styles.totalSettlementAvatarText}>
+                          {total.name?.charAt(0).toUpperCase() || 'U'}
                         </Text>
-                      </>
+                      </View>
                     )}
-                  </Text>
+                    <View style={styles.totalSettlementInfo}>
+                      {total.net > 0 ? (
+                        <Text style={styles.totalSettlementText}>
+                          <Text style={styles.totalSettlementName}>{total.name}</Text> owes you{' '}
+                          <Text style={styles.totalOwedAmount}>₹{Math.abs(total.net).toFixed(0)}</Text>
+                        </Text>
+                      ) : (
+                        <Text style={styles.totalSettlementText}>
+                          You owe <Text style={styles.totalSettlementName}>{total.name}</Text>{' '}
+                          <Text style={styles.totalOweAmount}>₹{Math.abs(total.net).toFixed(0)}</Text>
+                        </Text>
+                      )}
+                    </View>
+                    <TouchableOpacity
+                      style={styles.totalSettleButton}
+                      onPress={() => handleTotalSettle(total)}>
+                      <Text style={styles.totalSettleButtonText}>Settle All</Text>
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </View>
+            )}
+
+            {/* Individual Expense Settlements */}
+            <View style={styles.individualSettlementsSection}>
+              <Text style={styles.individualSettlementsTitle}>Individual Expenses</Text>
+              {expenseSettlements.map(settlement => {
+                const isYouOwe = settlement.fromUserId === user?.uid;
+                const avatarMember = isYouOwe ? settlement.toMember : settlement.fromMember;
+
+                return (
+              <View key={settlement.id} style={styles.expenseSettlementItem}>
+                {/* Expense Header */}
+                <View style={styles.expenseSettlementHeader}>
+                  <View style={[styles.expenseSettlementIcon, {backgroundColor: settlement.expenseCategory.color}]}>
+                    <Text style={styles.expenseSettlementEmoji}>{settlement.expenseCategory.emoji}</Text>
+                  </View>
+                  <View style={styles.expenseSettlementInfo}>
+                    <Text style={styles.expenseSettlementTitle}>{settlement.expenseDescription}</Text>
+                    <Text style={styles.expenseSettlementDate}>{settlement.expenseDate}</Text>
+                  </View>
                 </View>
+
+                {/* Settlement Details */}
+                <View style={styles.settlementDetails}>
+                  <View style={styles.settlementMemberRow}>
+                    {avatarMember?.avatar ? (
+                      <Image
+                        source={{uri: avatarMember.avatar}}
+                        style={styles.settlementAvatar}
+                      />
+                    ) : (
+                      <View style={styles.settlementAvatarPlaceholder}>
+                        <Text style={styles.settlementAvatarText}>
+                          {avatarMember?.name?.charAt(0).toUpperCase() || 'U'}
+                        </Text>
+                      </View>
+                    )}
+                    <View style={styles.settlementTextContainer}>
+                      {isYouOwe ? (
+                        <Text style={styles.settlementText}>
+                          You owe <Text style={styles.settlementAmount}>₹{settlement.amount.toFixed(0)}</Text> to{' '}
+                          <Text style={styles.settlementMemberName}>{settlement.toMember?.name}</Text>
+                        </Text>
+                      ) : (
+                        <Text style={styles.settlementText}>
+                          <Text style={styles.settlementMemberName}>{settlement.fromMember?.name}</Text> owes you{' '}
+                          <Text style={styles.settlementAmountGreen}>₹{settlement.amount.toFixed(0)}</Text>
+                        </Text>
+                      )}
+                    </View>
+                  </View>
+                </View>
+
+                {/* Settle Button */}
                 <TouchableOpacity
-                  style={styles.settleButton}
+                  style={styles.expenseSettleButton}
                   onPress={() => handleSettleUp(settlement)}>
-                  <Text style={styles.settleButtonText}>Settle up</Text>
+                  <Text style={styles.settleButtonText}>Mark as Settled</Text>
                 </TouchableOpacity>
               </View>
-            );
-          })
+                );
+              })}
+            </View>
+          </>
         )}
-      </ScrollView>
+      </>
     );
   };
 
@@ -948,7 +1087,7 @@ const GroupDetailScreen = ({route, navigation}) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
+      {/* Sticky Header */}
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.backButton}
@@ -962,129 +1101,143 @@ const GroupDetailScreen = ({route, navigation}) => {
         </TouchableOpacity>
       </View>
 
-      {/* Group Info */}
-      <View style={styles.groupInfo}>
-        <View style={styles.groupImageContainer}>
-          {group.coverImageUrl ? (
-            <Image
-              source={{uri: group.coverImageUrl}}
-              style={styles.groupCoverImage}
-            />
-          ) : (
-            <View style={styles.groupAvatarContainer}>
-              <Text style={styles.groupAvatar}>{group.avatar || '🎭'}</Text>
+      {/* Scrollable Content */}
+      <ScrollView
+        style={styles.scrollContainer}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={[theme.colors.primary]}
+            tintColor={theme.colors.primary}
+          />
+        }>
+        {/* Group Info */}
+        <View style={styles.groupInfo}>
+          <View style={styles.groupImageContainer}>
+            {group.coverImageUrl ? (
+              <Image
+                source={{uri: group.coverImageUrl}}
+                style={styles.groupCoverImage}
+              />
+            ) : (
+              <View style={styles.groupAvatarContainer}>
+                <Text style={styles.groupAvatar}>{group.avatar || '🎭'}</Text>
+              </View>
+            )}
+            <View style={styles.membersPreview}>
+              {groupMembers.slice(0, 3).map((member, index) => (
+                <View
+                  key={member.id || index}
+                  style={[
+                    styles.memberAvatarContainer,
+                    {marginLeft: index * -8},
+                  ]}>
+                  {member.avatar ? (
+                    <Image
+                      source={{uri: member.avatar}}
+                      style={styles.memberAvatar}
+                    />
+                  ) : (
+                    <View style={styles.memberAvatarPlaceholder}>
+                      <Text style={styles.memberAvatarText}>
+                        {member.name?.charAt(0).toUpperCase() || 'U'}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              ))}
             </View>
-          )}
-          <View style={styles.membersPreview}>
-            {groupMembers.slice(0, 3).map((member, index) => (
-              <View
-                key={member.id || index}
-                style={[
-                  styles.memberAvatarContainer,
-                  {marginLeft: index * -8},
-                ]}>
-                {member.avatar ? (
-                  <Image
-                    source={{uri: member.avatar}}
-                    style={styles.memberAvatar}
-                  />
-                ) : (
-                  <View style={styles.memberAvatarPlaceholder}>
-                    <Text style={styles.memberAvatarText}>
-                      {member.name?.charAt(0).toUpperCase() || 'U'}
-                    </Text>
-                  </View>
-                )}
-              </View>
-            ))}
           </View>
+          <Text style={styles.groupName}>{group.name}</Text>
         </View>
-        <Text style={styles.groupName}>{group.name}</Text>
-      </View>
 
-      {/* Group Summary */}
-      <View style={styles.summarySection}>
-        <Text style={styles.summaryTitle}>Group Summary</Text>
-        {loading ? (
-          <ActivityIndicator size="small" color={theme.colors.primary} />
-        ) : balances[user?.uid] ? (
-          (() => {
-            const userBalance = balances[user?.uid];
-            const settlements = calculateSettlements();
-            const youOwe = settlements.filter(s => s.fromUserId === user?.uid);
-            const owedToYou = settlements.filter(s => s.toUserId === user?.uid);
+        {/* Group Summary */}
+        <View style={styles.summarySection}>
+          <Text style={styles.summaryTitle}>Group Summary</Text>
+          {loading ? (
+            <ActivityIndicator size="small" color={theme.colors.primary} />
+          ) : balances[user?.uid] ? (
+            (() => {
+              const userBalance = balances[user?.uid];
+              const settlements = calculateSettlements();
+              const youOwe = settlements.filter(s => s.fromUserId === user?.uid);
+              const owedToYou = settlements.filter(s => s.toUserId === user?.uid);
 
-            return (
-              <View>
-                {userBalance.net === 0 ? (
-                  <Text style={styles.summaryText}>
-                    You are all settled up in {group.name}! 🎉
-                  </Text>
-                ) : userBalance.net > 0 ? (
-                  <Text style={styles.summaryText}>
-                    You get back total{' '}
-                    <Text style={styles.owedAmount}>
-                      ₹{userBalance.net.toFixed(0)}
-                    </Text>{' '}
-                    in {group.name}
-                  </Text>
-                ) : (
-                  <Text style={styles.summaryText}>
-                    You owe total{' '}
-                    <Text style={styles.oweAmount}>
-                      ₹{Math.abs(userBalance.net).toFixed(0)}
-                    </Text>{' '}
-                    in {group.name}
-                  </Text>
-                )}
-
-                {owedToYou.length > 0 &&
-                  owedToYou.map(settlement => (
-                    <Text key={settlement.id} style={styles.summaryText}>
-                      {settlement.from.replace(' (You)', '')} owes you{' '}
+              return (
+                <View>
+                  {userBalance.net === 0 ? (
+                    <Text style={styles.summaryText}>
+                      You are all settled up in {group.name}! 🎉
+                    </Text>
+                  ) : userBalance.net > 0 ? (
+                    <Text style={styles.summaryText}>
+                      You get back total{' '}
                       <Text style={styles.owedAmount}>
-                        ₹{settlement.amount.toFixed(0)}
-                      </Text>
+                        ₹{userBalance.net.toFixed(0)}
+                      </Text>{' '}
+                      in {group.name}
                     </Text>
-                  ))}
-
-                {youOwe.length > 0 &&
-                  youOwe.map(settlement => (
-                    <Text key={settlement.id} style={styles.summaryText}>
-                      You owe {settlement.to.replace(' (You)', '')}{' '}
+                  ) : (
+                    <Text style={styles.summaryText}>
+                      You owe total{' '}
                       <Text style={styles.oweAmount}>
-                        ₹{settlement.amount.toFixed(0)}
-                      </Text>
+                        ₹{Math.abs(userBalance.net).toFixed(0)}
+                      </Text>{' '}
+                      in {group.name}
                     </Text>
-                  ))}
-              </View>
-            );
-          })()
-        ) : (
-          <Text style={styles.summaryText}>No expense data available</Text>
-        )}
-      </View>
+                  )}
 
-      {/* Tabs */}
-      <View style={styles.tabContainer}>
-        {['Expenses', 'Balance', 'Settlement'].map(tab => (
-          <TouchableOpacity
-            key={tab}
-            style={[styles.tab, activeTab === tab && styles.activeTab]}
-            onPress={() => setActiveTab(tab)}>
-            <Text
-              style={[
-                styles.tabText,
-                activeTab === tab && styles.activeTabText,
-              ]}>
-              {tab}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+                  {owedToYou.length > 0 &&
+                    owedToYou.map(settlement => (
+                      <Text key={settlement.id} style={styles.summaryText}>
+                        {settlement.from.replace(' (You)', '')} owes you{' '}
+                        <Text style={styles.owedAmount}>
+                          ₹{settlement.amount.toFixed(0)}
+                        </Text>
+                      </Text>
+                    ))}
 
-      {/* Tab Content */}
-      {renderTabContent()}
+                  {youOwe.length > 0 &&
+                    youOwe.map(settlement => (
+                      <Text key={settlement.id} style={styles.summaryText}>
+                        You owe {settlement.to.replace(' (You)', '')}{' '}
+                        <Text style={styles.oweAmount}>
+                          ₹{settlement.amount.toFixed(0)}
+                        </Text>
+                      </Text>
+                    ))}
+                </View>
+              );
+            })()
+          ) : (
+            <Text style={styles.summaryText}>No expense data available</Text>
+          )}
+        </View>
+
+        {/* Tabs */}
+        <View style={styles.tabContainer}>
+          {['Expenses', 'Balance', 'Settlement'].map(tab => (
+            <TouchableOpacity
+              key={tab}
+              style={[styles.tab, activeTab === tab && styles.activeTab]}
+              onPress={() => setActiveTab(tab)}>
+              <Text
+                style={[
+                  styles.tabText,
+                  activeTab === tab && styles.activeTabText,
+                ]}>
+                {tab}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* Tab Content */}
+        <View style={styles.tabContent}>
+          {renderTabContent()}
+        </View>
+      </ScrollView>
 
       {/* Floating Add Button */}
       <TouchableOpacity
@@ -1113,6 +1266,17 @@ const GroupDetailScreen = ({route, navigation}) => {
                 style={styles.optionIconStyle}
               />
               <Text style={styles.optionText}>Add Member</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.optionItem}
+              onPress={handleGroupDetails}>
+              <MaterialIcons
+                name="info"
+                size={16}
+                color="#6B7280"
+                style={styles.optionIconStyle}
+              />
+              <Text style={styles.optionText}>Group Details</Text>
             </TouchableOpacity>
             {isGroupAdmin && (
               <TouchableOpacity
@@ -1295,9 +1459,12 @@ const createStyles = theme =>
       color: '#4F46E5',
       fontWeight: '600',
     },
-    tabContent: {
+    scrollContainer: {
       flex: 1,
+    },
+    tabContent: {
       paddingHorizontal: 16,
+      paddingBottom: 100, // Add space for floating button
     },
     expenseItem: {
       flexDirection: 'row',
@@ -1626,6 +1793,155 @@ const createStyles = theme =>
       color: '#FFFFFF',
       fontSize: 16,
       fontWeight: 'bold',
+    },
+    expenseSettlementItem: {
+      backgroundColor: theme.colors.surface,
+      marginVertical: 8,
+      borderRadius: 12,
+      padding: 16,
+      shadowColor: theme.colors.text,
+      shadowOffset: {
+        width: 0,
+        height: 1,
+      },
+      shadowOpacity: 0.05,
+      shadowRadius: 2,
+      elevation: 1,
+    },
+    expenseSettlementHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 12,
+    },
+    expenseSettlementIcon: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginRight: 12,
+    },
+    expenseSettlementEmoji: {
+      fontSize: 20,
+    },
+    expenseSettlementInfo: {
+      flex: 1,
+    },
+    expenseSettlementTitle: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: theme.colors.text,
+      marginBottom: 2,
+    },
+    expenseSettlementDate: {
+      fontSize: 12,
+      color: theme.colors.textMuted,
+    },
+    settlementMemberRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    settlementTextContainer: {
+      flex: 1,
+      marginLeft: 12,
+    },
+    settlementMemberName: {
+      fontWeight: '600',
+      color: theme.colors.text,
+    },
+    expenseSettleButton: {
+      backgroundColor: theme.colors.primary,
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      borderRadius: 6,
+      marginTop: 12,
+      alignSelf: 'flex-end',
+    },
+    totalSettlementsSection: {
+      marginBottom: 20,
+    },
+    totalSettlementsTitle: {
+      fontSize: 18,
+      fontWeight: '600',
+      color: theme.colors.text,
+      marginBottom: 16,
+      paddingHorizontal: 16,
+    },
+    totalSettlementItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: theme.colors.surface,
+      marginHorizontal: 16,
+      marginVertical: 4,
+      padding: 16,
+      borderRadius: 12,
+      shadowColor: theme.colors.text,
+      shadowOffset: {
+        width: 0,
+        height: 1,
+      },
+      shadowOpacity: 0.05,
+      shadowRadius: 2,
+      elevation: 1,
+    },
+    totalSettlementAvatar: {
+      width: 50,
+      height: 50,
+      borderRadius: 25,
+      marginRight: 12,
+    },
+    totalSettlementAvatarPlaceholder: {
+      width: 50,
+      height: 50,
+      borderRadius: 25,
+      backgroundColor: theme.colors.primary,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginRight: 12,
+    },
+    totalSettlementAvatarText: {
+      color: '#FFFFFF',
+      fontSize: 18,
+      fontWeight: 'bold',
+    },
+    totalSettlementInfo: {
+      flex: 1,
+    },
+    totalSettlementText: {
+      fontSize: 16,
+      color: theme.colors.text,
+    },
+    totalSettlementName: {
+      fontWeight: '600',
+      color: theme.colors.text,
+    },
+    totalOweAmount: {
+      color: '#EF4444',
+      fontWeight: '700',
+    },
+    totalOwedAmount: {
+      color: '#10B981',
+      fontWeight: '700',
+    },
+    totalSettleButton: {
+      backgroundColor: theme.colors.primary,
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+      borderRadius: 6,
+    },
+    totalSettleButtonText: {
+      color: '#FFFFFF',
+      fontSize: 14,
+      fontWeight: '600',
+    },
+    individualSettlementsSection: {
+      paddingHorizontal: 16,
+    },
+    individualSettlementsTitle: {
+      fontSize: 18,
+      fontWeight: '600',
+      color: theme.colors.text,
+      marginBottom: 16,
     },
   });
 
