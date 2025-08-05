@@ -34,7 +34,7 @@ const AppVersion = ({onClose}) => {
       </View>
 
       <ScrollView style={styles.scrollView}>
-        <Text style={styles.text}>App Version 1.0.0</Text>
+        <Text style={styles.text}>App Version 1.0.1</Text>
 
       </ScrollView>
     </SafeAreaView>
