@@ -18,8 +18,6 @@ import ThemedAlert from '../components/ThemedAlert';
 const LoginScreen = ({navigation}) => {
   const {signIn, loading, getErrorMessage, isAndroid} = useAuth();
   const {theme} = useTheme();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   // Alert state
@@ -32,37 +30,6 @@ const LoginScreen = ({navigation}) => {
     setAlertTitle(title);
     setAlertMessage(message);
     setShowAlert(true);
-  };
-
-  const handleLogin = async () => {
-    // Basic validation
-    if (!email.trim()) {
-      showThemedAlert('Error', 'Please enter your email address');
-      return;
-    }
-
-    if (!password.trim()) {
-      showThemedAlert('Error', 'Please enter your password');
-      return;
-    }
-
-    // For iOS, use static navigation (Firebase Auth not implemented yet)
-    if (!isAndroid) {
-      navigation.replace('Main');
-      return;
-    }
-
-    // For Android, use Firebase Auth
-    try {
-      setIsLoading(true);
-      await signIn(email.trim(), password);
-      // Navigation will be handled automatically by auth state change
-    } catch (error) {
-      console.error('Login error:', error);
-      showThemedAlert('Login Failed', getErrorMessage(error));
-    } finally {
-      setIsLoading(false);
-    }
   };
 
   const handleSignup = () => {
@@ -83,11 +50,6 @@ const LoginScreen = ({navigation}) => {
   const handleAppleLogin = () => {
     // Handle Apple login
     console.log('Apple login');
-  };
-
-  const handleForgotPassword = () => {
-    // Navigate to forgot password screen
-    navigation.navigate('ForgotPassword');
   };
 
   const styles = createStyles(theme);
@@ -111,63 +73,14 @@ const LoginScreen = ({navigation}) => {
         <Text style={styles.welcomeText}>Welcome to Splitzy!</Text>
 
         {/* Sign In Section */}
-        <Text style={styles.signInTitle}>Sign In</Text>
-
-        {/* Email Input */}
-        <View style={styles.inputContainer}>
-          <Text style={styles.inputLabel}>Email ID</Text>
-          <TextInput
-            style={styles.textInput}
-            placeholder="Enter Your Email"
-            placeholderTextColor={theme.colors.textSecondary}
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
-          />
-        </View>
-
-        {/* Password Input */}
-        <View style={styles.inputContainer}>
-          <Text style={styles.inputLabel}>Password</Text>
-          <TextInput
-            style={styles.textInput}
-            placeholder="Enter Your Password"
-            placeholderTextColor={theme.colors.textSecondary}
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-          />
-          <TouchableOpacity
-            style={styles.forgotPassword}
-            onPress={handleForgotPassword}>
-            <Text style={styles.forgotPasswordText}>Forgot password?</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Login Button */}
-        <TouchableOpacity
-          style={[
-            styles.loginButton,
-            (isLoading || loading) && styles.loginButtonDisabled,
-          ]}
-          onPress={handleLogin}
-          disabled={isLoading || loading}>
-          {isLoading || loading ? (
-            <ActivityIndicator color="#FFFFFF" size="small" />
-          ) : (
-            <Text style={styles.loginButtonText}>
-              {isAndroid ? 'Login' : 'Login (Demo)'}
-            </Text>
-          )}
-        </TouchableOpacity>
+        <Text style={styles.signInTitle}>Login</Text>
 
         {/* Phone Login Button */}
-        {/* <TouchableOpacity
+        <TouchableOpacity
           style={styles.phoneLoginButton}
           onPress={handlePhoneLogin}>
           <Text style={styles.phoneLoginText}>Login With Phone Number</Text>
-        </TouchableOpacity> */}
+        </TouchableOpacity> 
 
         {/* Sign Up Link */}
         <View style={styles.signupContainer}>

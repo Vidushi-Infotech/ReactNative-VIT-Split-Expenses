@@ -408,7 +408,7 @@ function AppContent() {
           barStyle={theme.colors.statusBarStyle}
           backgroundColor={theme.colors.statusBarBackground}
         />
-        <LoginScreen
+        <PhoneLoginScreen
           navigation={{
             replace: (screenName) => {
               if (screenName === 'Main') {
@@ -416,12 +416,8 @@ function AppContent() {
               }
             },
             navigate: (screenName) => {
-              if (screenName === 'PhoneLogin') {
+              if (screenName === 'OTPVerification') {
                 setShowPhoneLogin(true);
-              } else if (screenName === 'Register') {
-                setShowRegister(true);
-              } else if (screenName === 'ForgotPassword') {
-                setShowForgotPassword(true);
               }
             },
           }}

@@ -9,6 +9,7 @@ import {
   Image,
   ScrollView,
 } from 'react-native';
+import {useAuth} from '../context/AuthContext';
 import {useTheme} from '../context/ThemeContext';
 
 const PhoneLoginScreen = ({navigation}) => {
@@ -16,7 +17,7 @@ const PhoneLoginScreen = ({navigation}) => {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [countryCode, setCountryCode] = useState('+91');
   const [showCountryPicker, setShowCountryPicker] = useState(false);
-  const [phoneError, setPhoneError] = useState('');
+  const [phoneError, setPhoneError] = useState('')
 
   // Validate and format phone number input
   const handlePhoneNumberChange = text => {
@@ -70,10 +71,10 @@ const PhoneLoginScreen = ({navigation}) => {
     }
   };
 
-  const handleBackToLogin = () => {
-    // Navigate back to main login screen
-    navigation.goBack();
-  };
+  // const handleBackToLogin = () => {
+  //   // Navigate back to main login screen
+  //   navigation.goBack();
+  // };
 
   const styles = createStyles(theme);
 
@@ -89,18 +90,17 @@ const PhoneLoginScreen = ({navigation}) => {
             style={styles.logo}
             resizeMode="contain"
           />
-          <Text style={styles.brandName}>Splitzy</Text>
         </View>
 
         {/* Welcome Text */}
         <Text style={styles.welcomeText}>Welcome to Splitzy!</Text>
 
-        {/* Phone Login Section */}
-        <Text style={styles.loginTitle}>Login with mobile number</Text>
+        {/* Sign In Section */}
+        <Text style={styles.signInTitle}>Login</Text>
 
         {/* Phone Number Input */}
         <View style={styles.inputContainer}>
-          <Text style={styles.inputLabel}>Mobile Number</Text>
+          {/* <Text style={styles.inputLabel}>Mobile Number</Text> */}
           <View
             style={[
               styles.phoneInputContainer,
@@ -121,7 +121,7 @@ const PhoneLoginScreen = ({navigation}) => {
                 styles.phoneTextInput,
                 phoneError ? styles.phoneTextInputError : null,
               ]}
-              placeholder="Enter Your Phone Number"
+              placeholder="Enter Phone Number"
               placeholderTextColor={theme.colors.textSecondary}
               value={phoneNumber}
               onChangeText={handlePhoneNumberChange}
@@ -190,11 +190,11 @@ const PhoneLoginScreen = ({navigation}) => {
         </TouchableOpacity>
 
         {/* Back to Login Link */}
-        <TouchableOpacity
+        {/* <TouchableOpacity
           style={styles.backToLoginContainer}
           onPress={handleBackToLogin}>
           <Text style={styles.backToLoginText}>Back to Email Login</Text>
-        </TouchableOpacity>
+        </TouchableOpacity> */}
       </ScrollView>
     </SafeAreaView>
   );
@@ -209,17 +209,17 @@ const createStyles = theme =>
     scrollContent: {
       flexGrow: 1,
       paddingHorizontal: 32,
-      paddingTop: 60,
-      paddingBottom: 40,
+      paddingTop: 80,
+      paddingBottom: 0,
     },
     logoContainer: {
       alignItems: 'center',
-      marginBottom: 40,
+      marginBottom: 10,
     },
     logo: {
-      width: 80,
-      height: 80,
-      marginBottom: 12,
+      width: 200,
+      height: 200,
+      marginBottom: 0,
     },
     brandName: {
       fontSize: 32,
@@ -228,17 +228,17 @@ const createStyles = theme =>
       textAlign: 'center',
     },
     welcomeText: {
-      fontSize: 20,
-      fontWeight: '600',
+      fontSize: 25,
+      fontWeight: '60',
       color: theme.colors.primary,
       textAlign: 'center',
-      marginBottom: 60,
+      marginBottom: 30,
     },
-    loginTitle: {
+    signInTitle: {
       fontSize: 18,
       fontWeight: '600',
       color: theme.colors.text,
-      marginBottom: 32,
+      marginBottom: 30,
       textAlign: 'center',
     },
     inputContainer: {
@@ -266,14 +266,14 @@ const createStyles = theme =>
     countryCodeButton: {
       flexDirection: 'row',
       alignItems: 'center',
-      paddingHorizontal: 12,
-      paddingVertical: 16,
+      paddingHorizontal: 5,
+      paddingVertical: 0,
       borderRightWidth: 1,
       borderRightColor: theme.colors.border,
       minWidth: 80,
     },
     flagEmoji: {
-      fontSize: 18,
+      fontSize: 15,
       marginRight: 6,
     },
     countryCodeText: {
@@ -288,8 +288,8 @@ const createStyles = theme =>
     },
     phoneTextInput: {
       flex: 1,
-      paddingHorizontal: 16,
-      paddingVertical: 16,
+      paddingHorizontal: 7,
+      paddingVertical: 0,
       fontSize: 16,
       color: theme.colors.text,
       backgroundColor: 'transparent',
@@ -302,7 +302,7 @@ const createStyles = theme =>
       marginTop: 4,
     },
     phoneCounter: {
-      fontSize: 12,
+      fontSize: 10,
       color: theme.colors.textSecondary,
       fontWeight: '400',
     },
@@ -356,7 +356,7 @@ const createStyles = theme =>
       backgroundColor: theme.colors.primary,
       borderRadius: 8,
       paddingVertical: 18,
-      marginTop: 24,
+      marginTop: 30,
       marginBottom: 32,
     },
     sendOTPButtonText: {

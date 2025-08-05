@@ -143,6 +143,11 @@ const OTPVerificationScreen = ({navigation, route}) => {
       .padStart(2, '0')}`;
   };
 
+   const handleBackToLogin = () => {
+    // Navigate back to main login screen
+    navigation.goBack();
+  };
+
   const styles = createStyles(theme);
 
   return (
@@ -215,6 +220,12 @@ const OTPVerificationScreen = ({navigation, route}) => {
         message={alertConfig.message}
         buttons={alertConfig.buttons}
       />
+
+              <TouchableOpacity
+                style={styles.backToLoginContainer}
+                onPress={handleBackToLogin}>
+                <Text style={styles.backToLoginText}>Back to Login</Text>
+              </TouchableOpacity>
     </SafeAreaView>
   );
 };
