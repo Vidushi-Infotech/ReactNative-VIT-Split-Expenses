@@ -143,7 +143,7 @@ const OTPVerificationScreen = ({navigation, route}) => {
       .padStart(2, '0')}`;
   };
 
-   const handleBackToLogin = () => {
+  const handleBackToLogin = () => {
     // Navigate back to main login screen
     navigation.goBack();
   };
@@ -221,11 +221,11 @@ const OTPVerificationScreen = ({navigation, route}) => {
         buttons={alertConfig.buttons}
       />
 
-              <TouchableOpacity
-                style={styles.backToLoginContainer}
-                onPress={handleBackToLogin}>
-                <Text style={styles.backToLoginText}>Back to Login</Text>
-              </TouchableOpacity>
+      <TouchableOpacity
+        style={styles.backToLoginContainer}
+        onPress={handleBackToLogin}>
+        <Text style={styles.backToLoginText}>Back to Login</Text>
+      </TouchableOpacity>
     </SafeAreaView>
   );
 };
@@ -313,6 +313,16 @@ const createStyles = theme =>
       fontSize: 16,
       color: theme.colors.textSecondary,
       fontWeight: '400',
+    },
+        backToLoginContainer: {
+      alignItems: 'center',
+      marginTop: 30,
+    },
+    backToLoginText: {
+      fontSize: 16,
+      color: theme.colors.primary,
+      fontWeight: '500',
+      textDecorationLine: 'underline',
     },
   });
 
