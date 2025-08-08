@@ -71,10 +71,7 @@ const PhoneLoginScreen = ({navigation}) => {
     }
   };
 
-  // const handleBackToLogin = () => {
-  //   // Navigate back to main login screen
-  //   navigation.goBack();
-  // };
+ 
 
   const styles = createStyles(theme);
 
@@ -189,12 +186,6 @@ const PhoneLoginScreen = ({navigation}) => {
           <Text style={styles.sendOTPButtonText}>Send OTP</Text>
         </TouchableOpacity>
 
-        {/* Back to Login Link */}
-        {/* <TouchableOpacity
-          style={styles.backToLoginContainer}
-          onPress={handleBackToLogin}>
-          <Text style={styles.backToLoginText}>Back to Email Login</Text>
-        </TouchableOpacity> */}
       </ScrollView>
     </SafeAreaView>
   );
@@ -365,16 +356,7 @@ const createStyles = theme =>
       fontWeight: '600',
       textAlign: 'center',
     },
-    backToLoginContainer: {
-      alignItems: 'center',
-      marginTop: 20,
-    },
-    backToLoginText: {
-      fontSize: 16,
-      color: theme.colors.primary,
-      fontWeight: '500',
-      textDecorationLine: 'underline',
-    },
+
   });
 
 export default PhoneLoginScreen;
