@@ -22,6 +22,7 @@ import { isBiometricAuthEnabled, promptBiometric } from './utils/biometrics';
 import LoginScreen from './src/screens/LoginScreen';
 import PhoneLoginScreen from './src/screens/PhoneLoginScreen';
 import OTPVerificationScreen from './src/screens/OTPVerificationScreen';
+import ProfileSetupScreen from './src/screens/ProfileSetupScreen';
 import RegisterScreen from './src/screens/RegisterScreen';
 import ForgotPasswordScreen from './src/screens/ForgotPasswordScreen';
 import CreateNewPasswordScreen from './src/screens/CreateNewPasswordScreen';
