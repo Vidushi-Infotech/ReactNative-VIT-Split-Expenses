@@ -10,7 +10,7 @@ function PrivacyPolicy() {
           <div className="max-w-7xl mx-auto px-6 flex justify-between items-center">
             <div className="flex items-center gap-3">
               <img src={logo} alt="Splitzy Logo" className="w-8 h-8" />
-              <Link to="/" className="text-2xl font-bold gradient-text">Splitzy</Link>
+              <Link to="/" className="text-2xl font-bold gradient-text">KharchaSplit</Link>
             </div>
             <Link to="/" className="text-gray-600 hover:text-primary-500 font-medium transition-colors">
               Back to Home
@@ -33,7 +33,7 @@ function PrivacyPolicy() {
                 <section>
                   <h2 className="text-2xl font-bold text-gray-900 mb-4">1. Introduction</h2>
                   <p className="text-gray-600 leading-relaxed">
-                    Welcome to Splitzy ("we," "our," or "us"). We are committed to protecting your privacy and personal information. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our mobile application and related services.
+                    Welcome to KharchaSplit ("we," "our," or "us"). We are committed to protecting your privacy and personal information. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our mobile application and related services.
                   </p>
                 </section>
 

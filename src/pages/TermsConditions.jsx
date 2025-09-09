@@ -10,7 +10,7 @@ function TermsConditions() {
           <div className="max-w-7xl mx-auto px-6 flex justify-between items-center">
             <div className="flex items-center gap-3">
               <img src={logo} alt="Splitzy Logo" className="w-8 h-8" />
-              <Link to="/" className="text-2xl font-bold gradient-text">Splitzy</Link>
+              <Link to="/" className="text-2xl font-bold gradient-text">KharchaSplit</Link>
             </div>
             <Link to="/" className="text-gray-600 hover:text-primary-500 font-medium transition-colors">
               Back to Home
@@ -33,14 +33,14 @@ function TermsConditions() {
                 <section>
                   <h2 className="text-2xl font-bold text-gray-900 mb-4">1. Acceptance of Terms</h2>
                   <p className="text-gray-600 leading-relaxed">
-                    By accessing and using Splitzy ("the App"), you accept and agree to be bound by the terms and provision of this agreement. If you do not agree to abide by the above, please do not use this service.
+                    By accessing and using KharchaSplit ("the App"), you accept and agree to be bound by the terms and provision of this agreement. If you do not agree to abide by the above, please do not use this service.
                   </p>
                 </section>
 
                 <section>
                   <h2 className="text-2xl font-bold text-gray-900 mb-4">2. Description of Service</h2>
                   <p className="text-gray-600 leading-relaxed">
-                    Splitzy is a mobile application that allows users to track, split, and settle shared expenses with friends, family, and groups. The service includes features for expense management, balance calculations, and group coordination.
+                    KharchaSplit is a mobile application that allows users to track, split, and settle shared expenses with friends, family, and groups. The service includes features for expense management, balance calculations, and group coordination.
                   </p>
                 </section>
 
@@ -70,7 +70,7 @@ function TermsConditions() {
                 <section>
                   <h2 className="text-2xl font-bold text-gray-900 mb-4">5. Financial Transactions</h2>
                   <ul className="list-disc list-inside space-y-2 text-gray-600">
-                    <li>Splitzy facilitates expense tracking and splitting but does not process payments</li>
+                    <li>KharchaSplit facilitates expense tracking and splitting but does not process payments</li>
                     <li>Users are responsible for settling debts outside of the app</li>
                     <li>We are not responsible for disputes between users regarding payments</li>
                     <li>All expense calculations are provided for informational purposes only</li>
@@ -80,7 +80,7 @@ function TermsConditions() {
                 <section>
                   <h2 className="text-2xl font-bold text-gray-900 mb-4">6. Intellectual Property</h2>
                   <p className="text-gray-600 leading-relaxed">
-                    The service and its original content, features, and functionality are owned by Splitzy and are protected by international copyright, trademark, patent, trade secret, and other intellectual property laws.
+                    The service and its original content, features, and functionality are owned by KharchaSplit and are protected by international copyright, trademark, patent, trade secret, and other intellectual property laws.
                   </p>
                 </section>
 
@@ -111,7 +111,7 @@ function TermsConditions() {
                 <section>
                   <h2 className="text-2xl font-bold text-gray-900 mb-4">10. Limitation of Liability</h2>
                   <p className="text-gray-600 leading-relaxed">
-                    In no event shall Splitzy, nor its directors, employees, partners, agents, suppliers, or affiliates, be liable for any indirect, incidental, special, consequential, or punitive damages, including without limitation, loss of profits, data, use, goodwill, or other intangible losses, resulting from your use of the service.
+                    In no event shall KharchaSplit, nor its directors, employees, partners, agents, suppliers, or affiliates, be liable for any indirect, incidental, special, consequential, or punitive damages, including without limitation, loss of profits, data, use, goodwill, or other intangible losses, resulting from your use of the service.
                   </p>
                 </section>
 

@@ -15,7 +15,7 @@ function HomePage() {
           <div className="max-w-7xl mx-auto px-6 flex justify-between items-center">
             <div className="flex items-center gap-3">
               <img src={logo} alt="Splitzy Logo" className="w-8 h-8" />
-              <span className="text-2xl font-bold gradient-text">Splitzy</span>
+              <span className="text-2xl font-bold gradient-text">KharchaSplit</span>
             </div>
             <ul className="hidden md:flex space-x-8">
               <li><a href="#features" className="text-gray-600 hover:text-primary-500 font-medium transition-colors">Features</a></li>
@@ -231,7 +231,7 @@ function HomePage() {
 
         <section id="features" className="py-12 sm:py-16 lg:py-20 bg-gradient-to-br from-gray-50 to-gray-100">
           <div className="max-w-7xl mx-auto px-4 sm:px-6">
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-center text-gray-900 mb-12 sm:mb-16 scroll-animate">Why Choose Splitzy?</h2>
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-center text-gray-900 mb-12 sm:mb-16 scroll-animate">Why Choose KharchaSplit?</h2>
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
               <div className="group bg-white p-6 sm:p-8 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 hover:scale-105 border border-gray-100 relative overflow-hidden scroll-animate-left">
                 <div className="absolute inset-0 bg-gradient-to-br from-primary-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
@@ -354,20 +354,20 @@ function HomePage() {
             <h2 className="text-5xl font-bold text-center text-gray-900 mb-16 scroll-animate">Frequently Asked Questions</h2>
             <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
               <div className="bg-gray-50 p-6 rounded-2xl border border-gray-100 hover:shadow-lg transition-shadow duration-300 scroll-animate-left">
-                <h3 className="text-xl font-bold text-gray-900 mb-4">Is Splitzy free to use?</h3>
-                <p className="text-gray-600 leading-relaxed">Yes! Splitzy offers a free basic version with all essential features. Premium plans are available for advanced features.</p>
+                <h3 className="text-xl font-bold text-gray-900 mb-4">Is KharchaSplit free to use?</h3>
+                <p className="text-gray-600 leading-relaxed">Yes! KharchaSplit offers a free basic version with all essential features. Premium plans are available for advanced features.</p>
               </div>
               <div className="bg-gray-50 p-6 rounded-2xl border border-gray-100 hover:shadow-lg transition-shadow duration-300 scroll-animate-right">
                 <h3 className="text-xl font-bold text-gray-900 mb-4">How secure is my data?</h3>
                 <p className="text-gray-600 leading-relaxed">We use industry-standard encryption to ensure your expense data is completely secure and private.</p>
               </div>
               <div className="bg-gray-50 p-6 rounded-2xl border border-gray-100 hover:shadow-lg transition-shadow duration-300 scroll-animate-left" style={{transitionDelay: '0.2s'}}>
-                <h3 className="text-xl font-bold text-gray-900 mb-4">Can I use Splitzy on mobile?</h3>
-                <p className="text-gray-600 leading-relaxed">Absolutely! Splitzy is fully responsive and works great on all devices.</p>
+                <h3 className="text-xl font-bold text-gray-900 mb-4">Can I use KharchaSplit on mobile?</h3>
+                <p className="text-gray-600 leading-relaxed">Absolutely! KharchaSplit is fully responsive and works great on all devices.</p>
               </div>
               <div className="bg-gray-50 p-6 rounded-2xl border border-gray-100 hover:shadow-lg transition-shadow duration-300 scroll-animate-right" style={{transitionDelay: '0.2s'}}>
                 <h3 className="text-xl font-bold text-gray-900 mb-4">How does expense splitting work?</h3>
-                <p className="text-gray-600 leading-relaxed">Simply add expenses, select participants, and Splitzy automatically calculates fair shares for everyone.</p>
+                <p className="text-gray-600 leading-relaxed">Simply add expenses, select participants, and KharchaSplit automatically calculates fair shares for everyone.</p>
               </div>
             </div>
           </div>
@@ -382,7 +382,7 @@ function HomePage() {
           
           <div className="relative z-10 max-w-7xl mx-auto px-6 text-center">
             <h2 className="text-5xl font-bold mb-6">Ready to Start Splitting?</h2>
-            <p className="text-xl mb-12 opacity-90 max-w-2xl mx-auto">Join thousands of users who have simplified their expense management with Splitzy.</p>
+            <p className="text-xl mb-12 opacity-90 max-w-2xl mx-auto">Join thousands of users who have simplified their expense management with KharchaSplit.</p>
             <div className="flex flex-col items-center gap-8">
               <button className="bg-white text-primary-500 px-12 py-4 rounded-full font-bold text-xl hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 flex items-center gap-3">
                 <span>Get Started Free</span>
@@ -424,7 +424,7 @@ function HomePage() {
           <div className="text-center mb-16">
             <h4 className="text-4xl font-bold mb-4">
               <span className="bg-gradient-to-r from-primary-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
-                Splitzy
+                KharchaSplit
               </span>
             </h4>
             <p className="text-xl text-gray-300 mb-12">Split Expenses, Not Friendships</p>
@@ -474,7 +474,7 @@ function HomePage() {
           {/* Bottom Section */}
           <div className="pt-8 border-t border-gray-700/50 text-center">
             <div className="flex flex-col md:flex-row justify-center items-center gap-4">
-              <p className="text-gray-400">&copy; 2025 Splitzy. All rights reserved.</p>
+              <p className="text-gray-400">&copy; 2025 KharchaSplit. All rights reserved.</p>
               <div className="hidden md:block w-px h-4 bg-gray-600"></div>
               <p className="text-gray-400">Made with ❤️ for better expense sharing</p>
             </div>
