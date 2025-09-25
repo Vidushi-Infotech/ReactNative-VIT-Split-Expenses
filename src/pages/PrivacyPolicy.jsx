@@ -9,7 +9,7 @@ function PrivacyPolicy() {
         <nav className="py-4">
           <div className="max-w-7xl mx-auto px-6 flex justify-between items-center">
             <div className="flex items-center gap-3">
-              <img src={logo} alt="Splitzy Logo" className="w-8 h-8" />
+              <img src={logo} alt="KharchaSplit Logo" className="w-8 h-8" />
               <Link to="/" className="text-2xl font-bold gradient-text">KharchaSplit</Link>
             </div>
             <Link to="/" className="text-gray-600 hover:text-primary-500 font-medium transition-colors">
@@ -119,7 +119,7 @@ function PrivacyPolicy() {
                     If you have any questions about this Privacy Policy, please contact us at:
                   </p>
                   <div className="bg-gray-50 p-4 rounded-lg mt-4">
-                    <p className="text-gray-700">Email: support@splitzy.in</p>
+                    <p className="text-gray-700">Email: support@KharchaSplit.in</p>
                     <p className="text-gray-700">Phone: +1 (555) 123-4567</p>
                   </div>
                 </section>

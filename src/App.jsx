@@ -14,7 +14,7 @@ function HomePage() {
         <nav className="py-4">
           <div className="max-w-7xl mx-auto px-6 flex justify-between items-center">
             <div className="flex items-center gap-3">
-              <img src={logo} alt="Splitzy Logo" className="w-8 h-8" />
+              <img src={logo} alt="KharchaSplit Logo" className="w-8 h-8" />
               <span className="text-2xl font-bold gradient-text">KharchaSplit</span>
             </div>
             <ul className="hidden md:flex space-x-8">
@@ -144,7 +144,7 @@ function HomePage() {
                     {/* App Screenshot */}
                     <img 
                       src={appScreen} 
-                      alt="Splitzy App Interface" 
+                      alt="KharchaSplit App Interface" 
                       className="relative w-64 sm:w-72 md:w-80 lg:max-w-80 h-auto object-contain rounded-3xl shadow-2xl border border-white/30"
                     />
                     
@@ -277,7 +277,7 @@ function HomePage() {
                   2
                 </div>
                 <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-3 sm:mb-4">Add Expenses</h3>
-                <p className="text-gray-600 leading-relaxed text-sm sm:text-base">Add shared expenses and let Splitzy calculate everyone's fair share.</p>
+                <p className="text-gray-600 leading-relaxed text-sm sm:text-base">Add shared expenses and let KharchaSplit calculate everyone's fair share.</p>
               </div>
               <div className="text-center group scroll-animate-scale sm:col-span-2 lg:col-span-1" style={{transitionDelay: '0.4s'}}>
                 <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gradient-primary rounded-full flex items-center justify-center text-white text-xl sm:text-2xl font-bold mx-auto mb-4 sm:mb-6 shadow-lg group-hover:scale-110 transition-transform duration-300">
@@ -298,7 +298,7 @@ function HomePage() {
                 <div className="absolute inset-0 bg-gradient-to-br from-primary-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                 <div className="relative z-10">
                   <div className="mb-6">
-                    <p className="text-gray-700 italic leading-relaxed">"Splitzy has made managing group expenses so much easier. No more awkward conversations about money!"</p>
+                    <p className="text-gray-700 italic leading-relaxed">"KharchaSplit has made managing group expenses so much easier. No more awkward conversations about money!"</p>
                   </div>
                   <div className="flex items-center gap-4">
                     <div className="w-12 h-12 bg-gradient-primary rounded-full flex items-center justify-center text-white font-semibold group-hover:scale-110 transition-transform duration-300">
@@ -434,7 +434,7 @@ function HomePage() {
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-8 mb-12 text-center">
             <div className="space-y-2">
               <h5 className="text-lg font-semibold text-white mb-3">Contact Us</h5>
-              <p className="text-gray-300 text-sm sm:text-base">support@splitzy.in</p>
+              <p className="text-gray-300 text-sm sm:text-base">support@KharchaSplit.in</p>
               <p className="text-gray-300 text-sm sm:text-base">+1 (555) 123-4567</p>
             </div>
             
