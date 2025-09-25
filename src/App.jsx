@@ -434,7 +434,7 @@ function HomePage() {
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-8 mb-12 text-center">
             <div className="space-y-2">
               <h5 className="text-lg font-semibold text-white mb-3">Contact Us</h5>
-              <p className="text-gray-300 text-sm sm:text-base">support@KharchaSplit.in</p>
+              <p className="text-gray-300 text-sm sm:text-base">support@KharchaSplit.com</p>
               <p className="text-gray-300 text-sm sm:text-base">+1 (555) 123-4567</p>
             </div>
             

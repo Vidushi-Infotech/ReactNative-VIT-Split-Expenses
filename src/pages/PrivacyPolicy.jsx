@@ -119,7 +119,7 @@ function PrivacyPolicy() {
                     If you have any questions about this Privacy Policy, please contact us at:
                   </p>
                   <div className="bg-gray-50 p-4 rounded-lg mt-4">
-                    <p className="text-gray-700">Email: support@KharchaSplit.in</p>
+                    <p className="text-gray-700">Email: support@KharchaSplit.com</p>
                     <p className="text-gray-700">Phone: +1 (555) 123-4567</p>
                   </div>
                 </section>
