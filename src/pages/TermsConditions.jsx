@@ -8,10 +8,13 @@ function TermsConditions() {
       <header className="fixed w-full top-0 z-50 bg-white/95 backdrop-blur-md border-b border-white/20 shadow-lg">
         <nav className="py-4">
           <div className="max-w-7xl mx-auto px-6 flex justify-between items-center">
-            <div className="flex items-center gap-3">
-              <img src={logo} alt="KharchaSplit Logo" className="w-8 h-8" />
-              <Link to="/" className="text-2xl font-bold gradient-text">KharchaSplit</Link>
-            </div>
+            <Link to="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity" style={{ cursor: 'pointer' }}>
+              <img src={logo} alt="KharchaSplit Logo" className="w-8 h-8" style={{ pointerEvents: 'none' }} />
+              <span className="text-2xl font-bold" style={{ pointerEvents: 'none' }}>
+                <span className="text-[#0D5B5B]">Kharcha</span>
+                <span className="text-[#FF8C42]">Split</span>
+              </span>
+            </Link>
             <Link to="/" className="text-gray-600 hover:text-primary-500 font-medium transition-colors">
               Back to Home
             </Link>
