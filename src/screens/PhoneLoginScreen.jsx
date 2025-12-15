@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useState, useEffect} from 'react';
 import {
   View,
   Text,
@@ -8,24 +8,68 @@ import {
   TouchableOpacity,
   Image,
   ScrollView,
+  ActivityIndicator,
+  Alert,
+  Animated,
 } from 'react-native';
 import {useAuth} from '../context/AuthContext';
 import {useTheme} from '../context/ThemeContext';
+import watiService from '../services/watiService';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 
 const PhoneLoginScreen = ({navigation}) => {
   const {theme} = useTheme();
   const [phoneNumber, setPhoneNumber] = useState('');
   const [countryCode, setCountryCode] = useState('+91');
   const [showCountryPicker, setShowCountryPicker] = useState(false);
-  const [phoneError, setPhoneError] = useState('')
+  const [phoneError, setPhoneError] = useState('');
+  const [selectedMethod, setSelectedMethod] = useState('whatsapp'); // 'whatsapp' or 'sms'
+  const [isLoading, setIsLoading] = useState(false);
+  const [whatsappAvailable, setWhatsappAvailable] = useState(null);
+  const [checkingWhatsApp, setCheckingWhatsApp] = useState(false);
+  const [fadeAnim] = useState(new Animated.Value(0));
+
+  // Countries data with more options
+  const countries = [
+    { code: '+91', name: 'India', flag: '🇮🇳', length: 10 },
+    { code: '+1', name: 'United States', flag: '🇺🇸', length: 10 },
+    { code: '+44', name: 'United Kingdom', flag: '🇬🇧', length: 11 },
+    { code: '+61', name: 'Australia', flag: '🇦🇺', length: 9 },
+    { code: '+81', name: 'Japan', flag: '🇯🇵', length: 11 },
+    { code: '+86', name: 'China', flag: '🇨🇳', length: 11 },
+  ];
+
+  const currentCountry = countries.find(c => c.code === countryCode) || countries[0];
+
+  // Animation on component mount
+  useEffect(() => {
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 800,
+      useNativeDriver: true,
+    }).start();
+  }, []);
+
+  // Check WhatsApp availability when phone number changes
+  useEffect(() => {
+    if (phoneNumber.length === currentCountry.length) {
+      // Temporarily disable availability check due to API issues
+      // checkWhatsAppAvailability();
+      
+      // For now, assume WhatsApp is available for testing
+      setWhatsappAvailable(true);
+    } else {
+      setWhatsappAvailable(null);
+    }
+  }, [phoneNumber, countryCode]);
 
   // Validate and format phone number input
   const handlePhoneNumberChange = text => {
     // Remove any non-numeric characters
     const numericOnly = text.replace(/[^0-9]/g, '');
 
-    // Limit to 10 digits
-    const limitedNumber = numericOnly.slice(0, 10);
+    // Limit to country-specific length
+    const limitedNumber = numericOnly.slice(0, currentCountry.length);
 
     setPhoneNumber(limitedNumber);
 
@@ -35,43 +79,144 @@ const PhoneLoginScreen = ({navigation}) => {
     }
   };
 
+  // Check if WhatsApp is available for this number
+  const checkWhatsAppAvailability = async () => {
+    if (phoneNumber.length !== currentCountry.length) return;
+    
+    setCheckingWhatsApp(true);
+    try {
+      const fullNumber = countryCode + phoneNumber;
+      const availability = await watiService.checkWhatsAppAvailability(fullNumber);
+      setWhatsappAvailable(availability.whatsappExists);
+      
+      // Auto-select WhatsApp if available, SMS if not
+      if (availability.whatsappExists && selectedMethod !== 'whatsapp') {
+        setSelectedMethod('whatsapp');
+      } else if (!availability.whatsappExists && selectedMethod === 'whatsapp') {
+        setSelectedMethod('sms');
+      }
+    } catch (error) {
+      console.log('Could not check WhatsApp availability:', error);
+      setWhatsappAvailable(false);
+    } finally {
+      setCheckingWhatsApp(false);
+    }
+  };
+
   // Validate phone number
   const validatePhoneNumber = () => {
     if (phoneNumber.length === 0) {
       setPhoneError('Phone number is required');
       return false;
     }
-    if (phoneNumber.length < 10) {
-      setPhoneError('Phone number must be 10 digits');
+    if (phoneNumber.length < currentCountry.length) {
+      setPhoneError(`Phone number must be ${currentCountry.length} digits`);
       return false;
     }
-    if (phoneNumber.length > 10) {
-      setPhoneError('Phone number cannot exceed 10 digits');
+    if (phoneNumber.length > currentCountry.length) {
+      setPhoneError(`Phone number cannot exceed ${currentCountry.length} digits`);
       return false;
     }
-    // Check if it's all numbers (additional validation)
-    if (!/^\d{10}$/.test(phoneNumber)) {
-      setPhoneError('Please enter a valid 10-digit phone number');
+    // Check if it's all numbers
+    const regex = new RegExp(`^\\d{${currentCountry.length}}$`);
+    if (!regex.test(phoneNumber)) {
+      setPhoneError(`Please enter a valid ${currentCountry.length}-digit phone number`);
       return false;
     }
     setPhoneError('');
     return true;
   };
 
-  const handleSendOTP = () => {
+  const handleSendOTP = async () => {
     // Validate phone number before sending OTP
-    if (validatePhoneNumber()) {
-      // Handle OTP sending logic
-      console.log('Sending OTP to:', countryCode + phoneNumber);
-      // Navigate to OTP verification screen
-      navigation.navigate('OTPVerification', {
-        phoneNumber: phoneNumber,
-        countryCode: countryCode,
-      });
+    if (!validatePhoneNumber()) {
+      return;
+    }
+
+    setIsLoading(true);
+    const fullPhoneNumber = countryCode + phoneNumber;
+
+    try {
+      console.log(`🚀 Sending ${selectedMethod.toUpperCase()} OTP to:`, fullPhoneNumber);
+      
+      const result = await watiService.sendOTP(fullPhoneNumber, selectedMethod);
+      
+      if (result.success) {
+        // Show success message
+        const methodName = result.provider === 'whatsapp' ? 'WhatsApp' : 'SMS';
+        Alert.alert(
+          'OTP Sent Successfully!',
+          `Verification code has been sent to your ${methodName}.${result.fallback ? ' (Sent via SMS as backup)' : ''}`,
+          [{ text: 'OK' }]
+        );
+
+        // Navigate to OTP verification screen with additional data
+        navigation.navigate('OTPVerification', {
+          phoneNumber: phoneNumber,
+          countryCode: countryCode,
+          fullPhoneNumber: fullPhoneNumber,
+          provider: result.provider,
+          messageId: result.messageId,
+          otpForTesting: result.otp, // Remove this in production
+          selectedMethod: selectedMethod,
+        });
+      } else {
+        throw new Error(result.message || 'Failed to send OTP');
+      }
+    } catch (error) {
+      console.error('❌ Error sending OTP:', error);
+      
+      let errorMessage = 'Could not send verification code. Please try again.';
+      let showRetry = true;
+      
+      // Provide specific error messages based on the error
+      if (error.message.includes('401')) {
+        errorMessage = 'Authentication failed. Please contact support.';
+        showRetry = false;
+      } else if (error.message.includes('403')) {
+        errorMessage = 'Service temporarily unavailable. Please try SMS instead.';
+      } else if (error.message.includes('Invalid response')) {
+        errorMessage = 'Service error. Trying SMS fallback automatically.';
+      } else if (error.message.includes('Failed to send WhatsApp')) {
+        errorMessage = 'WhatsApp delivery failed. Would you like to try SMS instead?';
+      }
+      
+      const alertButtons = [
+        { text: 'Cancel', style: 'cancel' }
+      ];
+      
+      if (showRetry) {
+        alertButtons.unshift({ text: 'Retry', onPress: handleSendOTP });
+      }
+      
+      if (selectedMethod === 'whatsapp') {
+        alertButtons.unshift({ 
+          text: 'Try SMS', 
+          onPress: () => {
+            setSelectedMethod('sms');
+            setTimeout(handleSendOTP, 500);
+          }
+        });
+      }
+      
+      Alert.alert('OTP Send Failed', errorMessage, alertButtons);
+    } finally {
+      setIsLoading(false);
     }
   };
 
- 
+  // Handle country selection
+  const handleCountrySelect = (country) => {
+    setCountryCode(country.code);
+    setShowCountryPicker(false);
+    setPhoneNumber(''); // Clear phone number when country changes
+    setWhatsappAvailable(null);
+  };
+
+  // const handleBackToLogin = () => {
+  //   // Navigate back to main login screen
+  //   navigation.goBack();
+  // };
 
   const styles = createStyles(theme);
 
@@ -81,23 +226,24 @@ const PhoneLoginScreen = ({navigation}) => {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}>
         {/* Logo Section */}
-        <View style={styles.logoContainer}>
+        <Animated.View style={[styles.logoContainer, { opacity: fadeAnim }]}>
           <Image
             source={require('../Assets/Logo.png')}
             style={styles.logo}
             resizeMode="contain"
           />
-        </View>
+        </Animated.View>
 
         {/* Welcome Text */}
-        <Text style={styles.welcomeText}>Welcome to Splitzy!</Text>
+        <Animated.Text style={[styles.welcomeText, { opacity: fadeAnim }]}>
+          Welcome to Splitzy!
+        </Animated.Text>
 
         {/* Sign In Section */}
-        <Text style={styles.signInTitle}>Login</Text>
+        <Text style={styles.signInTitle}>Login with Phone Number</Text>
 
         {/* Phone Number Input */}
         <View style={styles.inputContainer}>
-          {/* <Text style={styles.inputLabel}>Mobile Number</Text> */}
           <View
             style={[
               styles.phoneInputContainer,
@@ -107,9 +253,13 @@ const PhoneLoginScreen = ({navigation}) => {
             <TouchableOpacity
               style={styles.countryCodeButton}
               onPress={() => setShowCountryPicker(!showCountryPicker)}>
-              <Text style={styles.flagEmoji}>🇮🇳</Text>
+              <Text style={styles.flagEmoji}>{currentCountry.flag}</Text>
               <Text style={styles.countryCodeText}>{countryCode}</Text>
-              <Text style={styles.dropdownArrow}>▼</Text>
+              <Ionicons 
+                name={showCountryPicker ? "chevron-up" : "chevron-down"} 
+                size={16} 
+                color={theme.colors.textSecondary} 
+              />
             </TouchableOpacity>
 
             {/* Phone Number Input */}
@@ -118,59 +268,62 @@ const PhoneLoginScreen = ({navigation}) => {
                 styles.phoneTextInput,
                 phoneError ? styles.phoneTextInputError : null,
               ]}
-              placeholder="Enter Phone Number"
+              placeholder={`Enter ${currentCountry.length}-digit phone number`}
               placeholderTextColor={theme.colors.textSecondary}
               value={phoneNumber}
               onChangeText={handlePhoneNumberChange}
               keyboardType="numeric"
               autoCapitalize="none"
-              maxLength={10}
+              maxLength={currentCountry.length}
             />
+
+            {/* WhatsApp availability indicator */}
+            {checkingWhatsApp && (
+              <View style={styles.availabilityIndicator}>
+                <ActivityIndicator size="small" color={theme.colors.primary} />
+              </View>
+            )}
+            {whatsappAvailable === true && (
+              <View style={styles.availabilityIndicator}>
+                <Ionicons name="logo-whatsapp" size={20} color="#25D366" />
+              </View>
+            )}
+            {whatsappAvailable === false && phoneNumber.length === currentCountry.length && (
+              <View style={styles.availabilityIndicator}>
+                <Ionicons name="chatbubble-outline" size={18} color={theme.colors.textMuted} />
+              </View>
+            )}
           </View>
 
-          {/* Country Picker Dropdown */}
+          {/* Enhanced Country Picker Dropdown */}
           {showCountryPicker && (
             <View style={styles.countryPickerContainer}>
-              <TouchableOpacity
-                style={styles.countryOption}
-                onPress={() => {
-                  setCountryCode('+91');
-                  setShowCountryPicker(false);
-                }}>
-                <Text style={styles.flagEmoji}>🇮🇳</Text>
-                <Text style={styles.countryName}>India</Text>
-                <Text style={styles.countryCodeOption}>+91</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.countryOption}
-                onPress={() => {
-                  setCountryCode('+1');
-                  setShowCountryPicker(false);
-                }}>
-                <Text style={styles.flagEmoji}>🇺🇸</Text>
-                <Text style={styles.countryName}>United States</Text>
-                <Text style={styles.countryCodeOption}>+1</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.countryOption}
-                onPress={() => {
-                  setCountryCode('+44');
-                  setShowCountryPicker(false);
-                }}>
-                <Text style={styles.flagEmoji}>🇬🇧</Text>
-                <Text style={styles.countryName}>United Kingdom</Text>
-                <Text style={styles.countryCodeOption}>+44</Text>
-              </TouchableOpacity>
+              {countries.map((country, index) => (
+                <TouchableOpacity
+                  key={country.code}
+                  style={[
+                    styles.countryOption,
+                    index === countries.length - 1 && styles.lastCountryOption
+                  ]}
+                  onPress={() => handleCountrySelect(country)}>
+                  <Text style={styles.flagEmoji}>{country.flag}</Text>
+                  <Text style={styles.countryName}>{country.name}</Text>
+                  <Text style={styles.countryCodeOption}>{country.code}</Text>
+                </TouchableOpacity>
+              ))}
             </View>
           )}
 
           {/* Phone Number Counter */}
           <View style={styles.phoneCounterContainer}>
             <Text style={styles.phoneCounter}>
-              {phoneNumber.length}/10 digits
+              {phoneNumber.length}/{currentCountry.length} digits
             </Text>
+            {whatsappAvailable === true && (
+              <Text style={styles.whatsappAvailableText}>
+                <Ionicons name="checkmark-circle" size={14} color="#25D366" /> WhatsApp Available
+              </Text>
+            )}
           </View>
 
           {/* Error Message */}
@@ -181,9 +334,56 @@ const PhoneLoginScreen = ({navigation}) => {
           ) : null}
         </View>
 
+        {/* WhatsApp Only Message */}
+        {phoneNumber.length === currentCountry.length && (
+          <View style={styles.methodSelectionContainer}>
+            <Text style={styles.methodSelectionTitle}>Verification via WhatsApp</Text>
+            
+            <View style={styles.whatsappOnlyContainer}>
+              <View style={styles.whatsappOnlyOption}>
+                <View style={styles.methodIcon}>
+                  <Ionicons name="logo-whatsapp" size={28} color="#25D366" />
+                </View>
+                <View style={styles.methodInfo}>
+                  <Text style={styles.whatsappOnlyTitle}>WhatsApp OTP</Text>
+                  <Text style={styles.whatsappOnlySubtitle}>
+                    Verification code will be sent to your WhatsApp
+                  </Text>
+                </View>
+                <Ionicons name="checkmark-circle" size={20} color="#25D366" />
+              </View>
+              
+              {/* Development Note */}
+              <View style={styles.developmentNote}>
+                <Ionicons name="information-circle" size={16} color={theme.colors.textMuted} />
+                <Text style={styles.developmentNoteText}>
+                  If WhatsApp fails, OTP will be logged in console for development
+                </Text>
+              </View>
+            </View>
+          </View>
+        )}
+
         {/* Send OTP Button */}
-        <TouchableOpacity style={styles.sendOTPButton} onPress={handleSendOTP}>
-          <Text style={styles.sendOTPButtonText}>Send OTP</Text>
+        <TouchableOpacity 
+          style={[
+            styles.sendOTPButton,
+            (isLoading || phoneNumber.length !== currentCountry.length) && styles.sendOTPButtonDisabled
+          ]} 
+          onPress={handleSendOTP}
+          disabled={isLoading || phoneNumber.length !== currentCountry.length}>
+          {isLoading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="small" color="#FFFFFF" />
+              <Text style={styles.sendOTPButtonText}>
+                Sending WhatsApp OTP...
+              </Text>
+            </View>
+          ) : (
+            <Text style={styles.sendOTPButtonText}>
+              Send WhatsApp OTP
+            </Text>
+          )}
         </TouchableOpacity>
 
       </ScrollView>
@@ -289,13 +489,25 @@ const createStyles = theme =>
       borderColor: theme.colors.error,
     },
     phoneCounterContainer: {
-      alignItems: 'flex-end',
-      marginTop: 4,
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginTop: 6,
     },
     phoneCounter: {
-      fontSize: 10,
+      fontSize: 12,
       color: theme.colors.textSecondary,
       fontWeight: '400',
+    },
+    whatsappAvailableText: {
+      fontSize: 12,
+      color: '#25D366',
+      fontWeight: '500',
+    },
+    availabilityIndicator: {
+      paddingHorizontal: 8,
+      justifyContent: 'center',
+      alignItems: 'center',
     },
     errorContainer: {
       marginTop: 4,
@@ -332,6 +544,9 @@ const createStyles = theme =>
       borderBottomWidth: 1,
       borderBottomColor: theme.colors.border,
     },
+    lastCountryOption: {
+      borderBottomWidth: 0,
+    },
     countryName: {
       flex: 1,
       fontSize: 16,
@@ -343,12 +558,75 @@ const createStyles = theme =>
       color: theme.colors.textSecondary,
       fontWeight: '500',
     },
+    methodSelectionContainer: {
+      marginTop: 24,
+      marginBottom: 16,
+    },
+    methodSelectionTitle: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: theme.colors.text,
+      marginBottom: 16,
+      textAlign: 'center',
+    },
+    methodOptionsContainer: {
+      gap: 12,
+    },
+    methodOption: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: 16,
+      borderRadius: 12,
+      borderWidth: 2,
+      borderColor: theme.colors.border,
+      backgroundColor: theme.colors.surface,
+    },
+    selectedMethodOption: {
+      borderColor: theme.colors.primary,
+      backgroundColor: theme.colors.primary + '10',
+    },
+    disabledMethodOption: {
+      opacity: 0.5,
+      backgroundColor: theme.colors.background,
+    },
+    methodIcon: {
+      marginRight: 12,
+    },
+    methodInfo: {
+      flex: 1,
+    },
+    methodTitle: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: theme.colors.text,
+      marginBottom: 2,
+    },
+    methodSubtitle: {
+      fontSize: 14,
+      color: theme.colors.textSecondary,
+    },
+    disabledMethodText: {
+      color: theme.colors.textMuted,
+    },
     sendOTPButton: {
       backgroundColor: theme.colors.primary,
-      borderRadius: 8,
+      borderRadius: 12,
       paddingVertical: 18,
-      marginTop: 30,
+      marginTop: 24,
       marginBottom: 32,
+      shadowColor: theme.colors.primary,
+      shadowOffset: {
+        width: 0,
+        height: 4,
+      },
+      shadowOpacity: 0.3,
+      shadowRadius: 8,
+      elevation: 8,
+    },
+    sendOTPButtonDisabled: {
+      backgroundColor: theme.colors.textMuted,
+      shadowOpacity: 0,
+      elevation: 0,
     },
     sendOTPButtonText: {
       color: '#FFFFFF',
@@ -356,7 +634,57 @@ const createStyles = theme =>
       fontWeight: '600',
       textAlign: 'center',
     },
-
+    loadingContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+    },
+    whatsappOnlyContainer: {
+      gap: 12,
+    },
+    whatsappOnlyOption: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: 16,
+      borderRadius: 12,
+      borderWidth: 2,
+      borderColor: '#25D366',
+      backgroundColor: '#25D366' + '10',
+    },
+    whatsappOnlyTitle: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: theme.colors.text,
+      marginBottom: 2,
+    },
+    whatsappOnlySubtitle: {
+      fontSize: 14,
+      color: theme.colors.textSecondary,
+    },
+    developmentNote: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: 12,
+      backgroundColor: theme.colors.background,
+      borderRadius: 8,
+      gap: 8,
+    },
+    developmentNoteText: {
+      fontSize: 12,
+      color: theme.colors.textMuted,
+      flex: 1,
+    },
+    backToLoginContainer: {
+      alignItems: 'center',
+      marginTop: 20,
+    },
+    backToLoginText: {
+      fontSize: 16,
+      color: theme.colors.primary,
+      fontWeight: '500',
+      textDecorationLine: 'underline',
+    },
   });
 
 export default PhoneLoginScreen;
