@@ -4,6 +4,7 @@ import appScreen from './assets/app-screen.jpeg';
 import logo from './assets/logo.png';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsConditions from './pages/TermsConditions';
+import DeleteAccount from './pages/DeleteAccount';
 
 function HomePage() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
@@ -492,6 +493,7 @@ function App() {
         <Route path="/" element={<HomePage />} />
         <Route path="/privacy-policy" element={<PrivacyPolicy />} />
         <Route path="/terms-conditions" element={<TermsConditions />} />
+        <Route path="/app/delete-account" element={<DeleteAccount />} />
       </Routes>
     </Router>
   );
